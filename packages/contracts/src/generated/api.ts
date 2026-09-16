@@ -21,17 +21,307 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/terminals/enroll": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["enrollTerminal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/terminals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listTerminals"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/pin-unlock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Verify a staff PIN on an enrolled terminal
+         * @description Requires the enrollment credential in X-Terminal-Credential. Failed attempts back off per terminal and presented staff credential; 429 includes Retry-After.
+         */
+        post: operations["pinUnlock"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["refreshSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["logout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getCurrentStaffSession"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/staff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listStaff"];
+        put?: never;
+        post: operations["createStaff"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/staff/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["updateStaff"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listRoles"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/roles/{id}/permissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["replaceRolePermissions"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** Format: uuid */
+        Uuid: string;
         PingResponse: {
             /** @constant */
             ok: true;
         };
+        Terminal: {
+            id: components["schemas"]["Uuid"];
+            location_id: components["schemas"]["Uuid"];
+            name: string;
+            device_profile: string | null;
+            is_active: boolean;
+            version: number;
+        };
+        EnrollTerminalRequest: {
+            location_id: components["schemas"]["Uuid"];
+            name: string;
+            device_profile?: string;
+        };
+        EnrollTerminalResponse: {
+            terminal: components["schemas"]["Terminal"];
+            terminal_credential: string;
+        };
+        TerminalListResponse: {
+            data: components["schemas"]["Terminal"][];
+        };
+        PinUnlockRequest: {
+            staff_id: components["schemas"]["Uuid"];
+            pin: string;
+        };
+        SessionResponse: {
+            token: string;
+            /** Format: date-time */
+            expires_at: string;
+            staff_id: components["schemas"]["Uuid"];
+            location_id: components["schemas"]["Uuid"];
+        };
+        Staff: {
+            id: components["schemas"]["Uuid"];
+            first_name: string;
+            last_name: string;
+            active: boolean;
+            version: number;
+        };
+        StaffListResponse: {
+            data: components["schemas"]["Staff"][];
+        };
+        CreateStaffRequest: {
+            first_name: string;
+            last_name: string;
+            pin: string;
+            role_ids: components["schemas"]["Uuid"][];
+        };
+        UpdateStaffRequest: {
+            first_name?: string;
+            last_name?: string;
+            active?: boolean;
+            pin?: string;
+        };
+        PermissionGrant: {
+            permission_name: string;
+            /** @enum {string} */
+            scope: "organization" | "location";
+        };
+        Role: {
+            id: components["schemas"]["Uuid"];
+            name: string;
+            description: string | null;
+            is_system_template: boolean;
+            permissions: components["schemas"]["PermissionGrant"][];
+        };
+        RoleListResponse: {
+            data: components["schemas"]["Role"][];
+        };
+        ReplaceRolePermissionsRequest: {
+            permissions: components["schemas"]["PermissionGrant"][];
+        };
+        RolePermissionsResponse: {
+            id: components["schemas"]["Uuid"];
+            permissions: components["schemas"]["PermissionGrant"][];
+        };
+        MeResponse: {
+            staff: components["schemas"]["Staff"];
+            location_id: components["schemas"]["Uuid"];
+            terminal_id: components["schemas"]["Uuid"];
+            roles: {
+                id: components["schemas"]["Uuid"];
+                name: string;
+                description: string | null;
+            }[];
+            permissions: string[];
+        };
+        ErrorResponse: {
+            error: {
+                status: number;
+                code: string;
+                message: string;
+                request_id: string;
+                details?: unknown;
+            } & {
+                [key: string]: unknown;
+            };
+        };
+        ConcurrencyConflict: {
+            error: {
+                /** @constant */
+                status: 409;
+                /** @constant */
+                code: "OPTIMISTIC_CONCURRENCY_CONFLICT";
+                message: string;
+                request_id: string;
+                details: {
+                    current_version: number;
+                    current_state: components["schemas"]["Staff"];
+                };
+            };
+        };
     };
-    responses: never;
-    parameters: never;
+    responses: {
+        /** @description API error */
+        Error: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ErrorResponse"];
+            };
+        };
+    };
+    parameters: {
+        /** @description Enrollment credential returned once by terminal enrollment. */
+        TerminalCredential: string;
+    };
     requestBodies: never;
     headers: never;
     pathItems: never;
@@ -56,6 +346,292 @@ export interface operations {
                     "application/json": components["schemas"]["PingResponse"];
                 };
             };
+        };
+    };
+    enrollTerminal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EnrollTerminalRequest"];
+            };
+        };
+        responses: {
+            /** @description Terminal enrolled; credential is returned once */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnrollTerminalResponse"];
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+        };
+    };
+    listTerminals: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Terminals in the authenticated session location */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TerminalListResponse"];
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+        };
+    };
+    pinUnlock: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Enrollment credential returned once by terminal enrollment. */
+                "X-Terminal-Credential": components["parameters"]["TerminalCredential"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PinUnlockRequest"];
+            };
+        };
+        responses: {
+            /** @description New opaque staff session */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionResponse"];
+                };
+            };
+            401: components["responses"]["Error"];
+            /** @description Per-terminal PIN backoff is active */
+            429: {
+                headers: {
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    refreshSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Rotated staff session */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionResponse"];
+                };
+            };
+            401: components["responses"]["Error"];
+        };
+    };
+    logout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Session revoked */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Error"];
+        };
+    };
+    getCurrentStaffSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current staff identity and effective RBAC grants */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeResponse"];
+                };
+            };
+            401: components["responses"]["Error"];
+        };
+    };
+    listStaff: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Staff assigned to current location or organization-wide */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StaffListResponse"];
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+        };
+    };
+    createStaff: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateStaffRequest"];
+            };
+        };
+        responses: {
+            /** @description Staff created and assigned at current location */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Staff"];
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+        };
+    };
+    updateStaff: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Current staff version */
+                "If-Match": string;
+            };
+            path: {
+                id: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateStaffRequest"];
+            };
+        };
+        responses: {
+            /** @description Updated staff */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Staff"];
+                };
+            };
+            /** @description Optimistic concurrency conflict with current staff state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConcurrencyConflict"];
+                };
+            };
+            428: components["responses"]["Error"];
+        };
+    };
+    listRoles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Roles and grants for organization */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleListResponse"];
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+        };
+    };
+    replaceRolePermissions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReplaceRolePermissionsRequest"];
+            };
+        };
+        responses: {
+            /** @description Role permission set replaced */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RolePermissionsResponse"];
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
         };
     };
 }

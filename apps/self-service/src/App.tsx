@@ -428,7 +428,7 @@ function GuestExperience({ locationId, kiosk }: { locationId: string; kiosk: boo
     <main className="app-shell">
       <header>
         <div>
-          <p className="eyebrow">{kiosk ? 'Counter kiosk' : info.data.table?.name}</p>
+          <p className="eyebrow">{kiosk ? 'Counter kiosk' : (info.data.table?.name ?? 'Your table')}</p>
           <h1>{kiosk ? 'Place your order' : 'Order from your table'}</h1>
         </div>
         <ConnectionNotice stale={stale} connected={connected} />

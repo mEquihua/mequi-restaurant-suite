@@ -1935,6 +1935,7 @@ export interface components {
         OverrideReasonRequest: {
             reason: string;
             authorized_by: components["schemas"]["Uuid"];
+            authorized_by_pin?: string;
         };
         DiscountRequest: {
             /** @enum {string} */
@@ -1946,6 +1947,7 @@ export interface components {
         };
         OverrideDiscountRequest: components["schemas"]["DiscountRequest"] & {
             authorized_by: components["schemas"]["Uuid"];
+            authorized_by_pin?: string;
         };
         AccountDiscount: {
             id: components["schemas"]["Uuid"];

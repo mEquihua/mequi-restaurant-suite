@@ -24,7 +24,7 @@ import {
   verifyPin,
 } from './security.js';
 
-const DUMMY_PIN_HASH = '$argon2id$v=19$m=19456,p=1,t=2$WFOhbphr4YF2f5d5cbVt6Q$ZvSA3wsMNnEL1wWs5MfpYFncxBPY4Jw2joqoLxxa7UI';
+export const DUMMY_PIN_HASH = '$argon2id$v=19$m=19456,p=1,t=2$WFOhbphr4YF2f5d5cbVt6Q$ZvSA3wsMNnEL1wWs5MfpYFncxBPY4Jw2joqoLxxa7UI';
 const uuidSchema = { type: 'string', format: 'uuid' } as const;
 const terminalCredentialHeaders = {
   type: 'object',

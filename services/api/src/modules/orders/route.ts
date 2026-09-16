@@ -6,6 +6,15 @@ import {
   IdentityHttpError,
   requirePermission,
   withAuthenticatedSession,
+  lockPinAttempt,
+  recordFailedPinAttempt,
+  resetPinAttempt,
+  findStaff,
+  verifyPin,
+  fingerprintPresentedCredential,
+  retryAfterSeconds,
+  nextFailedPinAttempt,
+  DUMMY_PIN_HASH,
 } from '../identity/index.js';
 import { addOrderLines } from './commands.js';
 import {
@@ -133,8 +142,9 @@ const expected = (value: string | undefined) => {
     );
   return n;
 };
-const fail = (reply: FastifyReply, request: FastifyRequest, error: IdentityHttpError) =>
-  reply
+const fail = (reply: FastifyReply, request: FastifyRequest, error: IdentityHttpError) => {
+  for (const [name, value] of Object.entries(error.headers ?? {})) reply.header(name, value);
+  return reply
     .status(error.statusCode)
     .send({
       error: {
@@ -145,6 +155,7 @@ const fail = (reply: FastifyReply, request: FastifyRequest, error: IdentityHttpE
         ...(error.details === undefined ? {} : { details: error.details }),
       },
     });
+};
 const conflict = (row: { version: number }, state: unknown) =>
   new IdentityHttpError(
     409,
@@ -169,6 +180,7 @@ type DiscountBody = {
   order_line_id?: string;
   reason: string;
   authorized_by?: string;
+  authorized_by_pin?: string;
 };
 
 /** Private HTTP implementation for orders, visits, accounts, and payments. */
@@ -310,6 +322,69 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
       .execute();
     return response;
   }
+
+  async function enforceReauth(actor: Actor, authorizedBy: string | undefined, pin: string | undefined) {
+    if (!authorizedBy)
+      throw new IdentityHttpError(
+        400,
+        'MANAGER_AUTHORIZATION_REQUIRED',
+        'authorized_by is required for an override.',
+      );
+    if (authorizedBy === actor.staffId) return;
+
+    if (!pin)
+      throw new IdentityHttpError(
+        400,
+        'VALIDATION_ERROR',
+        'authorized_by_pin is required when authorizing as a different manager.',
+      );
+
+    const fingerprint = fingerprintPresentedCredential(authorizedBy);
+    const outcome = await app.withLocationTransaction(actor.locationId, async (authTrx) => {
+      const attempt = await lockPinAttempt(authTrx, actor.terminalId, fingerprint);
+      const timestamp = now();
+      const retryAfter = retryAfterSeconds({ failureCount: attempt.failure_count, nextAttemptAt: attempt.next_attempt_at }, timestamp);
+      
+      if (retryAfter !== undefined) {
+        return { kind: 'backoff' as const, retryAfter };
+      }
+
+      const [staff, location] = await Promise.all([
+        findStaff(authTrx, authorizedBy),
+        authTrx.selectFrom('locations').select(['organization_id']).where('id', '=', actor.locationId).executeTakeFirst(),
+      ]);
+      const pinMatches = await verifyPin(staff?.pin_hash ?? DUMMY_PIN_HASH, pin);
+      if (!staff || !location || !staff.active || staff.organization_id !== location.organization_id || !pinMatches) {
+        const next = nextFailedPinAttempt({ failureCount: attempt.failure_count, nextAttemptAt: attempt.next_attempt_at }, timestamp);
+        await recordFailedPinAttempt(authTrx, actor.terminalId, fingerprint, next.failureCount, next.nextAttemptAt!);
+        const seconds = retryAfterSeconds(next, timestamp)!;
+        return { kind: 'invalid-pin' as const, retryAfter: seconds };
+      }
+      
+      await resetPinAttempt(authTrx, actor.terminalId, fingerprint);
+      return { kind: 'success' as const };
+    });
+
+    if (outcome.kind === 'backoff') {
+      throw new IdentityHttpError(
+        429,
+        'PIN_BACKOFF_ACTIVE',
+        'PIN verification is temporarily delayed for this terminal and credential.',
+        { retry_after_seconds: outcome.retryAfter },
+        { 'Retry-After': String(outcome.retryAfter) },
+      );
+    }
+    if (outcome.kind === 'invalid-pin') {
+      throw new IdentityHttpError(
+        401,
+        'AUTHORIZER_PIN_INVALID',
+        'The authorizer PIN is invalid.',
+        undefined,
+        { 'Retry-After': String(outcome.retryAfter) }
+      );
+    }
+  }
+
   async function lineTransition(
     actor: Actor,
     request: FastifyRequest,
@@ -319,6 +394,7 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
     override = false,
     reason?: string,
     authorizedBy?: string,
+    authorizedByPin?: string,
   ) {
     requirePermission(actor, permission);
     const before = await findLine(actor.trx, actor.locationId, lineId);
@@ -331,12 +407,9 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
         'ILLEGAL_ORDER_LINE_STATUS_TRANSITION',
         `Cannot transition order line from ${before.status} to ${to}.`,
       );
-    if (override && !authorizedBy)
-      throw new IdentityHttpError(
-        400,
-        'MANAGER_AUTHORIZATION_REQUIRED',
-        'authorized_by is required for an override.',
-      );
+    if (override) {
+      await enforceReauth(actor, authorizedBy, authorizedByPin);
+    }
     const updated = await actor.trx
       .updateTable('order_lines')
       .set({ status: to, version: sql<number>`version + 1` })
@@ -399,12 +472,9 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
         'ACCOUNT_NOT_OPEN',
         'Discounts require an open or partially paid account.',
       );
-    if (override && !body.authorized_by)
-      throw new IdentityHttpError(
-        400,
-        'MANAGER_AUTHORIZATION_REQUIRED',
-        'authorized_by is required for an override.',
-      );
+    if (override) {
+      await enforceReauth(actor, body.authorized_by, body.authorized_by_pin);
+    }
 
     let line = undefined;
     let targetSubtotal = account.subtotal;
@@ -896,6 +966,7 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
           properties: {
             reason: { type: 'string', minLength: 1, maxLength: 500 },
             authorized_by: uuid,
+            authorized_by_pin: { type: 'string', minLength: 4, maxLength: 12 },
           },
         },
       },
@@ -903,11 +974,12 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
     async (request) =>
       withSession(request, async (actor) => {
         scoped(request, actor);
-        const body = request.body as { reason: string; authorized_by: string };
+        const body = request.body as { reason: string; authorized_by: string; authorized_by_pin?: string };
         const before = await findLine(
           actor.trx,
           actor.locationId,
           (request.params as { lineId: string }).lineId,
+
         );
         if (!before || !['PREPARING', 'READY', 'FULFILLED'].includes(before.status))
           throw new IdentityHttpError(
@@ -924,6 +996,7 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
           true,
           body.reason,
           body.authorized_by,
+          body.authorized_by_pin,
         );
       }),
   );
@@ -935,7 +1008,7 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
     if (!order) throw new IdentityHttpError(404, 'NOT_FOUND', 'Order was not found.');
     const v = expected(request.headers['if-match']);
     if (v !== order.version) throw conflict(order, order);
-    const body = request.body as { reason: string; authorized_by?: string };
+    const body = request.body as { reason: string; authorized_by?: string; authorized_by_pin?: string };
     const lines = await actor.trx
       .selectFrom('order_lines')
       .selectAll()
@@ -950,12 +1023,9 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
         'ROUTINE_CANCEL_NOT_ALLOWED',
         'Routine cancellation is legal only before any line is sent.',
       );
-    if (override && !body.authorized_by)
-      throw new IdentityHttpError(
-        400,
-        'MANAGER_AUTHORIZATION_REQUIRED',
-        'authorized_by is required for an override.',
-      );
+    if (override) {
+      await enforceReauth(actor, body.authorized_by, body.authorized_by_pin);
+    }
     for (const line of lines.filter((line) => !terminalLine(line.status))) {
       const postPrep = ['PREPARING', 'READY', 'FULFILLED'].includes(line.status);
       const status = postPrep ? 'VOIDED' : 'CANCELLED';
@@ -1018,7 +1088,11 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
       type: 'object',
       additionalProperties: false,
       required: override ? ['reason', 'authorized_by'] : ['reason'],
-      properties: { reason: { type: 'string', minLength: 1, maxLength: 500 }, authorized_by: uuid },
+      properties: {
+        reason: { type: 'string', minLength: 1, maxLength: 500 },
+        authorized_by: uuid,
+        authorized_by_pin: { type: 'string', minLength: 4, maxLength: 12 },
+      },
     },
   });
   app.post(
@@ -1155,6 +1229,7 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
         order_line_id: uuid,
         reason: { type: 'string', minLength: 1, maxLength: 500 },
         authorized_by: uuid,
+        authorized_by_pin: { type: 'string', minLength: 4, maxLength: 12 },
       },
     },
   });

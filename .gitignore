@@ -28,6 +28,11 @@ dist/
 build/
 .next/
 out/
+coverage/
+*.tsbuildinfo
+
+# Package-manager artifacts
+.pnpm-store/
 
 # Docker
 *.env.local

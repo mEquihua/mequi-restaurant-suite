@@ -1,0 +1,14 @@
+import type { FastifyPluginAsync } from 'fastify';
+import { ordersRoute, type OrdersRouteOptions } from './route.js';
+export const ordersModule: FastifyPluginAsync<OrdersRouteOptions> = async (app, options) => {
+  await app.register(ordersRoute, options);
+};
+export type { OrdersRouteOptions } from './route.js';
+export {
+  canTransitionLineStatus,
+  lineStatuses,
+  splitEqually,
+  resolveLinePrice,
+  lineAmount,
+  type LineStatus,
+} from './state.js';

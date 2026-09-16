@@ -5,6 +5,7 @@ import { identityModule, type IdentityRouteOptions } from './modules/identity/in
 import { menuModule, type MenuRouteOptions } from './modules/menu/index.js';
 import { floorModule, type FloorRouteOptions } from './modules/floor/index.js';
 import { moduleCenterModule, type ModuleCenterRouteOptions } from './modules/module-center/index.js';
+import { ordersModule, type OrdersRouteOptions } from './modules/orders/index.js';
 import { pingModule } from './modules/ping/index.js';
 
 export interface AppOptions {
@@ -14,6 +15,7 @@ export interface AppOptions {
   menu?: MenuRouteOptions;
   floor?: FloorRouteOptions;
   moduleCenter?: ModuleCenterRouteOptions;
+  orders?: OrdersRouteOptions;
 }
 
 /** Creates the HTTP application without binding a network port. */
@@ -48,6 +50,7 @@ export function createApp(options: AppOptions = {}): FastifyInstance {
   app.register(menuModule, options.menu ?? {});
   app.register(floorModule, options.floor ?? {});
   app.register(moduleCenterModule, options.moduleCenter ?? {});
+  app.register(ordersModule, options.orders ?? {});
 
   return app;
 }

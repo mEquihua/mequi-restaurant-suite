@@ -150,11 +150,12 @@ function TableDetails({ locationId, visitId, products, onBack, onClose }: { loca
         orderId = order.id;
         orderVersion = order.version;
         
-        const accountRes = await apiFetch<{ account: Account }>(`/api/v1/locations/${locationId}/visits/${visitId}/accounts`, {
+        // Account creation does not touch the visit's own version, unlike
+        // order creation above, so currentVisitVersion is not incremented.
+        const account = await apiFetch<Account>(`/api/v1/locations/${locationId}/visits/${visitId}/accounts`, {
           method: 'POST', headers: { 'If-Match': `"${currentVisitVersion}"` }, body: JSON.stringify({})
         });
-        currentVisitVersion++;
-        accountId = accountRes.account.id;
+        accountId = account.id;
       }
 
       const addLinesRes = await apiFetch<{ order: Order, lines: components['schemas']['OrderLine'][] }>(`/api/v1/locations/${locationId}/orders/${orderId}/lines`, {
@@ -193,9 +194,13 @@ function TableDetails({ locationId, visitId, products, onBack, onClose }: { loca
     try {
       setUiError(null);
       if (activeAccount) {
+        // Re-fetch the account for its server-computed total (never trust a
+        // client-side total) and current version, since it may have changed
+        // since the visit was last loaded (e.g. lines added and sent above).
+        const currentAccount = await apiFetch<Account>(`/api/v1/locations/${locationId}/accounts/${activeAccount.id}`);
         await apiFetch<unknown>(`/api/v1/locations/${locationId}/accounts/${activeAccount.id}/payments`, {
-          method: 'POST', headers: { 'If-Match': `"${activeAccount.version}"`, 'Idempotency-Key': crypto.randomUUID() },
-          body: JSON.stringify({ amount: 0, tender_type: 'CASH' })
+          method: 'POST', headers: { 'If-Match': `"${currentAccount.version}"`, 'Idempotency-Key': crypto.randomUUID() },
+          body: JSON.stringify({ amount: currentAccount.total, method: 'CASH' })
         });
       }
       await apiFetch<unknown>(`/api/v1/locations/${locationId}/visits/${visitId}/close`, {

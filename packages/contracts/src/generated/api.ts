@@ -681,6 +681,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/locations/{locationId}/order-lines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listOrderLines"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/locations/{locationId}/orders/{orderId}/lines": {
         parameters: {
             query?: never;
@@ -3311,6 +3327,40 @@ export interface operations {
             401: components["responses"]["Error"];
             403: components["responses"]["Error"];
             404: components["responses"]["Error"];
+        };
+    };
+    listOrderLines: {
+        parameters: {
+            query?: {
+                status?: string;
+            };
+            header?: never;
+            path: {
+                locationId: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of order lines with extra kitchen metadata */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: (components["schemas"]["OrderLine"] & {
+                            modifiers?: {
+                                modifier_id?: components["schemas"]["Uuid"];
+                            }[];
+                            visit_id?: components["schemas"]["Uuid"];
+                            table_id?: string | null;
+                            /** Format: date-time */
+                            order_created_at?: string;
+                        })[];
+                    };
+                };
+            };
         };
     };
     addOrderLines: {

@@ -1879,4 +1879,55 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
         return { ...account, payments, cancellations_and_voids: voids };
       }),
   );
+
+  app.get(
+    '/api/v1/locations/:locationId/order-lines',
+    {
+      schema: {
+        params: locationParams,
+        querystring: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            status: { type: 'string' },
+          },
+        },
+      },
+    },
+    async (request) =>
+      withSession(request, async (actor) => {
+        requirePermission(actor, 'kitchen.tickets.read');
+        const locationId = scoped(request, actor);
+        const { status } = request.query as { status?: string };
+        
+        let query = actor.trx
+          .selectFrom('order_lines as ol')
+          .innerJoin('orders as o', 'o.id', 'ol.order_id')
+          .innerJoin('visits as v', 'v.id', 'o.visit_id')
+          .selectAll('ol')
+          .select(['o.visit_id', 'v.table_id', 'o.created_at as order_created_at'])
+          .where('v.location_id', '=', locationId);
+          
+        if (status) {
+          const statuses = status.split(',');
+          query = query.where('ol.status', 'in', statuses as ("DRAFT" | "HELD" | "SENT" | "PREPARING" | "READY" | "FULFILLED" | "CANCELLED" | "VOIDED")[]);
+        }
+        
+        const lines = await query.execute();
+        
+        const modifierRows = lines.length ? await actor.trx
+          .selectFrom('order_line_modifiers')
+          .selectAll()
+          .where('order_line_id', 'in', lines.map(l => l.id))
+          .execute() : [];
+          
+        const linesWithModifiers = lines.map(line => ({
+          ...line,
+          modifiers: modifierRows.filter(m => m.order_line_id === line.id)
+        }));
+        
+        return { data: linesWithModifiers };
+      }),
+  );
+
 };

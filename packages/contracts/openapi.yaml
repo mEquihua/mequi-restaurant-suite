@@ -1189,6 +1189,52 @@ paths:
           '403': { $ref: '#/components/responses/Error' },
           '404': { $ref: '#/components/responses/Error' },
         }
+  /api/v1/locations/{locationId}/order-lines:
+    get:
+      operationId: listOrderLines
+      x-required-permission: kitchen.tickets.read
+      security: [{ staffSession: [] }]
+      parameters:
+        [
+          {
+            name: locationId,
+            in: path,
+            required: true,
+            schema: { $ref: '#/components/schemas/Uuid' },
+          },
+          {
+            name: status,
+            in: query,
+            required: false,
+            schema: { type: string },
+          },
+        ]
+      responses:
+        '200':
+          description: List of order lines with extra kitchen metadata
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      allOf:
+                        - $ref: '#/components/schemas/OrderLine'
+                        - type: object
+                          properties:
+                            modifiers:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  modifier_id: { $ref: '#/components/schemas/Uuid' }
+                            visit_id: { $ref: '#/components/schemas/Uuid' }
+                            table_id: { type: [string, "null"] }
+                            order_created_at: { type: string, format: date-time }
+
   /api/v1/locations/{locationId}/orders/{orderId}/lines:
     post:
       operationId: addOrderLines

@@ -527,6 +527,19 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
               'INVALID_TABLE',
               'Table does not belong to this location.',
             );
+          if (table.status !== 'AVAILABLE')
+            throw new IdentityHttpError(
+              409,
+              'TABLE_NOT_AVAILABLE',
+              'Table is not available.',
+            );
+          const updatedTable = await actor.trx
+            .updateTable('tables')
+            .set({ status: 'OCCUPIED', version: sql<number>`version + 1` })
+            .where('id', '=', body.table_id)
+            .where('version', '=', table.version)
+            .executeTakeFirst();
+          if (!updatedTable) throw conflict(table, table);
         }
         const visit = await actor.trx
           .insertInto('visits')
@@ -1686,7 +1699,178 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
           .returningAll()
           .executeTakeFirst();
         if (!updated) throw conflict(visit, visit);
+
+        if (updated.table_id) {
+          const table = await actor.trx
+            .selectFrom('tables')
+            .selectAll()
+            .where('id', '=', updated.table_id)
+            .executeTakeFirst();
+          if (table && table.status === 'OCCUPIED') {
+            const updatedTable = await actor.trx
+              .updateTable('tables')
+              .set({ status: 'NEEDS_CLEANING', version: sql<number>`version + 1` })
+              .where('id', '=', updated.table_id)
+              .where('version', '=', table.version)
+              .executeTakeFirst();
+            if (!updatedTable) throw conflict(table, table);
+          }
+        }
         return updated;
+      }),
+  );
+  app.get(
+    '/api/v1/locations/:locationId/visits',
+    {
+      schema: {
+        params: locationParams,
+        querystring: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            status: { type: 'string', enum: ['OPEN', 'COMPLETED', 'CANCELLED'] },
+            table_id: uuid,
+          },
+        },
+      },
+    },
+    async (request) =>
+      withSession(request, async (actor) => {
+        requirePermission(actor, 'orders.visits.read_all');
+        const locationId = scoped(request, actor);
+        let query = actor.trx
+          .selectFrom('visits')
+          .selectAll()
+          .where('location_id', '=', locationId)
+          .orderBy('created_at', 'desc');
+
+        const { status, table_id } = request.query as { status?: string; table_id?: string };
+        if (status) query = query.where('status', '=', status);
+        if (table_id) query = query.where('table_id', '=', table_id);
+
+        return { data: await query.execute() };
+      }),
+  );
+
+  app.get(
+    '/api/v1/locations/:locationId/visits/:visitId',
+    {
+      schema: {
+        params: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['locationId', 'visitId'],
+          properties: { locationId: uuid, visitId: uuid },
+        },
+      },
+    },
+    async (request) =>
+      withSession(request, async (actor) => {
+        requirePermission(actor, 'orders.visits.read_all');
+        const locationId = scoped(request, actor);
+        const visitId = (request.params as { visitId: string }).visitId;
+        
+        const visit = await findVisit(actor.trx, locationId, visitId);
+        if (!visit) throw new IdentityHttpError(404, 'NOT_FOUND', 'Visit was not found.');
+        
+        const orders = await actor.trx
+          .selectFrom('orders')
+          .select(['id', 'status', 'version'])
+          .where('visit_id', '=', visitId)
+          .execute();
+          
+        const accounts = await actor.trx
+          .selectFrom('accounts')
+          .select(['id', 'status', 'total', 'version'])
+          .where('visit_id', '=', visitId)
+          .execute();
+          
+        return { ...visit, orders, accounts };
+      }),
+  );
+
+  app.get(
+    '/api/v1/locations/:locationId/orders/:orderId',
+    {
+      schema: {
+        params: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['locationId', 'orderId'],
+          properties: { locationId: uuid, orderId: uuid },
+        },
+      },
+    },
+    async (request) =>
+      withSession(request, async (actor) => {
+        requirePermission(actor, 'orders.visits.read_all');
+        const locationId = scoped(request, actor);
+        const orderId = (request.params as { orderId: string }).orderId;
+        
+        const order = await findOrder(actor.trx, locationId, orderId);
+        if (!order) throw new IdentityHttpError(404, 'NOT_FOUND', 'Order was not found.');
+        
+        const lines = await actor.trx
+          .selectFrom('order_lines')
+          .selectAll()
+          .where('order_id', '=', orderId)
+          .execute();
+          
+        const modifierRows = lines.length ? await actor.trx
+          .selectFrom('order_line_modifiers')
+          .selectAll()
+          .where('order_line_id', 'in', lines.map(l => l.id))
+          .execute() : [];
+          
+        const linesWithModifiers = lines.map(line => ({
+          ...line,
+          modifiers: modifierRows.filter(m => m.order_line_id === line.id)
+        }));
+        
+        return { ...order, order_lines: linesWithModifiers };
+      }),
+  );
+
+  app.get(
+    '/api/v1/locations/:locationId/accounts/:accountId',
+    {
+      schema: {
+        params: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['locationId', 'accountId'],
+          properties: { locationId: uuid, accountId: uuid },
+        },
+      },
+    },
+    async (request) =>
+      withSession(request, async (actor) => {
+        requirePermission(actor, 'orders.visits.read_all');
+        const locationId = scoped(request, actor);
+        const accountId = (request.params as { accountId: string }).accountId;
+        
+        const account = await findAccount(actor.trx, locationId, accountId);
+        if (!account) throw new IdentityHttpError(404, 'NOT_FOUND', 'Account was not found.');
+        
+        const payments = await actor.trx
+          .selectFrom('payments')
+          .selectAll()
+          .where('account_id', '=', accountId)
+          .execute();
+          
+        const lines = await actor.trx
+          .selectFrom('order_lines')
+          .select('id')
+          .where('account_id', '=', accountId)
+          .execute();
+          
+        const voids = lines.length ? await actor.trx
+          .selectFrom('cancellations_and_voids')
+          .selectAll()
+          .where('order_line_id', 'in', lines.map(l => l.id))
+          .execute() : [];
+          
+        return { ...account, payments, cancellations_and_voids: voids };
       }),
   );
 };

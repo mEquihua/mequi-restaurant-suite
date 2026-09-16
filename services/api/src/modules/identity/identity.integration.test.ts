@@ -271,6 +271,25 @@ describeIntegration('identity API against PostgreSQL', () => {
     );
   });
 
+  it('commits a new role before the HTTP response returns, with no read-after-write delay needed', async () => {
+    // Regression test for a response-before-commit race: reply.send() called
+    // from inside the transaction callback could complete before the
+    // wrapping transaction actually reached COMMIT, so a client reading the
+    // row via a separate connection immediately after a success response
+    // could see it missing. Deliberately reads via `db` (a separate
+    // connection from the app's own pool) with zero delay.
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/v1/roles',
+      headers: { authorization: `Bearer ${ownerSession}` },
+      payload: { name: 'Host' },
+    });
+    expect(created.statusCode).toBe(201);
+    const row = await db.selectFrom('roles').selectAll().where('id', '=', created.json().id).executeTakeFirst();
+    expect(row).toBeTruthy();
+    expect(row?.name).toBe('Host');
+  });
+
   it('creates a custom role', async () => {
     const noAuth = await app.inject({
       method: 'POST',

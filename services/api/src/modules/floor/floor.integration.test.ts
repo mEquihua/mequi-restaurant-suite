@@ -185,6 +185,25 @@ describeIntegration('floor API against PostgreSQL', () => {
     expect(assigned.json().table_ids).toEqual([tableA]);
   });
 
+  it('commits a new area before the HTTP response returns, with no read-after-write delay needed', async () => {
+    // Regression test for a response-before-commit race: reply.send() called
+    // from inside the transaction callback could complete before the
+    // wrapping transaction actually reached COMMIT, so a client reading the
+    // row via a separate connection immediately after a success response
+    // could see it missing. Deliberately reads via `db` (a separate
+    // connection from the app's own pool) with zero delay.
+    const area = await app.inject({
+      method: 'POST',
+      url: `/api/v1/locations/${locationA}/areas`,
+      headers: auth(sessionA),
+      payload: { name: 'Rooftop' },
+    });
+    expect(area.statusCode).toBe(201);
+    const row = await db.selectFrom('areas').selectAll().where('id', '=', area.json().id).executeTakeFirst();
+    expect(row).toBeTruthy();
+    expect(row?.name).toBe('Rooftop');
+  });
+
   it('moves a table with optimistic concurrency', async () => {
     const current = await db
       .selectFrom('tables')

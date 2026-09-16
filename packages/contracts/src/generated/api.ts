@@ -1445,6 +1445,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/organizations/{org_id}/locations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List an organization's locations (public — no auth required) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    org_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Locations for this organization */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["LocationListResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/organizations/{org_id}/customer-sessions": {
         parameters: {
             query?: never;
@@ -2409,6 +2447,16 @@ export interface components {
             cancellations_and_voids?: {
                 [key: string]: unknown;
             }[];
+        };
+        Location: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            address?: string | null;
+            timezone: string;
+        };
+        LocationListResponse: {
+            data: components["schemas"]["Location"][];
         };
         Customer: {
             /** Format: uuid */

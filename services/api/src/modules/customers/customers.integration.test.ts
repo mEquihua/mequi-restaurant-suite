@@ -76,6 +76,12 @@ describeIntegration('customer accounts and online ordering against PostgreSQL', 
     await db.destroy();
   });
 
+  it('lists an organization\'s locations with no auth required', async () => {
+    const res = await app.inject({ method: 'GET', url: `/api/v1/organizations/${organization}/locations` });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().data.some((loc: { id: string }) => loc.id === location)).toBe(true);
+  });
+
   it('registers a customer and logs in', async () => {
     const reg = await app.inject({
       method: 'POST',

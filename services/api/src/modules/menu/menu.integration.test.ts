@@ -152,6 +152,25 @@ describeIntegration('menu API against PostgreSQL', () => {
     await db.destroy();
   });
 
+  it('commits a new category before the HTTP response returns, with no read-after-write delay needed', async () => {
+    // Regression test for a response-before-commit race: reply.send() called
+    // from inside the transaction callback could complete before the
+    // wrapping transaction actually reached COMMIT, so a client reading the
+    // row via a separate connection immediately after a success response
+    // could see it missing. Deliberately reads via `db` (a separate
+    // connection from the app's own pool) with zero delay.
+    const category = await app.inject({
+      method: 'POST',
+      url: '/api/v1/categories',
+      headers: auth(sessionA),
+      payload: { name: 'Drinks' },
+    });
+    expect(category.statusCode).toBe(201);
+    const row = await db.selectFrom('categories').selectAll().where('id', '=', category.json().id).executeTakeFirst();
+    expect(row).toBeTruthy();
+    expect(row?.name).toBe('Drinks');
+  });
+
   it('creates a category, product, modifier group, and combo', async () => {
     const category = await app.inject({
       method: 'POST',

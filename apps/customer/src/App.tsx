@@ -1,11 +1,750 @@
-import { Button } from '@restaurant-suite/ui-primitives';
-import { tokens } from '@restaurant-suite/ui-tokens';
+import { QueryClient, QueryClientProvider, useMutation, useQuery } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
+import { BrowserRouter, Link, Route, Routes, useNavigate, useParams } from 'react-router-dom';
+import {
+  ApiError,
+  LOCATION_HOURS,
+  ORGANIZATION_ID,
+  apiFetch,
+  clearCustomerToken,
+  getCustomerToken,
+  setCustomerToken,
+  type Category,
+  type Customer,
+  type Location,
+  type OnlineCheckoutRequest,
+  type OnlineCheckoutResponse,
+  type OnlineOrderDetail,
+  type Product,
+} from './api.js';
+import { cartItemPrice, cartTotal, requiresDeliveryAddress, type CartItem } from './logic.js';
+
+const queryClient = new QueryClient();
+const money = (amount: number) =>
+  new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(amount / 100);
+type StoredOrder = { id: string; locationId: string; orderToken: string | null; createdAt: string };
+const historyKey = (customer?: Customer | null) =>
+  `customer-online-orders:${ORGANIZATION_ID}:${customer?.id ?? 'guest'}`;
+const readOrders = (customer?: Customer | null): StoredOrder[] => {
+  try {
+    return JSON.parse(localStorage.getItem(historyKey(customer)) ?? '[]') as StoredOrder[];
+  } catch {
+    return [];
+  }
+};
+const storeOrder = (order: StoredOrder, customer?: Customer | null) => {
+  const current = readOrders(customer).filter((item) => item.id !== order.id);
+  localStorage.setItem(historyKey(customer), JSON.stringify([order, ...current].slice(0, 20)));
+};
+const onlineOrderPath = (locationId: string, orderId: string, orderToken?: string | null) =>
+  `/api/v1/locations/${locationId}/online-orders/${orderId}${orderToken ? `?order_token=${encodeURIComponent(orderToken)}` : ''}`;
+
+function ErrorMessage({ error }: { error: unknown }) {
+  const apiError = error as ApiError;
+  return <p className="error">{apiError.message || 'Something went wrong. Please try again.'}</p>;
+}
+
+function LocationGate({ children }: { children: (location: Location) => React.ReactNode }) {
+  const [locationId, setLocationId] = useState(() =>
+    localStorage.getItem(`customer-location:${ORGANIZATION_ID}`),
+  );
+  const locations = useQuery({
+    queryKey: ['customer-locations', ORGANIZATION_ID],
+    queryFn: () =>
+      apiFetch<{ data: Location[] }>(`/api/v1/organizations/${ORGANIZATION_ID}/locations`),
+    enabled: Boolean(ORGANIZATION_ID),
+  });
+  useEffect(() => {
+    if (locations.data?.data.length === 1 && !locationId) setLocationId(locations.data.data[0].id);
+  }, [locationId, locations.data]);
+  if (!ORGANIZATION_ID)
+    return (
+      <main className="centered">
+        <h1>Restaurant setup needed</h1>
+        <p>Set VITE_ORGANIZATION_ID for this installation.</p>
+      </main>
+    );
+  if (locations.isPending)
+    return (
+      <main className="centered">
+        <h1>Finding locations…</h1>
+      </main>
+    );
+  if (locations.isError)
+    return (
+      <main className="centered">
+        <h1>We could not load locations</h1>
+        <ErrorMessage error={locations.error} />
+      </main>
+    );
+  const selected = locations.data?.data.find((location) => location.id === locationId);
+  if (!selected)
+    return (
+      <main className="centered location-picker">
+        <h1>Choose your location</h1>
+        <p>Start with the restaurant you want to order from.</p>
+        {locations.data?.data.map((location) => (
+          <button
+            key={location.id}
+            onClick={() => {
+              localStorage.setItem(`customer-location:${ORGANIZATION_ID}`, location.id);
+              setLocationId(location.id);
+            }}
+          >
+            <strong>{location.name}</strong>
+            <span>{location.address ?? location.timezone}</span>
+          </button>
+        ))}
+      </main>
+    );
+  return <>{children(selected)}</>;
+}
+
+function Header({
+  location,
+  customer,
+  cartCount,
+  onSignOut,
+}: {
+  location: Location;
+  customer?: Customer | null;
+  cartCount: number;
+  onSignOut: () => void;
+}) {
+  return (
+    <header>
+      <Link className="brand" to="/">
+        {location.name}
+      </Link>
+      <nav>
+        <Link to="/">Menu</Link>
+        <Link to="/history">Orders</Link>
+        <Link to="/checkout">Cart ({cartCount})</Link>
+        {customer ? (
+          <button className="link-button" onClick={onSignOut}>
+            Sign out
+          </button>
+        ) : (
+          <Link to="/login">Sign in</Link>
+        )}
+      </nav>
+    </header>
+  );
+}
+
+function ProductDialog({
+  product,
+  onClose,
+  onAdd,
+}: {
+  product: Product;
+  onClose: () => void;
+  onAdd: (item: CartItem) => void;
+}) {
+  const [modifierIds, setModifierIds] = useState<string[]>([]);
+  const activeModifierGroups = product.modifier_groups.filter((group) => group.is_active);
+  const valid =
+    activeModifierGroups.filter((group) => {
+      const selected = group.modifiers.filter((modifier) =>
+        modifierIds.includes(modifier.id),
+      ).length;
+      return (
+        selected >= group.min_selections &&
+        (group.max_selections === null || selected <= group.max_selections)
+      );
+    }).length === product.modifier_groups.length;
+  const toggle = (id: string, group: Product['modifier_groups'][number]) =>
+    setModifierIds((current) => {
+      if (current.includes(id)) return current.filter((item) => item !== id);
+      const selected = group.modifiers.filter((modifier) => current.includes(modifier.id)).length;
+      return group.max_selections !== null && selected >= group.max_selections
+        ? current
+        : [...current, id];
+    });
+  return (
+    <div className="dialog-backdrop">
+      <section className="dialog" role="dialog" aria-modal="true" aria-labelledby="product-title">
+        <button className="close" onClick={onClose} aria-label="Close">
+          ×
+        </button>
+        <h2 id="product-title">{product.name}</h2>
+        <p>{product.description}</p>
+        {product.variants.length > 0 && (
+          <p className="muted">Sizes are not available for online ordering yet.</p>
+        )}
+        {activeModifierGroups.map((group) => (
+          <fieldset key={group.id}>
+            <legend>
+              {group.name}{' '}
+              {group.min_selections > 0 ? `(choose at least ${group.min_selections})` : ''}
+            </legend>
+            {group.modifiers
+              .filter((modifier) => modifier.is_active)
+              .map((modifier) => (
+                <label key={modifier.id}>
+                  <input
+                    type="checkbox"
+                    checked={modifierIds.includes(modifier.id)}
+                    onChange={() => toggle(modifier.id, group)}
+                  />{' '}
+                  {modifier.name}
+                  {modifier.price_adjustment ? ` (+${money(modifier.price_adjustment)})` : ''}
+                </label>
+              ))}
+          </fieldset>
+        ))}
+        <button
+          className="primary"
+          disabled={!valid}
+          onClick={() => onAdd({ product, quantity: 1, modifierIds })}
+        >
+          Add to cart · {money(cartItemPrice({ product, quantity: 1, modifierIds }))}
+        </button>
+      </section>
+    </div>
+  );
+}
+
+function Menu({
+  location,
+  setCart,
+}: {
+  location: Location;
+  setCart: React.Dispatch<React.SetStateAction<CartItem[]>>;
+}) {
+  const [fulfillment, setFulfillment] = useState<'PICKUP' | 'DELIVERY'>('PICKUP');
+  const [category, setCategory] = useState('all');
+  const [selected, setSelected] = useState<Product | null>(null);
+  const categories = useQuery({
+    queryKey: ['categories', location.id],
+    queryFn: () => apiFetch<{ data: Category[] }>(`/api/v1/categories?location_id=${location.id}`),
+  });
+  const products = useQuery({
+    queryKey: ['products', location.id, fulfillment],
+    queryFn: () =>
+      apiFetch<{ data: Product[] }>(
+        `/api/v1/products?location_id=${location.id}&channel=${fulfillment}&service_type=${fulfillment}`,
+      ),
+  });
+  const visible = (products.data?.data ?? []).filter(
+    (product) =>
+      product.is_active &&
+      product.availability.available &&
+      (category === 'all' || product.category_id === category),
+  );
+  return (
+    <main>
+      <section className="hero">
+        <p className="eyebrow">Order ahead</p>
+        <h1>Good food, on your schedule.</h1>
+        <p>{location.address ?? `Serving ${location.name}`}</p>
+        <p>Hours: {LOCATION_HOURS}</p>
+        <div className="toggle">
+          <button
+            className={fulfillment === 'PICKUP' ? 'active' : ''}
+            onClick={() => setFulfillment('PICKUP')}
+          >
+            Pickup
+          </button>
+          <button
+            className={fulfillment === 'DELIVERY' ? 'active' : ''}
+            onClick={() => setFulfillment('DELIVERY')}
+          >
+            Delivery
+          </button>
+        </div>
+      </section>
+      <section>
+        <h2>Menu</h2>
+        <div className="category-tabs">
+          <button className={category === 'all' ? 'active' : ''} onClick={() => setCategory('all')}>
+            All
+          </button>
+          {(categories.data?.data ?? [])
+            .filter((item) => item.is_active)
+            .map((item) => (
+              <button
+                className={category === item.id ? 'active' : ''}
+                key={item.id}
+                onClick={() => setCategory(item.id)}
+              >
+                {item.name}
+              </button>
+            ))}
+        </div>
+        {products.isPending && <p>Loading menu…</p>}
+        {products.isError && <ErrorMessage error={products.error} />}
+        <div className="product-grid">
+          {visible.map((product) => (
+            <button className="product-card" key={product.id} onClick={() => setSelected(product)}>
+              {product.photo_url && <img src={product.photo_url} alt="" />}
+              <strong>{product.name}</strong>
+              <span>{product.description}</span>
+              <b>{money(product.price)}</b>
+            </button>
+          ))}
+        </div>
+        {!products.isPending && visible.length === 0 && (
+          <p>No items are currently available for {fulfillment.toLowerCase()}.</p>
+        )}
+      </section>
+      {selected && (
+        <ProductDialog
+          product={selected}
+          onClose={() => setSelected(null)}
+          onAdd={(item) => {
+            setCart((current) => [...current, item]);
+            setSelected(null);
+          }}
+        />
+      )}
+    </main>
+  );
+}
+
+function AuthScreen({
+  mode,
+  onAuthenticated,
+}: {
+  mode: 'login' | 'register';
+  onAuthenticated: () => void;
+}) {
+  const navigate = useNavigate();
+  const mutation = useMutation({
+    mutationFn: async (form: HTMLFormElement) => {
+      const data = new FormData(form);
+      if (mode === 'register')
+        await apiFetch(`/api/v1/organizations/${ORGANIZATION_ID}/customers`, {
+          method: 'POST',
+          body: JSON.stringify({
+            name: data.get('name'),
+            email: data.get('email'),
+            phone: data.get('phone') || undefined,
+            password: data.get('password'),
+          }),
+        });
+      return apiFetch<{ token: string }>(
+        `/api/v1/organizations/${ORGANIZATION_ID}/customer-sessions`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ email: data.get('email'), password: data.get('password') }),
+        },
+      );
+    },
+    onSuccess: ({ token }) => {
+      setCustomerToken(token);
+      onAuthenticated();
+      navigate('/');
+    },
+  });
+  return (
+    <main className="narrow">
+      <h1>{mode === 'login' ? 'Welcome back' : 'Create an account'}</h1>
+      <p>
+        {mode === 'login'
+          ? 'Sign in to keep your orders together.'
+          : 'An account is optional; you can also check out as a guest.'}
+      </p>
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          mutation.mutate(event.currentTarget);
+        }}
+      >
+        {mode === 'register' && (
+          <>
+            <label>
+              Name
+              <input name="name" required maxLength={200} />
+            </label>
+            <label>
+              Phone <input name="phone" maxLength={40} />
+            </label>
+          </>
+        )}
+        <label>
+          Email
+          <input name="email" type="email" required />
+        </label>
+        <label>
+          Password
+          <input name="password" type="password" minLength={mode === 'register' ? 8 : 1} required />
+        </label>
+        {mutation.isError && <ErrorMessage error={mutation.error} />}
+        <button className="primary" disabled={mutation.isPending}>
+          {mutation.isPending ? 'Please wait…' : mode === 'login' ? 'Sign in' : 'Create account'}
+        </button>
+      </form>
+      <p>
+        {mode === 'login' ? (
+          <>
+            New here? <Link to="/register">Create an account</Link>
+          </>
+        ) : (
+          <>
+            Already have an account? <Link to="/login">Sign in</Link>
+          </>
+        )}
+      </p>
+    </main>
+  );
+}
+
+function Cart({
+  cart,
+  setCart,
+}: {
+  cart: CartItem[];
+  setCart: React.Dispatch<React.SetStateAction<CartItem[]>>;
+}) {
+  return (
+    <aside className="cart">
+      <h2>Your order</h2>
+      {cart.map((item, index) => (
+        <div className="cart-line" key={`${item.product.id}-${index}`}>
+          <span>
+            <strong>{item.product.name}</strong>
+            <small>
+              {item.modifierIds
+                .map(
+                  (id) =>
+                    item.product.modifier_groups
+                      .flatMap((group) => group.modifiers)
+                      .find((modifier) => modifier.id === id)?.name,
+                )
+                .filter(Boolean)
+                .join(', ')}
+            </small>
+          </span>
+          <span>
+            <button
+              onClick={() =>
+                setCart((items) =>
+                  items.map((line, i) =>
+                    i === index ? { ...line, quantity: Math.max(1, line.quantity - 1) } : line,
+                  ),
+                )
+              }
+            >
+              −
+            </button>{' '}
+            {item.quantity}{' '}
+            <button
+              onClick={() =>
+                setCart((items) =>
+                  items.map((line, i) =>
+                    i === index ? { ...line, quantity: line.quantity + 1 } : line,
+                  ),
+                )
+              }
+            >
+              +
+            </button>
+            <button
+              aria-label={`Remove ${item.product.name}`}
+              onClick={() => setCart((items) => items.filter((_, i) => i !== index))}
+            >
+              ×
+            </button>
+          </span>
+          <b>{money(cartItemPrice(item) * item.quantity)}</b>
+        </div>
+      ))}
+      <div className="total">
+        <span>Total</span>
+        <strong>{money(cartTotal(cart))}</strong>
+      </div>
+    </aside>
+  );
+}
+
+function Checkout({
+  location,
+  cart,
+  setCart,
+  customer,
+}: {
+  location: Location;
+  cart: CartItem[];
+  setCart: React.Dispatch<React.SetStateAction<CartItem[]>>;
+  customer?: Customer | null;
+}) {
+  const navigate = useNavigate();
+  const [fulfillment, setFulfillment] = useState<'PICKUP' | 'DELIVERY'>('PICKUP');
+  const mutation = useMutation({
+    mutationFn: (form: HTMLFormElement) => {
+      const data = new FormData(form);
+      const address = String(data.get('delivery_address') ?? '').trim();
+      const request: OnlineCheckoutRequest = {
+        items: cart.map((item) => ({
+          product_id: item.product.id,
+          quantity: item.quantity,
+          modifiers: item.modifierIds.map((modifier_id) => ({ modifier_id, quantity: 1 })),
+        })),
+        fulfillment_type: fulfillment,
+        scheduled_for: data.get('scheduled_for')
+          ? new Date(String(data.get('scheduled_for'))).toISOString()
+          : null,
+        customer_name: String(data.get('name')),
+        customer_email: String(data.get('email')),
+        customer_phone: String(data.get('phone')),
+        ...(requiresDeliveryAddress(fulfillment) ? { delivery_address: { address } } : {}),
+      };
+      return apiFetch<OnlineCheckoutResponse>(
+        `/api/v1/locations/${location.id}/online-orders/checkout`,
+        { method: 'POST', body: JSON.stringify(request) },
+      );
+    },
+    onSuccess: (result) => {
+      storeOrder(
+        {
+          id: result.order_id,
+          locationId: location.id,
+          orderToken: result.order_token ?? null,
+          createdAt: new Date().toISOString(),
+        },
+        customer,
+      );
+      setCart([]);
+      navigate(`/orders/${result.order_id}?token=${encodeURIComponent(result.order_token ?? '')}`);
+    },
+  });
+  if (!cart.length)
+    return (
+      <main className="narrow">
+        <h1>Your cart is empty</h1>
+        <Link className="button primary" to="/">
+          Browse the menu
+        </Link>
+      </main>
+    );
+  return (
+    <main className="checkout">
+      <section>
+        <h1>Checkout</h1>
+        <div className="toggle">
+          <button
+            className={fulfillment === 'PICKUP' ? 'active' : ''}
+            onClick={() => setFulfillment('PICKUP')}
+          >
+            Pickup
+          </button>
+          <button
+            className={fulfillment === 'DELIVERY' ? 'active' : ''}
+            onClick={() => setFulfillment('DELIVERY')}
+          >
+            Delivery
+          </button>
+        </div>
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            mutation.mutate(event.currentTarget);
+          }}
+        >
+          <label>
+            Name
+            <input name="name" required defaultValue={customer?.name} />
+          </label>
+          <label>
+            Email
+            <input name="email" type="email" required defaultValue={customer?.email} />
+          </label>
+          <label>
+            Phone
+            <input name="phone" required defaultValue={customer?.phone ?? ''} />
+          </label>
+          <label>
+            Schedule for later (optional)
+            <input name="scheduled_for" type="datetime-local" />
+          </label>
+          {requiresDeliveryAddress(fulfillment) && (
+            <label>
+              Delivery address
+              <textarea name="delivery_address" required />
+            </label>
+          )}
+          <p className="payment-note">
+            Pay when you {fulfillment === 'PICKUP' ? 'pick up your order' : 'receive your delivery'}
+            .
+          </p>
+          {mutation.isError && <ErrorMessage error={mutation.error} />}
+          <button className="primary" disabled={mutation.isPending}>
+            {mutation.isPending ? 'Placing order…' : `Place order · ${money(cartTotal(cart))}`}
+          </button>
+        </form>
+      </section>
+      <Cart cart={cart} setCart={setCart} />
+    </main>
+  );
+}
+
+function OrderStatus({ location, customer }: { location: Location; customer?: Customer | null }) {
+  const { orderId = '' } = useParams();
+  const token =
+    new URLSearchParams(window.location.search).get('token') ||
+    readOrders(customer).find((item) => item.id === orderId)?.orderToken ||
+    null;
+  const order = useQuery({
+    queryKey: ['online-order', location.id, orderId, token],
+    queryFn: () => apiFetch<OnlineOrderDetail>(onlineOrderPath(location.id, orderId, token)),
+    refetchInterval: 10_000,
+  });
+  if (order.isPending)
+    return (
+      <main className="centered">
+        <h1>Getting your order…</h1>
+      </main>
+    );
+  if (order.isError)
+    return (
+      <main className="centered">
+        <h1>We could not find that order</h1>
+        <ErrorMessage error={order.error} />
+      </main>
+    );
+  const value = order.data;
+  const lineStatus = value.lines.some((line) => line.status === 'READY')
+    ? 'READY'
+    : value.lines.some((line) => line.status === 'PREPARING')
+      ? 'PREPARING'
+      : value.order.status;
+  const message =
+    value.fulfillment.fulfillment_type === 'DELIVERY' &&
+    value.fulfillment.status === 'OUT_FOR_DELIVERY'
+      ? 'Out for delivery'
+      : value.fulfillment.status === 'DELIVERED'
+        ? 'Delivered'
+        : lineStatus === 'READY'
+          ? 'Ready for pickup'
+          : lineStatus === 'PREPARING'
+            ? 'Preparing your order'
+            : 'Order received';
+  return (
+    <main className="narrow confirmation">
+      <p className="eyebrow">Order confirmed</p>
+      <h1>{message}</h1>
+      <p>
+        Your reference is <strong>{value.order.id}</strong>.
+      </p>
+      <p className="payment-note">
+        Pay when you{' '}
+        {value.fulfillment.fulfillment_type === 'PICKUP'
+          ? 'pick up your order'
+          : 'receive your delivery'}
+        .
+      </p>
+      <p className="muted">We refresh this status automatically.</p>
+      <Link className="button primary" to="/history">
+        View recent orders
+      </Link>
+    </main>
+  );
+}
+
+function History({ customer }: { customer?: Customer | null }) {
+  const orders = readOrders(customer);
+  return (
+    <main>
+      <h1>Recent orders</h1>
+      <p className="muted">Orders saved in this browser.</p>
+      {!orders.length && <p>No recent orders here yet.</p>}
+      <div className="history-list">
+        {orders.map((stored) => (
+          <HistoryItem key={stored.id} stored={stored} />
+        ))}
+      </div>
+    </main>
+  );
+}
+function HistoryItem({ stored }: { stored: StoredOrder }) {
+  const query = useQuery({
+    queryKey: ['history-order', stored.locationId, stored.id, stored.orderToken],
+    queryFn: () =>
+      apiFetch<OnlineOrderDetail>(onlineOrderPath(stored.locationId, stored.id, stored.orderToken)),
+    retry: false,
+  });
+  return (
+    <Link
+      className="history-card"
+      to={`/orders/${stored.id}${stored.orderToken ? `?token=${encodeURIComponent(stored.orderToken)}` : ''}`}
+    >
+      <strong>{query.data?.fulfillment.fulfillment_type ?? 'Order'}</strong>
+      <span>
+        {query.data ? query.data.order.status : query.isError ? 'Unavailable' : 'Loading…'}
+      </span>
+      <small>{new Date(stored.createdAt).toLocaleString()}</small>
+    </Link>
+  );
+}
+
+function CustomerRoutes({ location }: { location: Location }) {
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const session = useQuery({
+    queryKey: ['customer-session'],
+    queryFn: () =>
+      apiFetch<Customer>(`/api/v1/organizations/${ORGANIZATION_ID}/customer-sessions/current`),
+    enabled: Boolean(getCustomerToken()),
+    retry: false,
+  });
+  const customer = session.data;
+  const onSignOut = () => {
+    clearCustomerToken();
+    queryClient.removeQueries({ queryKey: ['customer-session'] });
+  };
+  return (
+    <>
+      <Header
+        location={location}
+        customer={customer}
+        cartCount={cart.reduce((sum, item) => sum + item.quantity, 0)}
+        onSignOut={onSignOut}
+      />
+      <Routes>
+        <Route path="/" element={<Menu location={location} setCart={setCart} />} />
+        <Route
+          path="/checkout"
+          element={
+            <Checkout location={location} cart={cart} setCart={setCart} customer={customer} />
+          }
+        />
+        <Route
+          path="/login"
+          element={
+            <AuthScreen
+              mode="login"
+              onAuthenticated={() =>
+                queryClient.invalidateQueries({ queryKey: ['customer-session'] })
+              }
+            />
+          }
+        />
+        <Route
+          path="/register"
+          element={
+            <AuthScreen
+              mode="register"
+              onAuthenticated={() =>
+                queryClient.invalidateQueries({ queryKey: ['customer-session'] })
+              }
+            />
+          }
+        />
+        <Route
+          path="/orders/:orderId"
+          element={<OrderStatus location={location} customer={customer} />}
+        />
+        <Route path="/history" element={<History customer={customer} />} />
+      </Routes>
+    </>
+  );
+}
 export function App() {
   return (
-    <main style={{ fontFamily: tokens.font.sans, padding: tokens.space[8] }}>
-      <h1>Restaurant Suite — Customer</h1>
-      <p>Customer PWA shell is ready for future modules.</p>
-      <Button onClick={() => undefined}>Placeholder action</Button>
-    </main>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <LocationGate>{(location) => <CustomerRoutes location={location} />}</LocationGate>
+      </BrowserRouter>
+    </QueryClientProvider>
   );
 }

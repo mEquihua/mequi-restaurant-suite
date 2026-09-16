@@ -2513,9 +2513,53 @@ export interface components {
             /** @enum {string} */
             fulfillment_type: "PICKUP" | "DELIVERY";
         };
+        OnlineOrderTotals: {
+            subtotal: number;
+            total: number;
+            paid: number;
+        };
+        OnlineOrderSummary: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            location_id: string;
+            /** Format: uuid */
+            visit_id: string;
+            order_type: string;
+            status: string;
+            version: number;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+            totals: components["schemas"]["OnlineOrderTotals"];
+        };
+        OnlineOrderLineModifierSummary: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            modifier_id: string;
+        };
+        OnlineOrderLineSummary: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            order_id: string;
+            /** Format: uuid */
+            account_id: string;
+            /** Format: uuid */
+            product_id: string;
+            status: string;
+            quantity: number;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+            modifiers: components["schemas"]["OnlineOrderLineModifierSummary"][];
+        };
         OnlineOrderDetailResponse: {
-            order: components["schemas"]["Order"];
-            lines: components["schemas"]["OrderLine"][];
+            order: components["schemas"]["OnlineOrderSummary"];
+            lines: components["schemas"]["OnlineOrderLineSummary"][];
             fulfillment: components["schemas"]["OrderFulfillment"];
         };
         FulfillmentActionRequest: {

@@ -187,6 +187,73 @@ export const guestSessionsRoute: FastifyPluginAsync<GuestSessionsRouteOptions> =
     },
   );
 
+  app.post(
+    '/api/v1/locations/:locationId/counter-sessions',
+    {
+      schema: {
+        params: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['locationId'],
+          properties: { locationId: uuid },
+        },
+        body: {
+          type: 'object',
+          additionalProperties: false,
+          properties: { order_type: { type: 'string', enum: ['DINE_IN', 'TAKEOUT'] } },
+        },
+      },
+    },
+    async (request, reply) => {
+      const { locationId } = request.params as { locationId: string };
+      const body = request.body as { order_type?: 'DINE_IN' | 'TAKEOUT' } | null;
+      const orderType = body?.order_type ?? 'TAKEOUT';
+
+      const minted = await app.withLocationTransaction(locationId, async (trx) => {
+        const visit = await trx
+          .insertInto('visits')
+          .values({ location_id: locationId, table_id: null, staff_id: null })
+          .returningAll()
+          .executeTakeFirstOrThrow();
+
+        await trx
+          .insertInto('accounts')
+          .values({ location_id: locationId, visit_id: visit.id })
+          .returningAll()
+          .executeTakeFirstOrThrow();
+
+        await trx
+          .insertInto('orders')
+          .values({ location_id: locationId, visit_id: visit.id, order_type: orderType })
+          .returningAll()
+          .executeTakeFirstOrThrow();
+
+        const token = createGuestSessionToken(locationId);
+        const expiresAt = new Date(now().getTime() + sessionDurationMs);
+
+        await trx
+          .insertInto('guest_sessions')
+          .values({
+            location_id: locationId,
+            visit_id: visit.id,
+            table_id: null,
+            token_hash: hashGuestSecret(token),
+            device_info: request.headers['user-agent']?.slice(0, 500) ?? null,
+            expires_at: expiresAt,
+          })
+          .execute();
+
+        return {
+          token,
+          visit_id: visit.id,
+          table_id: null,
+          expires_at: expiresAt.toISOString(),
+        };
+      });
+      return reply.status(201).send(minted);
+    },
+  );
+
   app.get(
     '/api/v1/locations/:locationId/guest-sessions/current',
     {
@@ -204,11 +271,13 @@ export const guestSessionsRoute: FastifyPluginAsync<GuestSessionsRouteOptions> =
         const { locationId } = request.params as { locationId: string };
         requireLocation(session, locationId);
         const [table, activation] = await Promise.all([
-          session.trx
-            .selectFrom('tables')
-            .select(['id', 'name', 'status'])
-            .where('id', '=', session.tableId)
-            .executeTakeFirstOrThrow(),
+          session.tableId
+            ? session.trx
+                .selectFrom('tables')
+                .select(['id', 'name', 'status'])
+                .where('id', '=', session.tableId)
+                .executeTakeFirstOrThrow()
+            : Promise.resolve(null),
           session.trx
             .selectFrom('module_activations')
             .select(['status', 'guest_payment_mode'])
@@ -365,6 +434,9 @@ export const guestSessionsRoute: FastifyPluginAsync<GuestSessionsRouteOptions> =
       const serviceRequest = await withGuest(request, async (session) => {
         const { locationId } = request.params as { locationId: string };
         requireLocation(session, locationId);
+        if (!session.tableId) {
+          throw new GuestSessionHttpError(400, 'TABLE_REQUIRED', 'A physical table is required to request service.');
+        }
         const requestType = (request.body as { request_type: (typeof requestTypes)[number] })
           .request_type;
         const serviceRequest = await session.trx

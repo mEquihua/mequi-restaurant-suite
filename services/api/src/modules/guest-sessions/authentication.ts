@@ -14,7 +14,7 @@ export interface GuestSession {
   sessionId: string;
   locationId: string;
   visitId: string;
-  tableId: string;
+  tableId: string | null;
   organizationId: string;
   expiresAt: Date;
 }

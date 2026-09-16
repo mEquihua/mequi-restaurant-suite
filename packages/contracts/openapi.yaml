@@ -2378,6 +2378,34 @@ paths:
           $ref: "#/components/responses/Error"
         "429":
           $ref: "#/components/responses/Error"
+  /api/v1/locations/{locationId}/counter-sessions:
+    post:
+      operationId: mintCounterSession
+      security: []
+      parameters:
+        - name: locationId
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Uuid"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                order_type:
+                  type: string
+                  enum: [DINE_IN, TAKEOUT]
+      responses:
+        "201":
+          description: Counter (tableless) guest session minted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GuestSessionMintResponse"
   /api/v1/locations/{locationId}/guest-sessions/current:
     get:
       operationId: getCurrentGuestSession
@@ -3085,7 +3113,9 @@ components:
         visit_id:
           $ref: "#/components/schemas/Uuid"
         table_id:
-          $ref: "#/components/schemas/Uuid"
+          type: string
+          format: uuid
+          nullable: true
         expires_at:
           type: string
           format: date-time

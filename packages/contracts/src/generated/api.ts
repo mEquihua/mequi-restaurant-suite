@@ -1307,6 +1307,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/locations/{locationId}/counter-sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["mintCounterSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/locations/{locationId}/guest-sessions/current": {
         parameters: {
             query?: never;
@@ -1991,7 +2007,8 @@ export interface components {
         GuestSessionMintResponse: {
             token: string;
             visit_id: components["schemas"]["Uuid"];
-            table_id: components["schemas"]["Uuid"];
+            /** Format: uuid */
+            table_id: string | null;
             /** Format: date-time */
             expires_at: string;
         };
@@ -5386,6 +5403,35 @@ export interface operations {
             };
             409: components["responses"]["Error"];
             429: components["responses"]["Error"];
+        };
+    };
+    mintCounterSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                locationId: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    order_type?: "DINE_IN" | "TAKEOUT";
+                };
+            };
+        };
+        responses: {
+            /** @description Counter (tableless) guest session minted */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GuestSessionMintResponse"];
+                };
+            };
         };
     };
     getCurrentGuestSession: {

@@ -24,6 +24,8 @@ const apiBoundarySettings = {
       mode: 'file',
       capture: ['module'],
     },
+    { type: 'api-composition', pattern: 'services/api/src/app.ts', mode: 'file' },
+    { type: 'api-composition', pattern: 'services/api/src/server.ts', mode: 'file' },
     { type: 'api-shared', pattern: 'services/api/src/shared', mode: 'folder' },
     { type: 'contracts', pattern: 'packages/contracts/src', mode: 'folder' },
     { type: 'domain', pattern: 'packages/domain/src', mode: 'folder' },
@@ -73,6 +75,10 @@ export default [
           rules: [
             { from: 'api-module', allow: ['api-module', 'api-shared', 'contracts', 'domain'] },
             { from: 'api-shared', allow: ['api-shared', 'contracts', 'domain'] },
+            {
+              from: 'api-composition',
+              allow: ['api-composition', 'api-module', 'api-shared', 'contracts', 'domain'],
+            },
           ],
         },
       ],
@@ -81,7 +87,10 @@ export default [
         'error',
         {
           default: 'disallow',
-          rules: [{ target: 'api-module', allow: 'index.ts' }],
+          rules: [
+            { target: 'api-module', allow: 'index.ts' },
+            { target: 'api-composition', allow: ['app.ts', 'server.ts'] },
+          ],
         },
       ],
     },

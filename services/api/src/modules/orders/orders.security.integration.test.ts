@@ -239,9 +239,17 @@ describeIntegration('orders API security boundaries against PostgreSQL', () => {
     });
     expect(wrongPin.statusCode).toBe(401);
 
-    // 3. Second wrong attempt might trigger backoff if limit is reached, or just another 401. We check terminal_pin_attempts.
-    const attempts = await db.selectFrom('terminal_pin_attempts').selectAll().execute();
-    expect(attempts.length).toBeGreaterThan(0);
+    // 3. An immediate retry, even with the correct PIN, must be blocked by the
+    // backoff the wrong attempt just started — this is the actual anti-brute-force
+    // property this whole feature exists for, not just "a row got written".
+    const immediateRetry = await app.inject({
+      method: 'POST',
+      url: `/api/v1/locations/${location}/order-lines/${lineId}/void-override`,
+      headers: { authorization: `Bearer ${managerToken}`, 'if-match': String(preparingLine.version) },
+      payload: { reason: 'burnt', authorized_by: staff, authorized_by_pin: '1111' },
+    });
+    expect(immediateRetry.statusCode).toBe(429);
+    expect(immediateRetry.headers['retry-after']).toBeDefined();
 
     // 4. Wait for backoff to expire, then correct PIN succeeds
     await new Promise((resolve) => setTimeout(resolve, 2100));
@@ -252,5 +260,25 @@ describeIntegration('orders API security boundaries against PostgreSQL', () => {
       payload: { reason: 'burnt', authorized_by: staff, authorized_by_pin: '1111' },
     });
     expect(correctPin.statusCode).toBe(200);
+  });
+
+  it('skips PIN re-authentication entirely when a manager authorizes their own override', async () => {
+    const visit = (await app.inject({ method: 'POST', url: `/api/v1/locations/${location}/visits`, headers: { authorization: `Bearer ${managerToken}` }, payload: { guest_count: 1 } })).json();
+    const account = (await app.inject({ method: 'POST', url: `/api/v1/locations/${location}/visits/${visit.id}/accounts`, headers: { authorization: `Bearer ${managerToken}` }, payload: {} })).json();
+    const order = (await app.inject({ method: 'POST', url: `/api/v1/locations/${location}/visits/${visit.id}/orders`, headers: { authorization: `Bearer ${managerToken}`, 'if-match': String(visit.version) }, payload: { order_type: 'DINE_IN' } })).json();
+    const addLines = (await app.inject({ method: 'POST', url: `/api/v1/locations/${location}/orders/${order.id}/lines`, headers: { authorization: `Bearer ${managerToken}`, 'if-match': String(order.version) }, payload: { lines: [{ account_id: account.id, product_id: product, quantity: 1 }] } })).json();
+    const lineId = addLines.lines[0].id;
+    await app.inject({ method: 'POST', url: `/api/v1/locations/${location}/orders/${order.id}/send`, headers: { authorization: `Bearer ${managerToken}`, 'if-match': String(addLines.order.version), 'idempotency-key': 'reauth-self-1' }, payload: { line_ids: [lineId] } });
+    const afterSend = await db.selectFrom('order_lines').selectAll().where('id', '=', lineId).executeTakeFirstOrThrow();
+    await app.inject({ method: 'POST', url: `/api/v1/locations/${location}/order-lines/${lineId}/mark-preparing`, headers: { authorization: `Bearer ${managerToken}`, 'if-match': String(afterSend.version) }, payload: {} });
+    const preparingLine = await db.selectFrom('order_lines').selectAll().where('id', '=', lineId).executeTakeFirstOrThrow();
+
+    const selfOverride = await app.inject({
+      method: 'POST',
+      url: `/api/v1/locations/${location}/order-lines/${lineId}/void-override`,
+      headers: { authorization: `Bearer ${managerToken}`, 'if-match': String(preparingLine.version) },
+      payload: { reason: 'burnt', authorized_by: manager },
+    });
+    expect(selfOverride.statusCode).toBe(200);
   });
 });

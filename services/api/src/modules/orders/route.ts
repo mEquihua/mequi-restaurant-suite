@@ -142,8 +142,9 @@ const expected = (value: string | undefined) => {
     );
   return n;
 };
-const fail = (reply: FastifyReply, request: FastifyRequest, error: IdentityHttpError) =>
-  reply
+const fail = (reply: FastifyReply, request: FastifyRequest, error: IdentityHttpError) => {
+  for (const [name, value] of Object.entries(error.headers ?? {})) reply.header(name, value);
+  return reply
     .status(error.statusCode)
     .send({
       error: {
@@ -154,6 +155,7 @@ const fail = (reply: FastifyReply, request: FastifyRequest, error: IdentityHttpE
         ...(error.details === undefined ? {} : { details: error.details }),
       },
     });
+};
 const conflict = (row: { version: number }, state: unknown) =>
   new IdentityHttpError(
     409,
@@ -338,7 +340,7 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
       );
 
     const fingerprint = fingerprintPresentedCredential(authorizedBy);
-    const outcome = await app.withLocationTransaction(actor.locationId, async (authTrx: any) => {
+    const outcome = await app.withLocationTransaction(actor.locationId, async (authTrx) => {
       const attempt = await lockPinAttempt(authTrx, actor.terminalId, fingerprint);
       const timestamp = now();
       const retryAfter = retryAfterSeconds({ failureCount: attempt.failure_count, nextAttemptAt: attempt.next_attempt_at }, timestamp);

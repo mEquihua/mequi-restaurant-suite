@@ -24,6 +24,8 @@ export type Location = components['schemas']['Location'];
 export type OnlineCheckoutRequest = components['schemas']['OnlineCheckoutRequest'];
 export type OnlineCheckoutResponse = components['schemas']['OnlineCheckoutResponse'];
 export type OnlineOrderDetail = components['schemas']['OnlineOrderDetailResponse'];
+export type OnlineOrderListItem = components['schemas']['OnlineOrderListItem'];
+export type OnlineOrderListResponse = components['schemas']['OnlineOrderListResponse'];
 export type Product = components['schemas']['Product'];
 
 export function getCustomerToken() {

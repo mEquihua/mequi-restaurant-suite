@@ -2,7 +2,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { sql } from 'kysely';
 import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 import type { components } from '@restaurant-suite/contracts';
-import { withCustomerSession } from '../customers/index.js';
+import { CustomerSessionHttpError, withCustomerSession } from '../customers/index.js';
 import {
   IdentityHttpError,
   requirePermission,
@@ -17,6 +17,22 @@ const ifMatchAsBody = {
   additionalProperties: false,
   required: ['version'],
   properties: { version: { type: 'integer', minimum: 1 } },
+} as const;
+const listSchema = {
+  params: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['loc_id'],
+    properties: { loc_id: uuid },
+  },
+  querystring: {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      limit: { type: 'integer', minimum: 1, maximum: 50, default: 20 },
+      before: { type: 'string', format: 'date-time' },
+    },
+  },
 } as const;
 const checkoutSchema = {
   params: {
@@ -63,7 +79,11 @@ const checkoutSchema = {
   },
 } as const;
 
-function fail(reply: FastifyReply, request: FastifyRequest, error: IdentityHttpError) {
+function fail(
+  reply: FastifyReply,
+  request: FastifyRequest,
+  error: IdentityHttpError | CustomerSessionHttpError,
+) {
   return reply.status(error.statusCode).send({
     error: {
       status: error.statusCode,
@@ -84,7 +104,8 @@ function hashGuestOrderToken(token: string): string {
 
 export const onlineOrdersRoute: FastifyPluginAsync = async (app) => {
   app.setErrorHandler((error, request, reply) => {
-    if (error instanceof IdentityHttpError) return fail(reply, request, error);
+    if (error instanceof IdentityHttpError || error instanceof CustomerSessionHttpError)
+      return fail(reply, request, error);
     if (
       typeof error === 'object' &&
       error !== null &&
@@ -239,6 +260,133 @@ export const onlineOrdersRoute: FastifyPluginAsync = async (app) => {
 
       reply.status(201);
       return { order_id: result.order_id, order_token: result.order_token };
+    },
+  );
+
+  app.get<{
+    Params: { loc_id: string };
+    Querystring: { limit?: number; before?: string };
+  }>(
+    '/api/v1/locations/:loc_id/online-orders',
+    { schema: listSchema },
+    async (request) => {
+      const { loc_id } = request.params;
+      const { limit = 20, before } = request.query;
+
+      let authCustomerId!: string;
+      await withCustomerSession(app, request, new Date(), async (session) => {
+        authCustomerId = session.customerId;
+      });
+
+      return app.withLocationTransaction(loc_id, async (trx) => {
+        let query = trx
+          .selectFrom('orders')
+          .innerJoin('visits', 'visits.id', 'orders.visit_id')
+          .selectAll('orders')
+          .where('orders.location_id', '=', loc_id)
+          .where('visits.customer_id', '=', authCustomerId)
+          .where('orders.order_type', 'in', ['PICKUP', 'DELIVERY'])
+          .orderBy('orders.created_at', 'desc')
+          .orderBy('orders.id', 'desc')
+          .limit(limit);
+
+        if (before) {
+          query = query.where('orders.created_at', '<', new Date(before));
+        }
+
+        const orders = await query.execute();
+
+        if (orders.length === 0) {
+          return { data: [], next_before: null };
+        }
+
+        const orderIds = orders.map((o) => o.id);
+        const visitIds = Array.from(new Set(orders.map((o) => o.visit_id)));
+
+        const fulfillments = await trx
+          .selectFrom('order_fulfillments')
+          .selectAll()
+          .where('order_id', 'in', orderIds)
+          .execute();
+        const fulfillmentMap = new Map(fulfillments.map((f) => [f.order_id, f]));
+
+        const linesRows = await trx
+          .selectFrom('order_lines')
+          .selectAll()
+          .where('order_id', 'in', orderIds)
+          .execute();
+
+        const lineIds = linesRows.map((l) => l.id);
+        const modifiersRows = lineIds.length
+          ? await trx
+              .selectFrom('order_line_modifiers')
+              .selectAll()
+              .where('order_line_id', 'in', lineIds)
+              .execute()
+          : [];
+
+        const accounts = await trx
+          .selectFrom('accounts')
+          .select(['id', 'visit_id', 'status'])
+          .where('visit_id', 'in', visitIds)
+          .execute();
+
+        const accountIds = accounts.map((a) => a.id);
+        const payments = accountIds.length
+          ? await trx
+              .selectFrom('payments')
+              .select(['account_id', 'amount'])
+              .where('account_id', 'in', accountIds)
+              .execute()
+          : [];
+
+        const data = orders.map((order) => {
+          const orderLines = linesRows.filter((l) => l.order_id === order.id);
+          let subtotal = 0;
+          for (const line of orderLines) {
+            if (line.status !== 'CANCELLED' && line.status !== 'VOIDED') {
+              const mods = modifiersRows.filter((m) => m.order_line_id === line.id);
+              subtotal +=
+                (line.unit_price + mods.reduce((sum, m) => sum + m.unit_price, 0)) * line.quantity;
+            }
+          }
+
+          const orderAccountIds = new Set(
+            accounts.filter((a) => a.visit_id === order.visit_id).map((a) => a.id),
+          );
+          const orderPayments = payments.filter((p) => orderAccountIds.has(p.account_id));
+          const paid = orderPayments.reduce((sum, p) => sum + p.amount, 0);
+
+          const fulfillment = fulfillmentMap.get(order.id);
+
+          return {
+            order: {
+              id: order.id,
+              location_id: order.location_id,
+              visit_id: order.visit_id,
+              order_type: order.order_type,
+              status: order.status,
+              version: order.version,
+              created_at: order.created_at.toISOString(),
+              updated_at: order.updated_at.toISOString(),
+              totals: {
+                subtotal,
+                total: subtotal,
+                paid,
+              },
+            },
+            fulfillment: {
+              status: fulfillment?.status ?? 'PENDING',
+              fulfillment_type: fulfillment?.fulfillment_type ?? order.order_type,
+            },
+          };
+        });
+
+        const next_before =
+          orders.length === limit ? orders[orders.length - 1].created_at.toISOString() : null;
+
+        return { data, next_before };
+      });
     },
   );
 

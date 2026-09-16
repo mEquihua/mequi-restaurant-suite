@@ -1577,6 +1577,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/locations/{loc_id}/online-orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List customer online orders */
+        get: {
+            parameters: {
+                query?: {
+                    limit?: number;
+                    before?: string;
+                };
+                header?: never;
+                path: {
+                    loc_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description List of online orders */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["OnlineOrderListResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/locations/{loc_id}/online-orders/checkout": {
         parameters: {
             query?: never;
@@ -2561,6 +2602,14 @@ export interface components {
             order: components["schemas"]["OnlineOrderSummary"];
             lines: components["schemas"]["OnlineOrderLineSummary"][];
             fulfillment: components["schemas"]["OrderFulfillment"];
+        };
+        OnlineOrderListItem: {
+            order: components["schemas"]["OnlineOrderSummary"];
+            fulfillment: components["schemas"]["OrderFulfillment"];
+        };
+        OnlineOrderListResponse: {
+            data: components["schemas"]["OnlineOrderListItem"][];
+            next_before: string | null;
         };
         FulfillmentActionRequest: {
             version: number;

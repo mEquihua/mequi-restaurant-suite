@@ -185,6 +185,198 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listCategories"];
+        put?: never;
+        post: operations["createCategory"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listProducts"];
+        put?: never;
+        post: operations["createProduct"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/products/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["updateProduct"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/products/{id}/variants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["createProductVariant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/products/{id}/modifier-groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["attachProductModifierGroup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/products/{id}/combo-groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["createProductComboGroup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/products/{id}/duplicate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["duplicateProduct"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/modifier-groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["createModifierGroup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/modifier-groups/{id}/modifiers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["createModifier"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/locations/{locationId}/price-overrides/{productId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["putLocationPriceOverride"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/locations/{locationId}/products/{productId}/mark-unavailable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["markProductUnavailable"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/locations/{locationId}/products/{productId}/mark-available": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["markProductAvailable"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -280,6 +472,201 @@ export interface components {
                 description: string | null;
             }[];
             permissions: string[];
+        };
+        Category: {
+            id: components["schemas"]["Uuid"];
+            name: string;
+            description: string | null;
+            display_order: number;
+            is_active: boolean;
+        };
+        CategoryListResponse: {
+            data: components["schemas"]["Category"][];
+        };
+        CreateCategoryRequest: {
+            name: string;
+            description?: string | null;
+            display_order?: number;
+            is_active?: boolean;
+        };
+        Variant: {
+            id: components["schemas"]["Uuid"];
+            name: string;
+            /** @description Server-computed effective price in cents. */
+            price: number;
+            price_adjustment: number;
+            display_order: number;
+        };
+        Modifier: {
+            id: components["schemas"]["Uuid"];
+            name: string;
+            price_adjustment: number;
+            display_order: number;
+            is_active: boolean;
+        };
+        ModifierGroup: {
+            id: components["schemas"]["Uuid"];
+            name: string;
+            min_selections: number;
+            max_selections: number | null;
+            is_active: boolean;
+        };
+        ProductModifierGroup: {
+            product_id: components["schemas"]["Uuid"];
+            modifier_group_id: components["schemas"]["Uuid"];
+            display_order: number;
+        };
+        ComboGroup: {
+            id: components["schemas"]["Uuid"];
+            name: string;
+            min_selections: number;
+            max_selections: number;
+            items: ({
+                product_id: components["schemas"]["Uuid"];
+                price_adjustment?: number;
+            } & {
+                [key: string]: unknown;
+            })[];
+        } & {
+            [key: string]: unknown;
+        };
+        Availability: {
+            /** @enum {string} */
+            status: "AVAILABLE" | "EXHAUSTED" | "HIDDEN" | "SCHEDULED";
+            available: boolean;
+        };
+        Product: {
+            id: components["schemas"]["Uuid"];
+            category_id: components["schemas"]["Uuid"] | null;
+            name: string;
+            internal_name: string | null;
+            description: string | null;
+            photo_url: string | null;
+            notes: string | null;
+            allergens: string[];
+            tags: string[];
+            is_active: boolean;
+            version: number;
+            /** @description Server-resolved location price in cents; clients do not supply it to order flows. */
+            price: number;
+            variants: components["schemas"]["Variant"][];
+            modifier_groups: ({
+                id: components["schemas"]["Uuid"];
+                name: string;
+                min_selections: number;
+                max_selections: number | null;
+                is_active: boolean;
+                display_order: number;
+                modifiers: components["schemas"]["Modifier"][];
+            } & {
+                [key: string]: unknown;
+            })[];
+            combo_groups: components["schemas"]["ComboGroup"][];
+            availability: components["schemas"]["Availability"];
+        };
+        ProductListResponse: {
+            data: components["schemas"]["Product"][];
+        };
+        CreateProductRequest: {
+            category_id?: components["schemas"]["Uuid"] | null;
+            name: string;
+            internal_name?: string | null;
+            description?: string | null;
+            photo_url?: string | null;
+            notes?: string | null;
+            allergens?: string[];
+            tags?: string[];
+            /** @description Administrative catalog base price in cents. */
+            base_price: number;
+            is_active?: boolean;
+        };
+        UpdateProductRequest: {
+            category_id?: components["schemas"]["Uuid"] | null;
+            name?: string;
+            internal_name?: string | null;
+            description?: string | null;
+            photo_url?: string | null;
+            notes?: string | null;
+            allergens?: string[];
+            tags?: string[];
+            base_price?: number;
+            is_active?: boolean;
+        };
+        CreateVariantRequest: {
+            name: string;
+            price_adjustment?: number;
+            display_order?: number;
+        };
+        CreateModifierGroupRequest: {
+            name: string;
+            min_selections?: number;
+            max_selections?: number | null;
+            is_active?: boolean;
+        };
+        CreateModifierRequest: {
+            name: string;
+            price_adjustment?: number;
+            display_order?: number;
+            is_active?: boolean;
+        };
+        AttachModifierGroupRequest: {
+            modifier_group_id: components["schemas"]["Uuid"];
+            display_order?: number;
+        };
+        CreateComboGroupRequest: {
+            name: string;
+            min_selections?: number;
+            max_selections?: number;
+            items: {
+                product_id: components["schemas"]["Uuid"];
+                price_adjustment?: number;
+            }[];
+        };
+        LocationPriceOverride: {
+            location_id: components["schemas"]["Uuid"];
+            product_id: components["schemas"]["Uuid"];
+            override_price: number;
+            version: number;
+        };
+        PutPriceOverrideRequest: {
+            override_price: number;
+        };
+        AvailabilityRule: {
+            id: components["schemas"]["Uuid"];
+            location_id: components["schemas"]["Uuid"];
+            product_id: components["schemas"]["Uuid"];
+            /** @enum {string} */
+            status: "AVAILABLE" | "EXHAUSTED" | "HIDDEN" | "SCHEDULED";
+            channel_scope: string | null;
+            service_type_scope: string | null;
+            days_of_week: number[] | null;
+            /** Format: date-time */
+            start_time: string | null;
+            /** Format: date-time */
+            end_time: string | null;
+            version: number;
+        };
+        MarkUnavailableRequest: {
+            rule_id?: components["schemas"]["Uuid"];
+            /** @enum {string} */
+            status?: "EXHAUSTED" | "HIDDEN" | "SCHEDULED";
+            channel_scope?: string | null;
+            service_type_scope?: string | null;
+            days_of_week?: number[] | null;
+            /** Format: date-time */
+            start_time?: string | null;
+            /** Format: date-time */
+            end_time?: string | null;
+        };
+        MarkAvailableRequest: {
+            rule_id?: components["schemas"]["Uuid"];
+            channel_scope?: string | null;
+            service_type_scope?: string | null;
+            days_of_week?: number[] | null;
+            /** Format: date-time */
+            start_time?: string | null;
+            /** Format: date-time */
+            end_time?: string | null;
         };
         ErrorResponse: {
             error: {
@@ -632,6 +1019,410 @@ export interface operations {
             400: components["responses"]["Error"];
             401: components["responses"]["Error"];
             403: components["responses"]["Error"];
+        };
+    };
+    listCategories: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Organization categories */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoryListResponse"];
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+        };
+    };
+    createCategory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCategoryRequest"];
+            };
+        };
+        responses: {
+            /** @description Category created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Category"];
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+        };
+    };
+    listProducts: {
+        parameters: {
+            query?: {
+                /** @description Channel for server-resolved availability. */
+                channel?: string;
+                /** @description Service type for server-resolved availability. */
+                service_type?: string;
+                /** @description Instant used to evaluate scheduled availability. */
+                at?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Products priced and resolved for the authenticated location */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductListResponse"];
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+        };
+    };
+    createProduct: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateProductRequest"];
+            };
+        };
+        responses: {
+            /** @description Product created with server-resolved location price */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Product"];
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+        };
+    };
+    updateProduct: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Current product version */
+                "If-Match": string;
+            };
+            path: {
+                id: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateProductRequest"];
+            };
+        };
+        responses: {
+            /** @description Updated product */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Product"];
+                };
+            };
+            409: components["responses"]["Error"];
+            428: components["responses"]["Error"];
+        };
+    };
+    createProductVariant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateVariantRequest"];
+            };
+        };
+        responses: {
+            /** @description Variant created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Variant"];
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    attachProductModifierGroup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AttachModifierGroupRequest"];
+            };
+        };
+        responses: {
+            /** @description Modifier group attached */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductModifierGroup"];
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    createProductComboGroup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateComboGroupRequest"];
+            };
+        };
+        responses: {
+            /** @description Combo group created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ComboGroup"];
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    duplicateProduct: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Product copy created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Product"];
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    createModifierGroup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateModifierGroupRequest"];
+            };
+        };
+        responses: {
+            /** @description Modifier group created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModifierGroup"];
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+        };
+    };
+    createModifier: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateModifierRequest"];
+            };
+        };
+        responses: {
+            /** @description Modifier created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Modifier"];
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    putLocationPriceOverride: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Override version; use 0 when creating the first override */
+                "If-Match": string;
+            };
+            path: {
+                locationId: components["schemas"]["Uuid"];
+                productId: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PutPriceOverrideRequest"];
+            };
+        };
+        responses: {
+            /** @description Stored location override */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LocationPriceOverride"];
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    markProductUnavailable: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Availability-rule version; use 0 to create a scoped rule */
+                "If-Match": string;
+            };
+            path: {
+                locationId: components["schemas"]["Uuid"];
+                productId: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MarkUnavailableRequest"];
+            };
+        };
+        responses: {
+            /** @description Explicit availability operation recorded */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AvailabilityRule"];
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    markProductAvailable: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Availability-rule version; use 0 to create a scoped rule */
+                "If-Match": string;
+            };
+            path: {
+                locationId: components["schemas"]["Uuid"];
+                productId: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MarkAvailableRequest"];
+            };
+        };
+        responses: {
+            /** @description Explicit availability operation recorded */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AvailabilityRule"];
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            409: components["responses"]["Error"];
         };
     };
 }

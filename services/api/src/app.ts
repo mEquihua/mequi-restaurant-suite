@@ -2,12 +2,14 @@ import Fastify, { type FastifyInstance } from 'fastify';
 
 import { installDatabase } from './shared/index.js';
 import { identityModule, type IdentityRouteOptions } from './modules/identity/index.js';
+import { menuModule, type MenuRouteOptions } from './modules/menu/index.js';
 import { pingModule } from './modules/ping/index.js';
 
 export interface AppOptions {
   logLevel?: string;
   databaseUrl?: string;
   identity?: IdentityRouteOptions;
+  menu?: MenuRouteOptions;
 }
 
 /** Creates the HTTP application without binding a network port. */
@@ -39,6 +41,7 @@ export function createApp(options: AppOptions = {}): FastifyInstance {
 
   app.register(pingModule);
   app.register(identityModule, options.identity ?? {});
+  app.register(menuModule, options.menu ?? {});
 
   return app;
 }

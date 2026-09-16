@@ -12,6 +12,16 @@ export interface Database {
   terminals: TerminalTable;
   staff_sessions: StaffSessionTable;
   terminal_pin_attempts: TerminalPinAttemptTable;
+  categories: CategoryTable;
+  products: ProductTable;
+  product_variants: ProductVariantTable;
+  modifier_groups: ModifierGroupTable;
+  product_modifier_groups: ProductModifierGroupTable;
+  modifiers: ModifierTable;
+  product_combo_groups: ProductComboGroupTable;
+  product_combo_items: ProductComboItemTable;
+  location_price_overrides: LocationPriceOverrideTable;
+  availability_rules: AvailabilityRuleTable;
 }
 
 export interface OrganizationTable {
@@ -93,6 +103,108 @@ export interface TerminalPinAttemptTable {
   credential_fingerprint: string;
   failure_count: Generated<number>;
   next_attempt_at: Date | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+export interface CategoryTable {
+  id: Generated<string>;
+  organization_id: string;
+  name: string;
+  description: string | null;
+  display_order: Generated<number>;
+  is_active: Generated<boolean>;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+export interface ProductTable {
+  id: Generated<string>;
+  organization_id: string;
+  category_id: string | null;
+  name: string;
+  internal_name: string | null;
+  description: string | null;
+  photo_url: string | null;
+  notes: string | null;
+  allergens: Generated<string[]>;
+  tags: Generated<string[]>;
+  base_price: number;
+  is_active: Generated<boolean>;
+  version: Generated<number>;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+export interface ProductVariantTable {
+  id: Generated<string>;
+  product_id: string;
+  name: string;
+  price_adjustment: Generated<number>;
+  display_order: Generated<number>;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+export interface ModifierGroupTable {
+  id: Generated<string>;
+  organization_id: string;
+  name: string;
+  min_selections: Generated<number>;
+  max_selections: number | null;
+  is_active: Generated<boolean>;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+export interface ProductModifierGroupTable {
+  product_id: string;
+  modifier_group_id: string;
+  display_order: Generated<number>;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+export interface ModifierTable {
+  id: Generated<string>;
+  modifier_group_id: string;
+  name: string;
+  price_adjustment: Generated<number>;
+  display_order: Generated<number>;
+  is_active: Generated<boolean>;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+export interface ProductComboGroupTable {
+  id: Generated<string>;
+  product_id: string;
+  name: string;
+  min_selections: Generated<number>;
+  max_selections: Generated<number>;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+export interface ProductComboItemTable {
+  id: Generated<string>;
+  combo_group_id: string;
+  product_id: string;
+  price_adjustment: Generated<number>;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+export interface LocationPriceOverrideTable {
+  location_id: string;
+  product_id: string;
+  override_price: number;
+  version: Generated<number>;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+export interface AvailabilityRuleTable {
+  id: Generated<string>;
+  location_id: string;
+  product_id: string;
+  status: string;
+  channel_scope: string | null;
+  service_type_scope: string | null;
+  days_of_week: number[] | null;
+  start_time: Date | null;
+  end_time: Date | null;
+  version: Generated<number>;
   created_at: Generated<Date>;
   updated_at: Generated<Date>;
 }

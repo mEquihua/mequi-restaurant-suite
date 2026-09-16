@@ -841,6 +841,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/locations/{locationId}/accounts/{accountId}/discounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Routine discounts are limited to 20 percent of the stored target subtotal. Use the override endpoint for larger discounts. */
+        post: operations["applyAccountDiscount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/locations/{locationId}/accounts/{accountId}/discounts/override": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Manager-authorized discount with no routine cap; records an audit event. */
+        post: operations["applyAccountDiscountOverride"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/locations/{locationId}/accounts/{accountId}/reopen": {
         parameters: {
             query?: never;
@@ -1329,6 +1363,8 @@ export interface components {
             visit_id: components["schemas"]["Uuid"];
             /** @enum {string} */
             status: "OPEN" | "PARTIALLY_PAID" | "PAID" | "CLOSED" | "REFUNDED";
+            subtotal?: number;
+            discount?: number;
             total: number;
             paid_amount: number;
             version: number;
@@ -1396,6 +1432,37 @@ export interface components {
         OverrideReasonRequest: {
             reason: string;
             authorized_by: components["schemas"]["Uuid"];
+        };
+        DiscountRequest: {
+            /** @enum {string} */
+            discount_type: "PERCENTAGE" | "AMOUNT";
+            /** @description Percentage points or cents; the server computes the deducted cents. */
+            value: number;
+            order_line_id?: components["schemas"]["Uuid"];
+            reason: string;
+        };
+        OverrideDiscountRequest: components["schemas"]["DiscountRequest"] & {
+            authorized_by: components["schemas"]["Uuid"];
+        };
+        AccountDiscount: {
+            id: components["schemas"]["Uuid"];
+            account_id: components["schemas"]["Uuid"];
+            /** Format: uuid */
+            order_line_id?: string | null;
+            /** @enum {string} */
+            discount_type: "PERCENTAGE" | "AMOUNT";
+            value: number;
+            /** @description Server-computed cents */
+            computed_amount: number;
+            reason: string;
+            applied_by: components["schemas"]["Uuid"];
+            is_override: boolean;
+            /** Format: date-time */
+            created_at: string;
+        };
+        ApplyDiscountResponse: {
+            account: components["schemas"]["Account"];
+            discount: components["schemas"]["AccountDiscount"];
         };
         SplitAccountRequest: {
             /** @enum {string} */
@@ -3103,6 +3170,66 @@ export interface operations {
                     "application/json": Record<string, never>;
                 };
             };
+        };
+    };
+    applyAccountDiscount: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": string;
+            };
+            path: {
+                locationId: components["schemas"]["Uuid"];
+                accountId: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DiscountRequest"];
+            };
+        };
+        responses: {
+            /** @description Discount applied */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplyDiscountResponse"];
+                };
+            };
+            409: components["responses"]["Error"];
+        };
+    };
+    applyAccountDiscountOverride: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": string;
+            };
+            path: {
+                locationId: components["schemas"]["Uuid"];
+                accountId: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OverrideDiscountRequest"];
+            };
+        };
+        responses: {
+            /** @description Discount applied */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplyDiscountResponse"];
+                };
+            };
+            409: components["responses"]["Error"];
         };
     };
     reopenAccount: {

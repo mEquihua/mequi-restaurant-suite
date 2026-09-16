@@ -38,6 +38,7 @@ describeIntegration('orders API against PostgreSQL', () => {
     for (const table of [
       'command_idempotency',
       'audit_events',
+      'account_discounts',
       'outbox_events',
       'refunds',
       'cancellations_and_voids',
@@ -112,6 +113,8 @@ describeIntegration('orders API against PostgreSQL', () => {
           'accounts.accounts.create',
           'accounts.accounts.split',
           'accounts.accounts.reopen',
+          'accounts.discounts.apply',
+          'accounts.discounts.apply_override',
           'payments.payments.create',
           'payments.refunds.create',
           'kitchen.tickets.update_status',

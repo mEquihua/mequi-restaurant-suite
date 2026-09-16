@@ -34,6 +34,7 @@ export interface Database {
   order_lines: OrderLineTable;
   order_line_modifiers: OrderLineModifierTable;
   payments: PaymentTable;
+  account_discounts: AccountDiscountTable;
   cancellations_and_voids: CancellationAndVoidTable;
   refunds: RefundTable;
   outbox_events: OutboxEventTable;
@@ -351,6 +352,19 @@ export interface PaymentTable {
   version: Generated<number>;
   created_at: Generated<Date>;
   updated_at: Generated<Date>;
+}
+export interface AccountDiscountTable {
+  id: Generated<string>;
+  location_id: string;
+  account_id: string;
+  order_line_id: string | null;
+  discount_type: 'PERCENTAGE' | 'AMOUNT';
+  value: number;
+  computed_amount: number;
+  reason: string;
+  applied_by: string;
+  is_override: boolean;
+  created_at: Generated<Date>;
 }
 export interface CancellationAndVoidTable {
   id: Generated<string>;

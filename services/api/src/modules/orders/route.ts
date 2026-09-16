@@ -20,6 +20,7 @@ import {
 } from './persistence/repository.js';
 import {
   canTransitionLineStatus,
+  computeDiscountAmount,
   lineAmount,
   resolveLinePrice,
   splitEqually,
@@ -160,6 +161,15 @@ const requireLocation = (actor: Actor, locationId: string) => {
     );
 };
 const terminalLine = (status: string) => ['FULFILLED', 'VOIDED', 'CANCELLED'].includes(status);
+// A 20% reduction is a routine hospitality adjustment; anything larger needs manager authorization.
+const ROUTINE_DISCOUNT_MAX_PERCENT = 20;
+type DiscountBody = {
+  discount_type: 'PERCENTAGE' | 'AMOUNT';
+  value: number;
+  order_line_id?: string;
+  reason: string;
+  authorized_by?: string;
+};
 
 /** Private HTTP implementation for orders, visits, accounts, and payments. */
 export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, options) => {
@@ -363,6 +373,128 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
         `${reason ?? 'Void override'}; authorized_by=${authorizedBy}`,
       );
     return updated;
+  }
+
+  async function applyDiscount(
+    request: FastifyRequest,
+    actor: Actor,
+    override: boolean,
+  ) {
+    requirePermission(
+      actor,
+      override ? 'accounts.discounts.apply_override' : 'accounts.discounts.apply',
+    );
+    scoped(request, actor);
+    const accountId = (request.params as { accountId: string }).accountId;
+    const body = request.body as DiscountBody;
+    const account = await findAccount(actor.trx, actor.locationId, accountId);
+    if (!account) throw new IdentityHttpError(404, 'NOT_FOUND', 'Account was not found.');
+    const version = expected(request.headers['if-match']);
+    if (version !== account.version) throw conflict(account, account);
+    if (!['OPEN', 'PARTIALLY_PAID'].includes(account.status))
+      throw new IdentityHttpError(
+        409,
+        'ACCOUNT_NOT_OPEN',
+        'Discounts require an open or partially paid account.',
+      );
+    if (override && !body.authorized_by)
+      throw new IdentityHttpError(
+        400,
+        'MANAGER_AUTHORIZATION_REQUIRED',
+        'authorized_by is required for an override.',
+      );
+
+    let line = undefined;
+    let targetSubtotal = account.subtotal;
+    if (body.order_line_id) {
+      line = await findLine(actor.trx, actor.locationId, body.order_line_id);
+      if (!line || line.account_id !== account.id)
+        throw new IdentityHttpError(
+          400,
+          'INVALID_ORDER_LINE_FOR_ACCOUNT',
+          'order_line_id must belong to this account in this location.',
+        );
+      if (terminalLine(line.status))
+        throw new IdentityHttpError(
+          409,
+          'ORDER_LINE_NOT_DISCOUNTABLE',
+          'Discounts cannot be applied to a terminal order line.',
+        );
+      targetSubtotal = lineAmount(line);
+    }
+    if (targetSubtotal < 1)
+      throw new IdentityHttpError(
+        409,
+        'DISCOUNT_TARGET_EMPTY',
+        'A discount requires a positive target subtotal.',
+      );
+    let computedAmount: number;
+    try {
+      computedAmount = computeDiscountAmount({
+        targetSubtotal,
+        discountType: body.discount_type,
+        value: body.value,
+      });
+    } catch (error) {
+      throw new IdentityHttpError(
+        400,
+        'INVALID_DISCOUNT',
+        error instanceof Error ? error.message : 'Invalid discount.',
+      );
+    }
+    const requestedPercent =
+      body.discount_type === 'PERCENTAGE' ? body.value : (body.value * 100) / targetSubtotal;
+    if (!override && requestedPercent > ROUTINE_DISCOUNT_MAX_PERCENT)
+      throw new IdentityHttpError(
+        409,
+        'DISCOUNT_OVERRIDE_REQUIRED',
+        `Discounts above ${ROUTINE_DISCOUNT_MAX_PERCENT}% of the target subtotal require the override endpoint.`,
+      );
+    const total = account.total - computedAmount;
+    if (total < 0)
+      throw new IdentityHttpError(
+        409,
+        'ACCOUNT_TOTAL_UNDERFLOW',
+        'The account total cannot become negative.',
+      );
+    const updated = await actor.trx
+      .updateTable('accounts')
+      .set({
+        discount: account.discount + computedAmount,
+        total,
+        version: sql<number>`version + 1`,
+      })
+      .where('id', '=', accountId)
+      .where('version', '=', version)
+      .returningAll()
+      .executeTakeFirst();
+    if (!updated) throw conflict(account, account);
+    const discount = await actor.trx
+      .insertInto('account_discounts')
+      .values({
+        location_id: actor.locationId,
+        account_id: account.id,
+        order_line_id: line?.id ?? null,
+        discount_type: body.discount_type,
+        value: body.value,
+        computed_amount: computedAmount,
+        reason: body.reason,
+        applied_by: actor.staffId,
+        is_override: override,
+      })
+      .returningAll()
+      .executeTakeFirstOrThrow();
+    if (override)
+      await audit(
+        actor,
+        request,
+        'accounts.discounts.apply_override',
+        account.id,
+        account.version,
+        updated.version,
+        `${body.reason}; authorized_by=${body.authorized_by}`,
+      );
+    return { account: updated, discount };
   }
 
   app.post(
@@ -1090,6 +1222,45 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
         if (!updated) throw conflict(order, order);
         return { order: updated, line_ids: body.line_ids };
       }),
+  );
+  const discountSchema = (override: boolean) => ({
+    params: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['locationId', 'accountId'],
+      properties: { locationId: uuid, accountId: uuid },
+    },
+    headers: ifMatch,
+    body: {
+      type: 'object',
+      additionalProperties: false,
+      required: override
+        ? ['discount_type', 'value', 'reason', 'authorized_by']
+        : ['discount_type', 'value', 'reason'],
+      properties: {
+        discount_type: { type: 'string', enum: ['PERCENTAGE', 'AMOUNT'] },
+        value: { type: 'integer', minimum: 1 },
+        order_line_id: uuid,
+        reason: { type: 'string', minLength: 1, maxLength: 500 },
+        authorized_by: uuid,
+      },
+    },
+  });
+  app.post(
+    '/api/v1/locations/:locationId/accounts/:accountId/discounts',
+    { schema: discountSchema(false) },
+    async (request, reply) =>
+      withSession(request, async (actor) =>
+        reply.status(201).send(await applyDiscount(request, actor, false)),
+      ),
+  );
+  app.post(
+    '/api/v1/locations/:locationId/accounts/:accountId/discounts/override',
+    { schema: discountSchema(true) },
+    async (request, reply) =>
+      withSession(request, async (actor) =>
+        reply.status(201).send(await applyDiscount(request, actor, true)),
+      ),
   );
   app.post(
     '/api/v1/locations/:locationId/accounts/:accountId/split',

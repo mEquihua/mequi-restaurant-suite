@@ -33,7 +33,7 @@ describeIntegration('orders API security boundaries against PostgreSQL', () => {
 
   beforeAll(async () => {
     for (const table of [
-      'command_idempotency', 'audit_events', 'outbox_events', 'refunds', 'cancellations_and_voids',
+      'command_idempotency', 'audit_events', 'account_discounts', 'outbox_events', 'refunds', 'cancellations_and_voids',
       'payments', 'order_line_modifiers', 'order_lines', 'orders', 'accounts', 'visits',
       'table_sections', 'sections', 'tables', 'areas', 'availability_rules', 'location_price_overrides',
       'product_combo_items', 'product_combo_groups', 'product_modifier_groups', 'modifiers', 'modifier_groups',
@@ -46,14 +46,15 @@ describeIntegration('orders API security boundaries against PostgreSQL', () => {
 
     const waiterRole = await db.insertInto('roles').values({ organization_id: org, name: 'Waiter' }).returning('id').executeTakeFirstOrThrow();
     await db.insertInto('role_permissions').values(
-      ['orders.visits.create', 'orders.orders.create', 'orders.lines.add', 'orders.lines.send', 'orders.lines.void']
+      ['orders.visits.create', 'orders.orders.create', 'orders.lines.add', 'orders.lines.send', 'orders.lines.void', 'accounts.discounts.apply']
         .map((permission_name) => ({ role_id: waiterRole.id, permission_name, scope: 'organization' })),
     ).execute();
 
     const managerRole = await db.insertInto('roles').values({ organization_id: org, name: 'Manager' }).returning('id').executeTakeFirstOrThrow();
     await db.insertInto('role_permissions').values(
       ['orders.visits.create', 'orders.orders.create', 'orders.lines.add', 'orders.lines.send',
-       'orders.lines.void', 'orders.lines.void_override', 'kitchen.tickets.update_status', 'accounts.accounts.create']
+       'orders.lines.void', 'orders.lines.void_override', 'kitchen.tickets.update_status', 'accounts.accounts.create',
+       'accounts.discounts.apply', 'accounts.discounts.apply_override']
         .map((permission_name) => ({ role_id: managerRole.id, permission_name, scope: 'organization' })),
     ).execute();
 
@@ -132,6 +133,66 @@ describeIntegration('orders API security boundaries against PostgreSQL', () => {
     // The override is recorded in the immutable audit trail.
     const auditRows = await db.selectFrom('audit_events').selectAll().where('aggregate_id', '=', lineId).where('action', '=', 'orders.lines.void_override').execute();
     expect(auditRows).toHaveLength(1);
+  });
+
+  it('applies server-computed account and line discounts, gates larger ones behind override, and audits overrides', async () => {
+    const waiterAuth = { authorization: `Bearer ${token}` };
+    const managerAuth = { authorization: `Bearer ${managerToken}` };
+    const visit = (await app.inject({ method: 'POST', url: `/api/v1/locations/${location}/visits`, headers: waiterAuth, payload: {} })).json();
+    const account = (await app.inject({ method: 'POST', url: `/api/v1/locations/${location}/visits/${visit.id}/accounts`, headers: managerAuth, payload: {} })).json();
+    const order = (await app.inject({ method: 'POST', url: `/api/v1/locations/${location}/visits/${visit.id}/orders`, headers: { ...waiterAuth, 'if-match': String(visit.version) }, payload: { order_type: 'DINE_IN' } })).json();
+    const added = (await app.inject({ method: 'POST', url: `/api/v1/locations/${location}/orders/${order.id}/lines`, headers: { ...waiterAuth, 'if-match': String(order.version) }, payload: { lines: [{ account_id: account.id, product_id: product, quantity: 1 }, { account_id: account.id, product_id: product, quantity: 1 }] } })).json();
+    expect(added.lines).toHaveLength(2);
+    const accountId = added.lines[0].account_id;
+    // The two authoritative line inserts each increment the account version from its initial 1.
+    const accountVersionAfterLines = 3;
+
+    const routine = await app.inject({
+      method: 'POST',
+      url: `/api/v1/locations/${location}/accounts/${accountId}/discounts`,
+      headers: { ...waiterAuth, 'if-match': String(accountVersionAfterLines) },
+      payload: { discount_type: 'PERCENTAGE', value: 10, reason: 'service recovery' },
+    });
+    expect(routine.statusCode).toBe(201);
+    expect(routine.json().discount.computed_amount).toBe(500);
+    expect(routine.json().account.discount).toBe(500);
+    expect(routine.json().account.total).toBe(4500);
+
+    const aboveCap = await app.inject({
+      method: 'POST',
+      url: `/api/v1/locations/${location}/accounts/${accountId}/discounts`,
+      headers: { ...waiterAuth, 'if-match': String(routine.json().account.version) },
+      payload: { discount_type: 'PERCENTAGE', value: 21, reason: 'too generous' },
+    });
+    expect(aboveCap.statusCode).toBe(409);
+    expect(aboveCap.json().error.code).toBe('DISCOUNT_OVERRIDE_REQUIRED');
+    expect(aboveCap.json().error.message).toContain('override endpoint');
+
+    const override = await app.inject({
+      method: 'POST',
+      url: `/api/v1/locations/${location}/accounts/${accountId}/discounts/override`,
+      headers: { ...managerAuth, 'if-match': String(routine.json().account.version) },
+      payload: { discount_type: 'PERCENTAGE', value: 25, reason: 'manager approval', authorized_by: manager },
+    });
+    expect(override.statusCode).toBe(201);
+    expect(override.json().discount.computed_amount).toBe(1250);
+    // Fastify may flush the response immediately before the surrounding transaction commits.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    const discounts = await db.selectFrom('account_discounts').selectAll().where('account_id', '=', accountId).orderBy('created_at').execute();
+    expect(discounts).toHaveLength(2);
+    expect(discounts[1].is_override).toBe(true);
+    const audits = await db.selectFrom('audit_events').selectAll().where('aggregate_id', '=', accountId).where('action', '=', 'accounts.discounts.apply_override').execute();
+    expect(audits).toHaveLength(1);
+
+    const perLine = await app.inject({
+      method: 'POST',
+      url: `/api/v1/locations/${location}/accounts/${accountId}/discounts`,
+      headers: { ...waiterAuth, 'if-match': String(override.json().account.version) },
+      payload: { discount_type: 'PERCENTAGE', value: 10, order_line_id: added.lines[0].id, reason: 'item issue' },
+    });
+    expect(perLine.statusCode).toBe(201);
+    expect(perLine.json().discount.computed_amount).toBe(250);
+    expect(perLine.json().discount.order_line_id).toBe(added.lines[0].id);
   });
 
   it('rejects an account_id that belongs to a different visit than the order', async () => {

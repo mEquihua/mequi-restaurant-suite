@@ -1350,6 +1350,33 @@ paths:
               content: { application/json: { schema: { type: object } } },
             },
         }
+  /api/v1/locations/{locationId}/accounts/{accountId}/discounts:
+    post: &applyAccountDiscount
+      operationId: applyAccountDiscount
+      description: Routine discounts are limited to 20 percent of the stored target subtotal. Use the override endpoint for larger discounts.
+      x-required-permission: accounts.discounts.apply
+      security: [{ staffSession: [] }]
+      parameters:
+        [
+          { name: locationId, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } },
+          { name: accountId, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } },
+          { name: If-Match, in: header, required: true, schema: { type: string } },
+        ]
+      requestBody:
+        { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/DiscountRequest' } } } }
+      responses:
+        {
+          '201': { description: Discount applied, content: { application/json: { schema: { $ref: '#/components/schemas/ApplyDiscountResponse' } } } },
+          '409': { $ref: '#/components/responses/Error' },
+        }
+  /api/v1/locations/{locationId}/accounts/{accountId}/discounts/override:
+    post:
+      <<: *applyAccountDiscount
+      operationId: applyAccountDiscountOverride
+      description: Manager-authorized discount with no routine cap; records an audit event.
+      x-required-permission: accounts.discounts.apply_override
+      requestBody:
+        { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/OverrideDiscountRequest' } } } }
   /api/v1/locations/{locationId}/accounts/{accountId}/reopen:
     post:
       operationId: reopenAccount
@@ -1629,6 +1656,8 @@ components:
             location_id: { $ref: '#/components/schemas/Uuid' },
             visit_id: { $ref: '#/components/schemas/Uuid' },
             status: { type: string, enum: [OPEN, PARTIALLY_PAID, PAID, CLOSED, REFUNDED] },
+            subtotal: { type: integer },
+            discount: { type: integer },
             total: { type: integer },
             paid_amount: { type: integer },
             version: { type: integer },
@@ -1767,6 +1796,59 @@ components:
           {
             reason: { type: string, minLength: 1 },
             authorized_by: { $ref: '#/components/schemas/Uuid' },
+          },
+      }
+    DiscountRequest:
+      {
+        type: object,
+        additionalProperties: false,
+        required: [discount_type, value, reason],
+        properties:
+          {
+            discount_type: { type: string, enum: [PERCENTAGE, AMOUNT] },
+            value: { type: integer, minimum: 1, description: Percentage points or cents; the server computes the deducted cents. },
+            order_line_id: { $ref: '#/components/schemas/Uuid' },
+            reason: { type: string, minLength: 1 },
+          },
+      }
+    OverrideDiscountRequest:
+      {
+        allOf:
+          [
+            { $ref: '#/components/schemas/DiscountRequest' },
+            {
+              type: object,
+              required: [authorized_by],
+              properties: { authorized_by: { $ref: '#/components/schemas/Uuid' } },
+            },
+          ],
+      }
+    AccountDiscount:
+      {
+        type: object,
+        required: [id, account_id, discount_type, value, computed_amount, reason, applied_by, is_override, created_at],
+        properties:
+          {
+            id: { $ref: '#/components/schemas/Uuid' },
+            account_id: { $ref: '#/components/schemas/Uuid' },
+            order_line_id: { type: [string, 'null'], format: uuid },
+            discount_type: { type: string, enum: [PERCENTAGE, AMOUNT] },
+            value: { type: integer },
+            computed_amount: { type: integer, description: Server-computed cents },
+            reason: { type: string },
+            applied_by: { $ref: '#/components/schemas/Uuid' },
+            is_override: { type: boolean },
+            created_at: { type: string, format: date-time },
+          },
+      }
+    ApplyDiscountResponse:
+      {
+        type: object,
+        required: [account, discount],
+        properties:
+          {
+            account: { $ref: '#/components/schemas/Account' },
+            discount: { $ref: '#/components/schemas/AccountDiscount' },
           },
       }
     SplitAccountRequest:

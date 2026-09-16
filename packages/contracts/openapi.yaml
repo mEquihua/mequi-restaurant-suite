@@ -5010,6 +5010,106 @@ components:
           enum:
             - PICKUP
             - DELIVERY
+    OnlineOrderTotals:
+      type: object
+      required:
+        - subtotal
+        - total
+        - paid
+      properties:
+        subtotal:
+          type: integer
+        total:
+          type: integer
+        paid:
+          type: integer
+    OnlineOrderSummary:
+      type: object
+      required:
+        - id
+        - location_id
+        - visit_id
+        - order_type
+        - status
+        - version
+        - created_at
+        - updated_at
+        - totals
+      properties:
+        id:
+          type: string
+          format: uuid
+        location_id:
+          type: string
+          format: uuid
+        visit_id:
+          type: string
+          format: uuid
+        order_type:
+          type: string
+        status:
+          type: string
+        version:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        totals:
+          $ref: "#/components/schemas/OnlineOrderTotals"
+    OnlineOrderLineModifierSummary:
+      type: object
+      required:
+        - id
+        - modifier_id
+      properties:
+        id:
+          type: string
+          format: uuid
+        modifier_id:
+          type: string
+          format: uuid
+    OnlineOrderLineSummary:
+      type: object
+      required:
+        - id
+        - order_id
+        - account_id
+        - product_id
+        - status
+        - quantity
+        - created_at
+        - updated_at
+        - modifiers
+      properties:
+        id:
+          type: string
+          format: uuid
+        order_id:
+          type: string
+          format: uuid
+        account_id:
+          type: string
+          format: uuid
+        product_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+        quantity:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        modifiers:
+          type: array
+          items:
+            $ref: "#/components/schemas/OnlineOrderLineModifierSummary"
     OnlineOrderDetailResponse:
       type: object
       required:
@@ -5018,11 +5118,11 @@ components:
         - fulfillment
       properties:
         order:
-          $ref: "#/components/schemas/Order"
+          $ref: "#/components/schemas/OnlineOrderSummary"
         lines:
           type: array
           items:
-            $ref: "#/components/schemas/OrderLine"
+            $ref: "#/components/schemas/OnlineOrderLineSummary"
         fulfillment:
           $ref: "#/components/schemas/OrderFulfillment"
     FulfillmentActionRequest:

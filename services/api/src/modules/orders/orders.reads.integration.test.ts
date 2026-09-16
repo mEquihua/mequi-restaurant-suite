@@ -46,7 +46,7 @@ describeIntegration('orders API reads and table side effects against PostgreSQL'
       'product_combo_items', 'product_combo_groups', 'product_modifier_groups', 'modifiers',
       'modifier_groups', 'product_variants', 'products', 'categories', 'terminal_pin_attempts',
       'staff_sessions', 'staff_roles', 'role_permissions', 'terminals', 'staff', 'roles',
-      'customer_sessions', 'customers', 'locations', 'organizations',
+      'customer_sessions', 'customers', 'delivery_zones', 'locations', 'organizations',
     ] as const)
       await db.deleteFrom(table).execute();
 

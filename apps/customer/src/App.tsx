@@ -19,7 +19,7 @@ import {
   type OnlineOrderListResponse,
   type Product,
 } from './api.js';
-import { cartItemPrice, cartTotal, requiresDeliveryAddress, type CartItem } from './logic.js';
+import { cartItemPrice, cartTotal, requiresDeliveryAddress, meetsDeliveryMinimum, type CartItem } from './logic.js';
 
 const queryClient = new QueryClient();
 const money = (amount: number) =>
@@ -473,6 +473,15 @@ function Checkout({
 }) {
   const navigate = useNavigate();
   const [fulfillment, setFulfillment] = useState<'PICKUP' | 'DELIVERY'>('PICKUP');
+  const [deliveryZoneId, setDeliveryZoneId] = useState<string>('');
+  const { data: zonesData } = useQuery({
+    queryKey: ['delivery-zones', location.id],
+    queryFn: () => apiFetch<{ data: { id: string, name: string, fee: number, minimum_order_amount: number }[] }>(`/api/v1/locations/${location.id}/delivery-zones`),
+    enabled: fulfillment === 'DELIVERY',
+  });
+  const zones = zonesData?.data ?? [];
+  const selectedZone = deliveryZoneId ? zones.find(z => z.id === deliveryZoneId) : zones[0];
+  
   const mutation = useMutation({
     mutationFn: (form: HTMLFormElement) => {
       const data = new FormData(form);
@@ -490,7 +499,7 @@ function Checkout({
         customer_name: String(data.get('name')),
         customer_email: String(data.get('email')),
         customer_phone: String(data.get('phone')),
-        ...(requiresDeliveryAddress(fulfillment) ? { delivery_address: { address } } : {}),
+        ...(requiresDeliveryAddress(fulfillment) ? { delivery_address: { address }, delivery_zone_id: selectedZone?.id } : {}),
       };
       return apiFetch<OnlineCheckoutResponse>(
         `/api/v1/locations/${location.id}/online-orders/checkout`,
@@ -561,17 +570,35 @@ function Checkout({
             <input name="scheduled_for" type="datetime-local" />
           </label>
           {requiresDeliveryAddress(fulfillment) && (
-            <label>
-              Delivery address
-              <textarea name="delivery_address" required />
-            </label>
+            <>
+              <label>
+                Delivery address
+                <textarea name="delivery_address" required />
+              </label>
+              <label>
+                Delivery Zone
+                <select value={selectedZone?.id ?? ''} onChange={(e) => setDeliveryZoneId(e.target.value)} required>
+                  {zones.map(zone => (
+                    <option key={zone.id} value={zone.id}>
+                      {zone.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {selectedZone && (
+                <p className="payment-note">Fee: {money(selectedZone.fee)} &middot; {money(selectedZone.minimum_order_amount)} minimum order</p>
+              )}
+            </>
           )}
           <p className="payment-note">
             Pay when you {fulfillment === 'PICKUP' ? 'pick up your order' : 'receive your delivery'}
             .
           </p>
           {mutation.isError && <ErrorMessage error={mutation.error} />}
-          <button className="primary" disabled={mutation.isPending}>
+          {!meetsDeliveryMinimum(cartTotal(cart), selectedZone) && fulfillment === 'DELIVERY' && (
+            <div className="error">Subtotal does not meet the delivery zone minimum.</div>
+          )}
+          <button className="primary" disabled={mutation.isPending || (fulfillment === 'DELIVERY' && !meetsDeliveryMinimum(cartTotal(cart), selectedZone))}>
             {mutation.isPending ? 'Placing order…' : `Place order · ${money(cartTotal(cart))}`}
           </button>
         </form>
@@ -636,6 +663,14 @@ function OrderStatus({ location, customer }: { location: Location; customer?: Cu
           : 'receive your delivery'}
         .
       </p>
+      {value.order.totals && (
+        <div style={{ padding: '1rem', background: '#f5f5f5', borderRadius: '4px', marginBottom: '1rem' }}>
+          <div><strong>Total: {money(value.order.totals.total)}</strong></div>
+          {value.order.totals.delivery_fee > 0 && (
+            <div className="muted"><small>Includes {money(value.order.totals.delivery_fee)} delivery fee</small></div>
+          )}
+        </div>
+      )}
       <p className="muted">We refresh this status automatically.</p>
       <Link className="button primary" to="/history">
         View recent orders
@@ -682,6 +717,14 @@ function CustomerOrderHistory({ location }: { location: Location }) {
             <strong>{item.fulfillment.fulfillment_type}</strong>
             <span>{item.order.status}</span>
             <small>{new Date(item.order.created_at).toLocaleString()}</small>
+            {item.order.totals && (
+              <div style={{ marginTop: '0.5rem' }}>
+                <div>Total: {money(item.order.totals.total)}</div>
+                {item.order.totals.delivery_fee > 0 && (
+                  <div className="muted"><small>Includes {money(item.order.totals.delivery_fee)} delivery fee</small></div>
+                )}
+              </div>
+            )}
           </Link>
         ))}
       </div>
@@ -734,6 +777,14 @@ function HistoryItem({ stored }: { stored: StoredOrder }) {
         {query.data ? query.data.order.status : query.isError ? 'Unavailable' : 'Loading…'}
       </span>
       <small>{new Date(stored.createdAt).toLocaleString()}</small>
+      {query.data?.order.totals && (
+        <div style={{ marginTop: '0.5rem' }}>
+          <div>Total: {money(query.data.order.totals.total)}</div>
+          {query.data.order.totals.delivery_fee > 0 && (
+            <div className="muted"><small>Includes {money(query.data.order.totals.delivery_fee)} delivery fee</small></div>
+          )}
+        </div>
+      )}
     </Link>
   );
 }

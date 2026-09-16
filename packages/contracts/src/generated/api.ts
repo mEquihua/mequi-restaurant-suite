@@ -1797,6 +1797,151 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/locations/{loc_id}/delivery-zones": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List active delivery zones for location */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    loc_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DeliveryZoneListResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Create a delivery zone */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    loc_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["CreateDeliveryZoneRequest"];
+                };
+            };
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DeliveryZoneAdmin"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/locations/{loc_id}/delivery-zones/admin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List all delivery zones for location (admin) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    loc_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DeliveryZoneAdminListResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/locations/{loc_id}/delivery-zones/{zone_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update a delivery zone */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    loc_id: string;
+                    zone_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["UpdateDeliveryZoneRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DeliveryZoneAdmin"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2542,6 +2687,8 @@ export interface components {
             delivery_address?: {
                 [key: string]: unknown;
             } | null;
+            /** Format: uuid */
+            delivery_zone_id?: string | null;
         };
         OnlineCheckoutResponse: {
             /** Format: uuid */
@@ -2556,6 +2703,7 @@ export interface components {
         };
         OnlineOrderTotals: {
             subtotal: number;
+            delivery_fee: number;
             total: number;
             paid: number;
         };
@@ -2625,6 +2773,37 @@ export interface components {
             quantity: number;
             notes?: string | null;
             modifiers?: components["schemas"]["CheckoutModifier"][];
+        };
+        DeliveryZone: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            fee: number;
+            minimum_order_amount: number;
+        };
+        DeliveryZoneAdmin: components["schemas"]["DeliveryZone"] & {
+            /** Format: uuid */
+            location_id: string;
+            active: boolean;
+            version: number;
+        };
+        DeliveryZoneListResponse: {
+            data: components["schemas"]["DeliveryZone"][];
+        };
+        DeliveryZoneAdminListResponse: {
+            data: components["schemas"]["DeliveryZoneAdmin"][];
+        };
+        CreateDeliveryZoneRequest: {
+            name: string;
+            fee: number;
+            minimum_order_amount?: number;
+        };
+        UpdateDeliveryZoneRequest: {
+            version: number;
+            name?: string;
+            fee?: number;
+            minimum_order_amount?: number;
+            active?: boolean;
         };
     };
     responses: {

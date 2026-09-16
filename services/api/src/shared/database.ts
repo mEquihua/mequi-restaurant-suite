@@ -31,6 +31,7 @@ export interface DeliveryZoneTable {
   fee: number;
   minimum_order_amount: Generated<number>;
   active: Generated<boolean>;
+  version: Generated<number>;
   created_at: Generated<Date>;
   updated_at: Generated<Date>;
 }
@@ -48,6 +49,8 @@ export interface OrderFulfillmentTable {
   delivery_address: unknown | null;
   delivery_driver_name: string | null;
   guest_token_hash: string | null;
+  delivery_zone_id: string | null;
+  delivery_fee: Generated<number>;
   version: Generated<number>;
   created_at: Generated<Date>;
   updated_at: Generated<Date>;

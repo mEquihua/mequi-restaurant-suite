@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cartTotal, requiresDeliveryAddress, type CartItem } from './logic.js';
+import { cartTotal, meetsDeliveryMinimum, requiresDeliveryAddress, type CartItem } from './logic.js';
 
 const item: CartItem = {
   quantity: 2,
@@ -44,5 +44,18 @@ describe('fulfillment form rules', () => {
   it('requires an address only for delivery', () => {
     expect(requiresDeliveryAddress('DELIVERY')).toBe(true);
     expect(requiresDeliveryAddress('PICKUP')).toBe(false);
+  });
+});
+
+describe('meetsDeliveryMinimum', () => {
+  it('returns true when there is no zone', () => {
+    expect(meetsDeliveryMinimum(1000)).toBe(true);
+  });
+  it('returns true when cart total meets minimum', () => {
+    expect(meetsDeliveryMinimum(2000, { minimum_order_amount: 1500 })).toBe(true);
+    expect(meetsDeliveryMinimum(1500, { minimum_order_amount: 1500 })).toBe(true);
+  });
+  it('returns false when cart total is below minimum', () => {
+    expect(meetsDeliveryMinimum(1499, { minimum_order_amount: 1500 })).toBe(false);
   });
 });

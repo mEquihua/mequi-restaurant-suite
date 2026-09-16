@@ -232,6 +232,28 @@ describeIntegration('menu API against PostgreSQL', () => {
     expect(combo.statusCode).toBe(201);
   });
 
+  it('allows fully anonymous menu reads scoped by location_id, and requires it', async () => {
+    // idea.md 68: a Customer-app visitor reads the menu before registering,
+    // logging in, or starting checkout — there is no session of any kind at
+    // that point. Confirms the anonymous fallback branch in
+    // withMenuReadSession, distinct from the staff/guest/customer branches
+    // covered elsewhere.
+    const categories = await app.inject({ method: 'GET', url: `/api/v1/categories?location_id=${locationA}` });
+    expect(categories.statusCode).toBe(200);
+    expect(categories.json().data.length).toBeGreaterThan(0);
+
+    const products = await app.inject({ method: 'GET', url: `/api/v1/products?location_id=${locationA}` });
+    expect(products.statusCode).toBe(200);
+    expect(products.json().data.length).toBeGreaterThan(0);
+
+    const missingLocation = await app.inject({ method: 'GET', url: '/api/v1/categories' });
+    expect(missingLocation.statusCode).toBe(400);
+    expect(missingLocation.json().error.code).toBe('MISSING_LOCATION');
+
+    const unknownLocation = await app.inject({ method: 'GET', url: `/api/v1/categories?location_id=${crypto.randomUUID()}` });
+    expect(unknownLocation.statusCode).toBe(404);
+  });
+
   it('serves the location override rather than the base price', async () => {
     const product = await db
       .selectFrom('products')

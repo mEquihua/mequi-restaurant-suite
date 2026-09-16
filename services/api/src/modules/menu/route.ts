@@ -190,6 +190,31 @@ export const menuRoute: FastifyPluginAsync<MenuRouteOptions> = async (app, optio
           false,
         );
       });
+    if (!token) {
+      // Fully anonymous menu browsing (idea.md 68: a Customer-app visitor
+      // reads the menu before registering, logging in, or starting
+      // checkout — there is no session of any kind at that point). Reads
+      // are not sensitive, so this is scoped only by a required location_id
+      // and runs with no elevated privileges, matching how the guest-
+      // sessions module's public order-status-board endpoint reads data
+      // with no session at all.
+      const locationId = (request.query as { location_id?: string }).location_id;
+      if (!locationId)
+        throw new IdentityHttpError(
+          400,
+          'MISSING_LOCATION',
+          'location_id query parameter is required for anonymous menu reads.',
+        );
+      return app.withLocationTransaction(locationId, async (trx) => {
+        const location = await trx
+          .selectFrom('locations')
+          .select('organization_id')
+          .where('id', '=', locationId)
+          .executeTakeFirst();
+        if (!location) throw new IdentityHttpError(404, 'NOT_FOUND', 'Location was not found.');
+        return work({ trx, organizationId: location.organization_id, locationId }, true);
+      });
+    }
     return withSession(request, async (staff) => {
       requirePermission(staff, 'menu.catalog.read');
       return work(staff, false);

@@ -26,6 +26,8 @@ export interface Database {
   tables: DiningTableTable;
   sections: SectionTable;
   table_sections: TableSectionTable;
+  module_definitions: ModuleDefinitionTable;
+  module_activations: ModuleActivationTable;
 }
 
 export interface OrganizationTable {
@@ -243,6 +245,22 @@ export interface SectionTable {
 export interface TableSectionTable {
   table_id: string;
   section_id: string;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+export interface ModuleDefinitionTable {
+  key: string;
+  display_name: string;
+  description: string;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+export interface ModuleActivationTable {
+  location_id: string;
+  module_key: string;
+  status: string;
+  attention_reason: string | null;
+  version: Generated<number>;
   created_at: Generated<Date>;
   updated_at: Generated<Date>;
 }

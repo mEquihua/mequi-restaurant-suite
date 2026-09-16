@@ -93,6 +93,7 @@ const OWNER_AND_MANAGER_PERMISSIONS: readonly string[] = [
   'iam.terminals.enroll', 'iam.terminals.read', 'iam.staff.read', 'iam.staff.create', 'iam.staff.update', 'iam.roles.read', 'iam.roles.update',
   'menu.catalog.read', 'menu.products.write', 'menu.prices.update', 'menu.availability.update',
   'floor.layout.read', 'floor.layout.write', 'floor.tables.update_status', 'floor.sections.assign',
+  'module_center.modules.read', 'module_center.modules.write',
   'orders.visits.create', 'orders.visits.close', 'orders.visits.read_all', 'orders.visits.transfer',
   'orders.orders.create', 'orders.lines.add', 'orders.lines.hold', 'orders.lines.send', 'orders.lines.void', 'orders.lines.void_override',
   'orders.orders.cancel', 'orders.orders.cancel_override',

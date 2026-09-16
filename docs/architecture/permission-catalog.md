@@ -13,7 +13,7 @@ Every permission name in Restaurant Suite strictly adheres to a three-segment na
 $$\text{\texttt{<domain>.<resource>.<action>}}$$
 
 ### Structure Rules
-1. **`<domain>`**: The primary operational module (`iam`, `menu`, `floor`, `orders`, `accounts`, `payments`, `kitchen`, `reports`).
+1. **`<domain>`**: The primary operational module (`iam`, `menu`, `floor`, `module_center`, `orders`, `accounts`, `payments`, `kitchen`, `reports`).
 2. **`<resource>`**: The specific aggregate or target noun in plural form (`staff`, `roles`, `terminals`, `catalog`, `products`, `prices`, `availability`, `layout`, `tables`, `sections`, `visits`, `orders`, `lines`, `accounts`, `discounts`, `payments`, `refunds`, `cash`, `tickets`, `sales`, `audit`).
 3. **`<action>`**: The specific capability or lifecycle verb (`read`, `create`, `update`, `write`, `enroll`, `apply`, `hold`, `send`, `void`, `cancel`, `transfer`, `split`, `reopen`, `reconcile`, `update_status`, `assign`, `read_all`, `override`, `void_override`, `cancel_override`, `apply_override`).
 
@@ -74,7 +74,15 @@ Manages physical layout, dining areas, table arrangements, seating section assig
 | `floor.tables.update_status` | Update real-time table occupancy/readiness state (Needs Cleaning, Available, Out of Service). |
 | `floor.sections.assign` | Assign waiters and staff members to floor sections and table groups. |
 
-### 3.4 Orders & Visits (`orders`)
+### 3.4 Module Center (`module_center`)
+Manages the owner-facing, per-location registry of active Restaurant Suite capabilities.
+
+| Permission Name | Description |
+| --- | --- |
+| `module_center.modules.read` | View the fixed capability catalog and its current status for a location. |
+| `module_center.modules.write` | Activate, pause, deactivate, or flag a location capability for attention. |
+
+### 3.5 Orders & Visits (`orders`)
 Manages table visits, guest seating, order draft creation, line additions, kitchen firing, item voids, and order cancellations.
 
 | Permission Name | Description |
@@ -92,7 +100,7 @@ Manages table visits, guest seating, order draft creation, line additions, kitch
 | `orders.orders.cancel` | Cancel an un-fired draft order aggregate. |
 | `orders.orders.cancel_override` | Authorize manager override to cancel an active, sent, or partially prepared order aggregate. |
 
-### 3.5 Accounts (`accounts`)
+### 3.6 Accounts (`accounts`)
 Manages financial guest accounts, seat/check splitting, account reopening, and promotional discounts.
 
 | Permission Name | Description |
@@ -103,7 +111,7 @@ Manages financial guest accounts, seat/check splitting, account reopening, and p
 | `accounts.discounts.apply` | Apply standard item-level or account-level discounts and promotions. |
 | `accounts.discounts.apply_override` | Authorize manager override for custom discounts or discounts exceeding standard staff caps. |
 
-### 3.6 Payments & Cash (`payments`)
+### 3.7 Payments & Cash (`payments`)
 Manages payment recording (card/cash), refunds, manual cash drawer opening, and shift cash reconciliation.
 
 | Permission Name | Description |
@@ -114,7 +122,7 @@ Manages payment recording (card/cash), refunds, manual cash drawer opening, and 
 | `payments.cash.open_drawer` | Trigger manual cash drawer kick outside a completed payment transaction. |
 | `payments.cash.reconcile` | Perform cash float verification, cash drops, shift close counts, and drawer reconciliation. |
 
-### 3.7 Kitchen Display (`kitchen`)
+### 3.8 Kitchen Display (`kitchen`)
 Manages ticket queues and fulfillment state transitions on Kitchen Display System (KDS) terminals.
 
 | Permission Name | Description |
@@ -122,7 +130,7 @@ Manages ticket queues and fulfillment state transitions on Kitchen Display Syste
 | `kitchen.tickets.read` | View kitchen display station queues, order line tickets, and prep timers. |
 | `kitchen.tickets.update_status` | Transition order line fulfillment states (Preparing, Ready, Fulfilled, Recalled). |
 
-### 3.8 Reports (`reports`)
+### 3.9 Reports (`reports`)
 Manages read access to operational, financial, shift, and security audit reports.
 
 | Permission Name | Description |
@@ -155,6 +163,8 @@ $$\text{\textbf{Legend: }}\mathbf{X} = \text{Granted by default} \quad \vert \qu
 | | `floor.layout.write` | **X** | **X** | | | | |
 | | `floor.tables.update_status` | **X** | **X** | **X** | **X** | **X** | |
 | | `floor.sections.assign` | **X** | **X** | | | **X** | |
+| **Module Center** | `module_center.modules.read` | **X** | **X** | | | | |
+| | `module_center.modules.write` | **X** | **X** | | | | |
 | **Orders** | `orders.visits.create` | **X** | **X** | **X** | **X** | **X** | |
 | | `orders.visits.close` | **X** | **X** | **X** | **X** | **X** | |
 | | `orders.visits.read_all` | **X** | **X** | | **X** | **X** | |

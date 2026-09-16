@@ -201,6 +201,32 @@ export const customersRoute: FastifyPluginAsync<CustomersRouteOptions> = async (
   );
 
   app.get<{ Params: { org_id: string } }>(
+    '/api/v1/organizations/:org_id/locations',
+    {
+      schema: {
+        params: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['org_id'],
+          properties: { org_id: uuidSchema },
+        },
+      },
+    },
+    async (request) => {
+      const { org_id } = request.params;
+      return app.withOrganizationTransaction(org_id, async (trx) => {
+        const locations = await trx
+          .selectFrom('locations')
+          .select(['id', 'name', 'address', 'timezone'])
+          .where('organization_id', '=', org_id)
+          .orderBy('name')
+          .execute();
+        return { data: locations };
+      });
+    },
+  );
+
+  app.get<{ Params: { org_id: string } }>(
     '/api/v1/organizations/:org_id/customer-sessions/current',
     {
       schema: {

@@ -2545,6 +2545,25 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Customer"
+  /api/v1/organizations/{org_id}/locations:
+    get:
+      summary: List an organization's locations (public — no auth required)
+      tags:
+        - Customers
+      parameters:
+        - name: org_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Locations for this organization
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LocationListResponse"
   /api/v1/organizations/{org_id}/customer-sessions:
     post:
       summary: Login customer
@@ -4836,6 +4855,32 @@ components:
               items:
                 type: object
                 additionalProperties: true
+    Location:
+      type: object
+      required:
+        - id
+        - name
+        - timezone
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        address:
+          type: string
+          nullable: true
+        timezone:
+          type: string
+    LocationListResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Location"
     Customer:
       type: object
       required:

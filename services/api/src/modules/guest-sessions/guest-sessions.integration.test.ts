@@ -74,7 +74,12 @@ describeIntegration('guest table sessions against PostgreSQL', () => {
     const session = (await mint()).json();
     expect((await app.inject({ method: 'GET', url: '/api/v1/categories', headers: guestAuth(session.token) })).statusCode).toBe(200);
     expect((await app.inject({ method: 'GET', url: '/api/v1/categories', headers: staffAuth() })).statusCode).toBe(200);
-    expect((await app.inject({ method: 'GET', url: '/api/v1/categories' })).statusCode).toBe(401);
+    // No token at all is no longer an automatic 401: anonymous menu reads
+    // are intentionally supported (idea.md 68 — a Customer-app visitor
+    // browses before any login/checkout step), gated only by requiring a
+    // location_id rather than requiring any session.
+    expect((await app.inject({ method: 'GET', url: '/api/v1/categories' })).statusCode).toBe(400);
+    expect((await app.inject({ method: 'GET', url: `/api/v1/categories?location_id=${location}` })).statusCode).toBe(200);
     await db.updateTable('order_lines').set({ status: 'FULFILLED' }).where('order_id', '=', (await db.selectFrom('orders').select('id').where('visit_id', '=', session.visit_id).executeTakeFirstOrThrow()).id).execute();
     await db.updateTable('accounts').set({ status: 'PAID' }).where('visit_id', '=', session.visit_id).execute();
     const visit = await db.selectFrom('visits').select('version').where('id', '=', session.visit_id).executeTakeFirstOrThrow();

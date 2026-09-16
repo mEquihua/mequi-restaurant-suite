@@ -6,12 +6,16 @@
   "scripts": {
     "build": "tsc -b && vite build && node scripts/generate-sw.mjs",
     "dev": "vite",
-    "typecheck": "tsc -b --pretty false"
+    "typecheck": "tsc -b --pretty false",
+    "test": "vitest run"
   },
   "dependencies": {
+    "@restaurant-suite/contracts": "workspace:*",
     "@restaurant-suite/ui-primitives": "workspace:*",
     "@restaurant-suite/ui-tokens": "workspace:*",
+    "@tanstack/react-query": "^5.102.8",
     "react": "^19.1.1",
-    "react-dom": "^19.1.1"
+    "react-dom": "^19.1.1",
+    "react-router-dom": "^7.18.4"
   }
 }

@@ -79,6 +79,7 @@ const csv = (s: string) =>
 export const navForPermissions = (permissions: string[]) =>
   [
     ['Menu', '/menu', 'menu.catalog.read'],
+    ['Delivery Zones', '/delivery-zones', 'delivery.zones.read'],
     ['Module Center', '/modules', 'module_center.modules.read'],
     ['Staff & Roles', '/staff', 'iam.staff.read'],
     ['Reports', '/reports', 'reports.sales.read'],
@@ -238,9 +239,14 @@ function Workspace({ me }: { me: Me }) {
             path="/menu"
             element={<Menu permissions={me.permissions} locationId={me.location_id} />}
           />
+
           <Route
             path="/modules"
             element={<Modules permissions={me.permissions} locationId={me.location_id} />}
+          />
+          <Route
+            path="/delivery-zones"
+            element={<DeliveryZones permissions={me.permissions} locationId={me.location_id} />}
           />
           <Route
             path="/staff"
@@ -674,6 +680,111 @@ function Availability({
       />
       <button>Save rule</button>
     </form>
+  );
+}
+
+
+type DeliveryZone = { id: string, location_id: string, name: string, fee: number, minimum_order_amount: number, active: boolean, version: number };
+
+function DeliveryZones({ permissions, locationId }: { permissions: string[]; locationId: string }) {
+  const qc = useQueryClient();
+  const zones = useQuery({
+    queryKey: ['delivery-zones', locationId],
+    queryFn: () => apiFetch<{ data: DeliveryZone[] }>(`/api/v1/locations/${locationId}/delivery-zones/admin`),
+  });
+  const write = permissions.includes('delivery.zones.write');
+  const [error, setError] = useState<unknown>();
+  
+  const [name, setName] = useState('');
+  const [fee, setFee] = useState('');
+  const [minimum, setMinimum] = useState('');
+
+  async function create(e: FormEvent) {
+    e.preventDefault();
+    try {
+      await apiFetch(`/api/v1/locations/${locationId}/delivery-zones`, {
+        method: 'POST',
+        body: JSON.stringify({ name, fee: Math.round(+fee * 100), minimum_order_amount: Math.round(+minimum * 100) }),
+      });
+      setName(''); setFee(''); setMinimum('');
+      void qc.invalidateQueries({ queryKey: ['delivery-zones', locationId] });
+      setError(undefined);
+    } catch (err) {
+      setError(err);
+    }
+  }
+
+  return (
+    <section>
+      <h2>Delivery Zones</h2>
+      <Conflict error={error} refresh={() => void qc.invalidateQueries({ queryKey: ['delivery-zones', locationId] })} />
+      {!(error instanceof ApiError && error.code === 'OPTIMISTIC_CONCURRENCY_CONFLICT') && <ErrorNotice error={error} />}
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Fee</th>
+            <th>Minimum</th>
+            <th>Active</th>
+          </tr>
+        </thead>
+        <tbody>
+          {zones.data?.data.map((zone) => (
+            <DeliveryZoneRow key={zone.id} zone={zone} write={write} setError={setError} locationId={locationId} />
+          ))}
+        </tbody>
+      </table>
+      {write && (
+        <article className="panel" style={{ marginTop: '2rem' }}>
+          <h3>New Delivery Zone</h3>
+          <form className="compact" onSubmit={create}>
+            <input required placeholder="Zone Name" value={name} onChange={e => setName(e.target.value)} />
+            <input required placeholder="Fee ($)" type="number" step=".01" value={fee} onChange={e => setFee(e.target.value)} />
+            <input required placeholder="Minimum ($)" type="number" step=".01" value={minimum} onChange={e => setMinimum(e.target.value)} />
+            <button>Create</button>
+          </form>
+        </article>
+      )}
+    </section>
+  );
+}
+
+function DeliveryZoneRow({ zone, write, setError, locationId }: { zone: DeliveryZone, write: boolean, setError: (e: unknown) => void, locationId: string }) {
+  const qc = useQueryClient();
+  const [name, setName] = useState(zone.name);
+  const [fee, setFee] = useState((zone.fee / 100).toFixed(2));
+  const [minimum, setMinimum] = useState((zone.minimum_order_amount / 100).toFixed(2));
+  
+  async function update(payload: Record<string, unknown>) {
+    try {
+      await apiFetch(`/api/v1/locations/${locationId}/delivery-zones/${zone.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ version: zone.version, ...payload }),
+      });
+      void qc.invalidateQueries({ queryKey: ['delivery-zones', locationId] });
+      setError(undefined);
+    } catch (err) {
+      setError(err);
+    }
+  }
+
+  return (
+    <tr>
+      <td>
+        <input disabled={!write} value={name} onChange={e => setName(e.target.value)} onBlur={() => name !== zone.name && update({ name })} />
+      </td>
+      <td>
+        $<input disabled={!write} type="number" step=".01" value={fee} onChange={e => setFee(e.target.value)} onBlur={() => Math.round(+fee * 100) !== zone.fee && update({ fee: Math.round(+fee * 100) })} style={{width: '80px'}} />
+      </td>
+      <td>
+        $<input disabled={!write} type="number" step=".01" value={minimum} onChange={e => setMinimum(e.target.value)} onBlur={() => Math.round(+minimum * 100) !== zone.minimum_order_amount && update({ minimum_order_amount: Math.round(+minimum * 100) })} style={{width: '80px'}} />
+      </td>
+      <td>
+        <label>
+          <input disabled={!write} type="checkbox" checked={zone.active} onChange={e => update({ active: e.target.checked })} /> Active
+        </label>
+      </td>
+    </tr>
   );
 }
 

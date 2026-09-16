@@ -201,6 +201,12 @@ $$\text{\textbf{Legend: }}\mathbf{X} = \text{Granted by default} \quad \vert \qu
 | `orders.fulfillment.dispatch` | Dispatch a delivery order |
 | `orders.fulfillment.deliver` | Mark a delivery order as delivered |
 
+### 4.8 Delivery Zones (New)
+| Permission | Description |
+| :--- | :--- |
+| `delivery.zones.read` | View a location's delivery zones (name, fee, minimum order amount, active state). |
+| `delivery.zones.write` | Create, edit, and activate/deactivate a location's delivery zones. |
+
 ## 5. Out-of-Scope Domains & Deferred Modules
 
 To preserve modular architectural boundaries and prevent premature schema complexity, permissions for domains outside the Foundation scope are **deliberately omitted** from this document:
@@ -208,7 +214,7 @@ To preserve modular architectural boundaries and prevent premature schema comple
 - **`inventory`** (Stock counts, recipes, receiving, waste tracking, variance reporting)
 - **`loyalty`** (Customer rewards, points accumulation, coupon validation)
 - **`reservations`** (Table booking schedules, waitlist management, deposit collection)
-- **`delivery`** (Driver dispatching, delivery zone rules, aggregator channel integration)
+- **`delivery`** (Driver dispatching, aggregator channel integration — zone rules and minimum-order enforcement are now built, see section 4.8)
 - **`self-service` / `kiosk`** (Kiosk hardware pairing, QR customer session parameters)
 
 When these modules are built in subsequent development phases, each module will define its own permission catalog following the strict `<domain>.<resource>.<action>` naming standard established here.

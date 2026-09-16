@@ -1,9 +1,11 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { ordersRoute, type OrdersRouteOptions } from './route.js';
 import { onlineOrdersRoute } from './online-ordering.js';
+import { deliveryZonesRoute } from './delivery-zones.js';
 export const ordersModule: FastifyPluginAsync<OrdersRouteOptions> = async (app, options) => {
   await app.register(ordersRoute, options);
   await app.register(onlineOrdersRoute);
+  await app.register(deliveryZonesRoute);
 };
 export type { OrdersRouteOptions } from './route.js';
 export { addOrderLines, type GuestLineInput } from './commands.js';

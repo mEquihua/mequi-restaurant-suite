@@ -25,3 +25,8 @@ export function cartTotal(items: CartItem[]) {
 export function requiresDeliveryAddress(fulfillmentType: 'PICKUP' | 'DELIVERY') {
   return fulfillmentType === 'DELIVERY';
 }
+
+export function meetsDeliveryMinimum(cartTotalCents: number, zone?: { minimum_order_amount: number }) {
+  if (!zone) return true;
+  return cartTotalCents >= zone.minimum_order_amount;
+}

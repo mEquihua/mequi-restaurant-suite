@@ -28,6 +28,7 @@ describeIntegration('customer accounts and online ordering against PostgreSQL', 
   let customerToken = '';
   let customerId = '';
   let staffToken = '';
+  let deliveryZoneId = '';
   const customerAuth = () => ({ authorization: `Bearer ${customerToken}` });
 
   beforeAll(async () => {
@@ -37,7 +38,7 @@ describeIntegration('customer accounts and online ordering against PostgreSQL', 
       'order_fulfillments', 'order_line_modifiers', 'order_lines', 'orders', 'accounts', 'visits',
       'product_variants', 'products', 'categories',
       'staff_sessions', 'staff_roles', 'role_permissions', 'terminals', 'staff', 'roles',
-      'locations', 'organizations'
+      'delivery_zones', 'locations', 'organizations'
     ] as const) {
       await db.deleteFrom(name).execute().catch(() => {});
     }
@@ -48,6 +49,7 @@ describeIntegration('customer accounts and online ordering against PostgreSQL', 
     location = (await db.insertInto('locations').values({ organization_id: organization, name: 'Main' }).returning('id').executeTakeFirstOrThrow()).id;
     
     product = (await db.insertInto('products').values({ organization_id: organization, name: 'Burger', base_price: 1500 }).returning('id').executeTakeFirstOrThrow()).id;
+    deliveryZoneId = (await db.insertInto('delivery_zones').values({ location_id: location, name: 'Test Zone', fee: 0, minimum_order_amount: 0, active: true }).returning('id').executeTakeFirstOrThrow()).id;
 
     // We don't strictly need staff for all tests, but for dispatch/deliver we do.
     const role = await db.insertInto('roles').values({ organization_id: organization, name: 'Manager' }).returning('id').executeTakeFirstOrThrow();
@@ -173,6 +175,7 @@ describeIntegration('customer accounts and online ordering against PostgreSQL', 
         customer_email: 'test@example.com',
         customer_phone: '555-1234',
         delivery_address: { street: '123 Main St' },
+        delivery_zone_id: deliveryZoneId,
         items: [{ product_id: product, quantity: 1 }]
       }
     });

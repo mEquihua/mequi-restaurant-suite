@@ -75,7 +75,7 @@ describeIntegration('cash drawer API against PostgreSQL', () => {
       'terminals',
       'staff',
       'roles',
-      'customer_sessions', 'customers', 'locations',
+      'customer_sessions', 'customers', 'delivery_zones', 'locations',
       'organizations',
     ] as const)
       await db.deleteFrom(table).execute();

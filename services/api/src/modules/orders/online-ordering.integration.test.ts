@@ -24,6 +24,7 @@ describeIntegration('online ordering list endpoint integration tests against Pos
   let organization = '';
   let location = '';
   let product = '';
+  let deliveryZone = '';
   let customer1Token = '';
   let customer1Id = '';
   let customer2Token = '';
@@ -72,6 +73,7 @@ describeIntegration('online ordering list endpoint integration tests against Pos
       'terminals',
       'staff',
       'roles',
+      'delivery_zones',
       'locations',
       'organizations',
     ] as const) {
@@ -95,6 +97,13 @@ describeIntegration('online ordering list endpoint integration tests against Pos
       await db
         .insertInto('products')
         .values({ organization_id: organization, name: 'Pizza', base_price: 1200 })
+        .returning('id')
+        .executeTakeFirstOrThrow()
+    ).id;
+    deliveryZone = (
+      await db
+        .insertInto('delivery_zones')
+        .values({ location_id: location, name: 'Test Zone', fee: 0, minimum_order_amount: 0, active: true })
         .returning('id')
         .executeTakeFirstOrThrow()
     ).id;
@@ -172,6 +181,7 @@ describeIntegration('online ordering list endpoint integration tests against Pos
         customer_email: 'cust1@example.com',
         customer_phone: '555-0001',
         delivery_address: { street: '123 St' },
+        delivery_zone_id: deliveryZone,
         items: [{ product_id: product, quantity: 2 }],
       },
     });

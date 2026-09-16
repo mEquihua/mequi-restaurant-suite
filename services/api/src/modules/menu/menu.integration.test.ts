@@ -70,7 +70,7 @@ describeIntegration('menu API against PostgreSQL', () => {
     await db.deleteFrom('terminals').execute();
     await db.deleteFrom('staff').execute();
     await db.deleteFrom('roles').execute();
-    await db.deleteFrom('customer_sessions').execute();    await db.deleteFrom('customers').execute();    await db.deleteFrom('locations').execute();
+    await db.deleteFrom('customer_sessions').execute();    await db.deleteFrom('customers').execute();    await db.deleteFrom('delivery_zones').execute();    await db.deleteFrom('locations').execute();
     await db.deleteFrom('organizations').execute();
 
     const organization = await db

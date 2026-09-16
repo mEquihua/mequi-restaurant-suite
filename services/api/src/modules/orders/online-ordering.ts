@@ -75,6 +75,7 @@ const checkoutSchema = {
       customer_email: { type: 'string', format: 'email', maxLength: 255 },
       customer_phone: { type: 'string', minLength: 1, maxLength: 40 },
       delivery_address: { type: 'object', additionalProperties: true, nullable: true },
+      delivery_zone_id: { type: 'string', format: 'uuid', nullable: true },
     },
   },
 } as const;
@@ -210,6 +211,53 @@ export const onlineOrdersRoute: FastifyPluginAsync = async (app) => {
           lines,
         });
 
+        const modifiersRows = created.lines.length
+          ? await trx
+              .selectFrom('order_line_modifiers')
+              .selectAll()
+              .where(
+                'order_line_id',
+                'in',
+                created.lines.map((line) => line.id),
+              )
+              .execute()
+          : [];
+
+        let subtotal = 0;
+        for (const line of created.lines) {
+          const mods = modifiersRows.filter((modifier) => modifier.order_line_id === line.id);
+          subtotal += (line.unit_price + mods.reduce((sum, modifier) => sum + modifier.unit_price, 0)) * line.quantity;
+        }
+
+        let deliveryFee = 0;
+        let deliveryZoneId = null;
+        if (body.fulfillment_type === 'DELIVERY') {
+          if (!body.delivery_zone_id) {
+            throw new IdentityHttpError(400, 'VALIDATION_ERROR', 'delivery_zone_id is required for DELIVERY orders.');
+          }
+          const zone = await trx
+            .selectFrom('delivery_zones')
+            .selectAll()
+            .where('id', '=', body.delivery_zone_id)
+            .where('location_id', '=', loc_id)
+            .executeTakeFirst();
+          if (!zone || !zone.active) {
+            throw new IdentityHttpError(404, 'NOT_FOUND', 'Delivery zone was not found or is not active.');
+          }
+          if (subtotal < zone.minimum_order_amount) {
+            throw new IdentityHttpError(
+              400,
+              'DELIVERY_MINIMUM_NOT_MET',
+              `Order subtotal does not meet the delivery zone minimum.`,
+              { minimum_order_amount: zone.minimum_order_amount, subtotal }
+            );
+          }
+          deliveryFee = zone.fee;
+          deliveryZoneId = zone.id;
+        } else if (body.delivery_zone_id) {
+          throw new IdentityHttpError(400, 'VALIDATION_ERROR', 'delivery_zone_id is not allowed for PICKUP orders.');
+        }
+
         // addOrderLines creates lines in DRAFT and bumps the order's version
         // once for the lines being added; advance both to HELD (idea.md's
         // "Received" state — registered but not yet sent to the kitchen) with
@@ -252,6 +300,8 @@ export const onlineOrdersRoute: FastifyPluginAsync = async (app) => {
             customer_phone: body.customer_phone,
             delivery_address: body.delivery_address ?? null,
             guest_token_hash: guestTokenHash,
+            delivery_zone_id: deliveryZoneId,
+            delivery_fee: deliveryFee,
           })
           .execute();
 
@@ -371,7 +421,8 @@ export const onlineOrdersRoute: FastifyPluginAsync = async (app) => {
               updated_at: order.updated_at.toISOString(),
               totals: {
                 subtotal,
-                total: subtotal,
+                delivery_fee: fulfillment?.delivery_fee ?? 0,
+                total: subtotal + (fulfillment?.delivery_fee ?? 0),
                 paid,
               },
             },
@@ -516,7 +567,8 @@ export const onlineOrdersRoute: FastifyPluginAsync = async (app) => {
             updated_at: order.updated_at.toISOString(),
             totals: {
               subtotal,
-              total: subtotal,
+              delivery_fee: fulfillment.delivery_fee,
+              total: subtotal + fulfillment.delivery_fee,
               paid: payments.reduce((sum, payment) => sum + payment.amount, 0),
             },
           },

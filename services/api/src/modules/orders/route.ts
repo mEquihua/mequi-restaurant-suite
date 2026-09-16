@@ -212,18 +212,20 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
     requireLocation(actor, locationId);
     return locationId;
   };
-  const outbox = (actor: Actor, aggregateId: string, eventType: string, payload: unknown) =>
-    actor.trx
+  const outbox = async (actor: Actor, aggregateId: string, eventType: string, payload: unknown) => {
+    const line = await actor.trx.selectFrom('order_lines as ol').innerJoin('orders as o', 'o.id', 'ol.order_id').select('o.visit_id').where('ol.id', '=', aggregateId).executeTakeFirst();
+    return actor.trx
       .insertInto('outbox_events')
       .values({
         location_id: actor.locationId,
         aggregate_type: 'order_line',
         aggregate_id: aggregateId,
         event_type: eventType,
-        payload: payload as never,
+        payload: { ...(payload as Record<string, unknown>), ...(line ? { visit_id: line.visit_id } : {}) } as never,
         schema_version: 1,
       })
       .execute();
+  };
   const audit = (
     actor: Actor,
     request: FastifyRequest,
@@ -1705,6 +1707,8 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
           .returningAll()
           .executeTakeFirst();
         if (!updated) throw conflict(visit, visit);
+
+        await actor.trx.updateTable('guest_sessions').set({ revoked_at: now() }).where('visit_id', '=', visitId).where('revoked_at', 'is', null).execute();
 
         if (updated.table_id) {
           const table = await actor.trx

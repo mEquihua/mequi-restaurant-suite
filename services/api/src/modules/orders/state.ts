@@ -15,7 +15,10 @@ const transitions: Readonly<Record<LineStatus, readonly LineStatus[]>> = {
   HELD: ['SENT', 'CANCELLED', 'VOIDED'],
   SENT: ['PREPARING', 'CANCELLED', 'VOIDED'],
   PREPARING: ['READY', 'VOIDED'],
-  READY: ['FULFILLED', 'VOIDED'],
+  // READY -> PREPARING is the kitchen "recall" action: undo an accidental
+  // mark-ready via the existing mark-preparing endpoint (idea.md Kitchen
+  // Display System requirements).
+  READY: ['FULFILLED', 'VOIDED', 'PREPARING'],
   FULFILLED: ['VOIDED'],
   CANCELLED: [],
   VOIDED: [],

@@ -23,14 +23,14 @@ function EnrollmentScreen() {
         return;
       }
       setSessionToken(token);
-      const res = await apiFetch<any>('/api/v1/terminals/enroll', {
+      const res = await apiFetch<{ terminal: { id: string }, terminal_credential: string }>('/api/v1/terminals/enroll', {
         method: 'POST',
         body: JSON.stringify({ location_id: locationId, name }),
       });
       setTerminalCredential({ terminal_id: res.terminal.id, secret: res.terminal_credential });
       window.location.reload();
-    } catch (err: any) {
-      setError(err.message || 'Failed to enroll terminal');
+    } catch (err: unknown) {
+      setError((err as Error).message || 'Failed to enroll terminal');
       clearSessionToken();
     }
   };
@@ -60,16 +60,16 @@ function PinUnlockScreen() {
       const cred = getTerminalCredential();
       if (!cred) throw new Error('No terminal credential found');
       
-      const res = await apiFetch<any>('/api/v1/auth/pin-unlock', {
+      const res = await apiFetch<unknown>('/api/v1/auth/pin-unlock', {
         method: 'POST',
         headers: { 'x-terminal-credential': cred.secret },
         body: JSON.stringify({ staff_id: staffId, pin }),
       });
       
-      setSessionToken(res.token);
+      setSessionToken((res as { token: string }).token);
       window.location.reload();
-    } catch (err: any) {
-      setError(err.message || 'Failed to unlock');
+    } catch (err: unknown) {
+      setError((err as Error).message || 'Failed to unlock');
     }
   };
 
@@ -100,27 +100,28 @@ function ModeSwitcher() {
 function MainApp() {
   const { data: user, isLoading } = useQuery({
     queryKey: ['me'],
-    queryFn: () => apiFetch<any>('/api/v1/auth/me'),
+    queryFn: () => apiFetch<unknown>('/api/v1/auth/me'),
   });
 
   if (isLoading) return <div>Loading...</div>;
   if (!user) return <div>Error loading user profile</div>;
 
-  const hasWaiter = user.permissions.some((p: any) => p.permission_name === 'orders.visits.create');
-  const hasPos = user.permissions.some((p: any) => p.permission_name === 'orders.orders.create');
+  const typedUser = user as { permissions: { permission_name: string }[]; location_id: string };
+  const hasWaiter = typedUser.permissions.some((p: { permission_name: string }) => p.permission_name === 'orders.visits.create');
+  const hasPos = typedUser.permissions.some((p: { permission_name: string }) => p.permission_name === 'orders.orders.create');
   
   if (hasWaiter && hasPos) {
     return (
       <Routes>
         <Route path="/" element={<ModeSwitcher />} />
-        <Route path="/waiter/*" element={<WaiterMode locationId={user.location_id} />} />
-        <Route path="/pos/*" element={<POSMode locationId={user.location_id} />} />
+        <Route path="/waiter/*" element={<WaiterMode locationId={typedUser.location_id} />} />
+        <Route path="/pos/*" element={<POSMode locationId={typedUser.location_id} />} />
       </Routes>
     );
   }
   
-  if (hasWaiter) return <WaiterMode locationId={user.location_id} />;
-  if (hasPos) return <POSMode locationId={user.location_id} />;
+  if (hasWaiter) return <WaiterMode locationId={typedUser.location_id} />;
+  if (hasPos) return <POSMode locationId={typedUser.location_id} />;
 
   return <div>You don't have access to any operational modes.</div>;
 }

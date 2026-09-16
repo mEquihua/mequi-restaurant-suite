@@ -13,6 +13,7 @@
     "lint": "eslint . --max-warnings=0 --ignore-pattern 'services/api/lint-fixtures/**'",
     "typecheck": "tsc -b",
     "test": "pnpm -r --if-present test",
+    "clean": "tsc -b --clean && find . \\( -name dist -o -name tsconfig.tsbuildinfo \\) -not -path '*/node_modules/*' -exec rm -rf {} +",
     "contracts:generate": "pnpm --filter @restaurant-suite/contracts generate",
     "contracts:check": "pnpm --filter @restaurant-suite/contracts check:generated"
   },

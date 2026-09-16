@@ -85,21 +85,57 @@ export function nextFailedPinAttempt(state: PinAttemptState, now: Date): PinAtte
   return { failureCount, nextAttemptAt: new Date(now.getTime() + delay) };
 }
 
+/**
+ * Mirrors the default permission matrix in docs/architecture/permission-catalog.md section 4
+ * exactly. Update both together if the catalog changes.
+ */
+const OWNER_AND_MANAGER_PERMISSIONS: readonly string[] = [
+  'iam.terminals.enroll', 'iam.terminals.read', 'iam.staff.read', 'iam.staff.create', 'iam.staff.update', 'iam.roles.read', 'iam.roles.update',
+  'menu.catalog.read', 'menu.products.write', 'menu.prices.update', 'menu.availability.update',
+  'floor.layout.read', 'floor.layout.write', 'floor.tables.update_status', 'floor.sections.assign',
+  'orders.visits.create', 'orders.visits.close', 'orders.visits.read_all', 'orders.visits.transfer',
+  'orders.orders.create', 'orders.lines.add', 'orders.lines.hold', 'orders.lines.send', 'orders.lines.void', 'orders.lines.void_override',
+  'orders.orders.cancel', 'orders.orders.cancel_override',
+  'accounts.accounts.create', 'accounts.accounts.split', 'accounts.accounts.reopen', 'accounts.discounts.apply', 'accounts.discounts.apply_override',
+  'payments.payments.create', 'payments.refunds.create', 'payments.refunds.override', 'payments.cash.open_drawer', 'payments.cash.reconcile',
+  'kitchen.tickets.read', 'kitchen.tickets.update_status',
+  'reports.sales.read', 'reports.audit.read',
+];
+
 export const SYSTEM_ROLE_TEMPLATES: ReadonlyArray<{ name: string; description: string; permissions: readonly string[] }> = [
+  { name: 'Owner', description: 'Full installation administration.', permissions: OWNER_AND_MANAGER_PERMISSIONS },
+  { name: 'Manager', description: 'Restaurant operations management.', permissions: OWNER_AND_MANAGER_PERMISSIONS },
   {
-    name: 'Owner',
-    description: 'Full installation administration.',
-    permissions: ['iam.staff.read', 'iam.staff.write', 'iam.roles.read', 'iam.roles.write', 'iam.permissions.grant', 'iam.terminals.enroll', 'iam.terminals.read', 'menu.catalog.read', 'menu.catalog.write', 'orders.orders.create', 'orders.orders.update', 'payments.payments.create', 'reports.reports.read'],
+    name: 'Waiter',
+    description: 'Table service operations.',
+    permissions: [
+      'menu.catalog.read', 'floor.layout.read', 'floor.tables.update_status',
+      'orders.visits.create', 'orders.visits.close', 'orders.visits.transfer',
+      'orders.orders.create', 'orders.lines.add', 'orders.lines.hold', 'orders.lines.send', 'orders.lines.void', 'orders.orders.cancel',
+      'accounts.accounts.create', 'accounts.accounts.split', 'accounts.discounts.apply', 'payments.payments.create',
+    ],
   },
   {
-    name: 'Manager',
-    description: 'Restaurant operations management.',
-    permissions: ['iam.staff.read', 'iam.roles.read', 'iam.terminals.enroll', 'iam.terminals.read', 'menu.catalog.read', 'menu.catalog.write', 'orders.orders.create', 'orders.orders.update', 'payments.payments.create', 'reports.reports.read'],
+    name: 'Cashier',
+    description: 'Checkout operations.',
+    permissions: [
+      'menu.catalog.read', 'floor.layout.read', 'floor.tables.update_status',
+      'orders.visits.create', 'orders.visits.close', 'orders.visits.read_all', 'orders.visits.transfer',
+      'orders.orders.create', 'orders.lines.add', 'orders.lines.hold', 'orders.lines.send', 'orders.lines.void', 'orders.orders.cancel',
+      'accounts.accounts.create', 'accounts.accounts.split', 'accounts.accounts.reopen', 'accounts.discounts.apply',
+      'payments.payments.create', 'payments.refunds.create', 'payments.cash.open_drawer', 'payments.cash.reconcile', 'reports.sales.read',
+    ],
   },
-  { name: 'Waiter', description: 'Table service operations.', permissions: ['menu.catalog.read', 'orders.orders.create', 'orders.orders.update'] },
-  { name: 'Cashier', description: 'Checkout operations.', permissions: ['menu.catalog.read', 'orders.orders.read', 'payments.payments.create'] },
-  { name: 'Host', description: 'Guest arrival and seating operations.', permissions: ['floor.tables.read', 'floor.tables.update'] },
-  { name: 'Kitchen', description: 'Kitchen display operations.', permissions: ['orders.orders.read', 'kitchen.tickets.update'] },
+  {
+    name: 'Host',
+    description: 'Guest arrival and seating operations.',
+    permissions: ['menu.catalog.read', 'floor.layout.read', 'floor.tables.update_status', 'floor.sections.assign', 'orders.visits.create', 'orders.visits.close', 'orders.visits.read_all'],
+  },
+  {
+    name: 'Kitchen',
+    description: 'Kitchen display operations.',
+    permissions: ['menu.catalog.read', 'menu.availability.update', 'kitchen.tickets.read', 'kitchen.tickets.update_status'],
+  },
 ];
 
 export function isPermissionName(value: string): boolean {

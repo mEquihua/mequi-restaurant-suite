@@ -216,7 +216,7 @@ export const identityRoute: FastifyPluginAsync<IdentityRouteOptions> = async (ap
   app.post('/api/v1/staff', { schema: { body: staffSchema } }, async (request, reply) => {
     const body = request.body as CreateStaffBody;
     return withSession(request, async (actor) => {
-      requirePermission(actor, 'iam.staff.write');
+      requirePermission(actor, 'iam.staff.create');
       if (!body.first_name?.trim() || !body.last_name?.trim() || !/^\d{4,12}$/.test(body.pin ?? '') || !Array.isArray(body.role_ids) || body.role_ids.length === 0) {
         throw new IdentityHttpError(400, 'VALIDATION_ERROR', 'first_name, last_name, a 4-12 digit PIN, and at least one role are required.');
       }
@@ -237,7 +237,7 @@ export const identityRoute: FastifyPluginAsync<IdentityRouteOptions> = async (ap
     const params = request.params as { id: string };
     const expectedVersion = parseIfMatch(request.headers['if-match']);
     return withSession(request, async (actor) => {
-      requirePermission(actor, 'iam.staff.write');
+      requirePermission(actor, 'iam.staff.update');
       const patch: { first_name?: string; last_name?: string; active?: boolean; pin_hash?: string; version: RawBuilder<number> } = {
         version: sql<number>`version + 1`,
       };
@@ -297,7 +297,7 @@ export const identityRoute: FastifyPluginAsync<IdentityRouteOptions> = async (ap
     const body = request.body as UpdatePermissionsBody;
     const params = request.params as { id: string };
     return withSession(request, async (actor) => {
-      requirePermission(actor, 'iam.permissions.grant');
+      requirePermission(actor, 'iam.roles.update');
       if (!Array.isArray(body.permissions) || body.permissions.some((permission) => !isPermissionName(permission.permission_name) || !['organization', 'location'].includes(permission.scope))) {
         throw new IdentityHttpError(400, 'VALIDATION_ERROR', 'Each permission must use <domain>.<resource>.<action> and a valid scope.');
       }

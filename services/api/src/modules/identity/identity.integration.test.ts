@@ -40,7 +40,7 @@ describeIntegration('identity API against PostgreSQL', () => {
     locationA = firstLocation.id;
     locationB = secondLocation.id;
     const ownerRole = await db.insertInto('roles').values({ organization_id: organization.id, name: 'Owner' }).returning('id').executeTakeFirstOrThrow();
-    await db.insertInto('role_permissions').values(['iam.terminals.enroll', 'iam.terminals.read', 'iam.staff.read', 'iam.staff.write', 'iam.roles.read', 'iam.permissions.grant'].map((permission_name) => ({ role_id: ownerRole.id, permission_name, scope: 'organization' }))).execute();
+    await db.insertInto('role_permissions').values(['iam.terminals.enroll', 'iam.terminals.read', 'iam.staff.read', 'iam.staff.create', 'iam.staff.update', 'iam.roles.read', 'iam.roles.update'].map((permission_name) => ({ role_id: ownerRole.id, permission_name, scope: 'organization' }))).execute();
     const owner = await db.insertInto('staff').values({ organization_id: organization.id, first_name: 'Ada', last_name: 'Owner', pin_hash: await hashPin('2468') }).returning('id').executeTakeFirstOrThrow();
     ownerId = owner.id;
     await db.insertInto('staff_roles').values({ staff_id: owner.id, role_id: ownerRole.id, location_id: null }).execute();

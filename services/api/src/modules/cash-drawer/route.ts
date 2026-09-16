@@ -132,8 +132,8 @@ export const cashDrawerRoute: FastifyPluginAsync<CashDrawerRouteOptions> = async
         },
       },
     },
-    async (request, reply) =>
-      withSession(request, async (actor) => {
+    async (request, reply) => {
+      const session = await withSession(request, async (actor) => {
         requirePermission(actor, 'payments.cash.open_drawer');
         const locationId = scoped(request, actor);
         const { terminalId } = request.params as { locationId: string; terminalId: string };
@@ -160,8 +160,10 @@ export const cashDrawerRoute: FastifyPluginAsync<CashDrawerRouteOptions> = async
           .returningAll()
           .executeTakeFirstOrThrow();
 
-        return reply.status(201).send(session);
-      }),
+        return session;
+      });
+      return reply.status(201).send(session);
+    },
   );
 
   app.post(
@@ -186,12 +188,16 @@ export const cashDrawerRoute: FastifyPluginAsync<CashDrawerRouteOptions> = async
         },
       },
     },
-    async (request, reply) =>
-      withSession(request, async (actor) => {
+    async (request, reply) => {
+      const movement = await withSession(request, async (actor) => {
         requirePermission(actor, 'payments.cash.open_drawer');
         const locationId = scoped(request, actor);
         const { sessionId } = request.params as { locationId: string; sessionId: string };
-        const body = request.body as { movement_type: 'CASH_IN' | 'CASH_OUT'; amount: number; reason: string };
+        const body = request.body as {
+          movement_type: 'CASH_IN' | 'CASH_OUT';
+          amount: number;
+          reason: string;
+        };
 
         const session = await findSession(actor.trx, locationId, sessionId);
         if (!session) throw new IdentityHttpError(404, 'NOT_FOUND', 'Session not found.');
@@ -216,8 +222,10 @@ export const cashDrawerRoute: FastifyPluginAsync<CashDrawerRouteOptions> = async
           .returningAll()
           .executeTakeFirstOrThrow();
 
-        return reply.status(201).send(movement);
-      }),
+        return movement;
+      });
+      return reply.status(201).send(movement);
+    },
   );
 
   app.post(
@@ -241,8 +249,8 @@ export const cashDrawerRoute: FastifyPluginAsync<CashDrawerRouteOptions> = async
         },
       },
     },
-    async (request, reply) =>
-      withSession(request, async (actor) => {
+    async (request, reply) => {
+      const closedSession = await withSession(request, async (actor) => {
         requirePermission(actor, 'payments.cash.reconcile');
         const locationId = scoped(request, actor);
         const { sessionId } = request.params as { locationId: string; sessionId: string };
@@ -250,7 +258,7 @@ export const cashDrawerRoute: FastifyPluginAsync<CashDrawerRouteOptions> = async
 
         const session = await findSession(actor.trx, locationId, sessionId);
         if (!session) throw new IdentityHttpError(404, 'NOT_FOUND', 'Session not found.');
-        
+
         const v = expected(request.headers['if-match']);
         if (v !== session.version) throw conflict(session, session);
 
@@ -290,8 +298,10 @@ export const cashDrawerRoute: FastifyPluginAsync<CashDrawerRouteOptions> = async
           .returningAll()
           .executeTakeFirstOrThrow();
 
-        return reply.send(closedSession);
-      }),
+        return closedSession;
+      });
+      return reply.send(closedSession);
+    },
   );
 
   app.get(
@@ -320,8 +330,11 @@ export const cashDrawerRoute: FastifyPluginAsync<CashDrawerRouteOptions> = async
         const locationId = scoped(request, actor);
         const query = request.query as { terminal_id?: string; status?: 'OPEN' | 'CLOSED' };
 
-        let builder = actor.trx.selectFrom('cash_drawer_sessions').selectAll().where('location_id', '=', locationId);
-        
+        let builder = actor.trx
+          .selectFrom('cash_drawer_sessions')
+          .selectAll()
+          .where('location_id', '=', locationId);
+
         if (query.terminal_id) {
           builder = builder.where('terminal_id', '=', query.terminal_id);
         }

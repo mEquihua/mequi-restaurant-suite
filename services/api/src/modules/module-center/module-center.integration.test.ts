@@ -52,6 +52,19 @@ describeIntegration('Module Center API against PostgreSQL', () => {
     expect(await db.selectFrom('module_activations').selectAll().where('location_id', '=', locationA).where('module_key', '=', 'pos').executeTakeFirst()).toBeTruthy();
   });
 
+  it('commits the activation before the HTTP response returns, with no read-after-write delay needed', async () => {
+    // Regression test for a response-before-commit race: reply.send() called
+    // from inside the transaction callback could complete before the
+    // wrapping transaction actually reached COMMIT, so a client reading the
+    // row via a separate connection immediately after a success response
+    // could see stale, pre-transaction data. Deliberately reads via `db`
+    // (a separate connection from the app's own pool) with zero delay.
+    const activated = await app.inject({ method: 'POST', url: `/api/v1/locations/${locationB}/modules/loyalty/activate`, headers: auth(sessionB), payload: {} });
+    expect(activated.statusCode).toBe(200);
+    const row = await db.selectFrom('module_activations').selectAll().where('location_id', '=', locationB).where('module_key', '=', 'loyalty').executeTakeFirst();
+    expect(row?.status).toBe('ACTIVE');
+  });
+
   it('rejects pause from disabled', async () => {
     const current = await db.selectFrom('module_activations').select('version').where('location_id', '=', locationA).where('module_key', '=', 'pos').executeTakeFirstOrThrow();
     const invalid = await app.inject({ method: 'POST', url: `/api/v1/locations/${locationA}/modules/pos/pause`, headers: { ...auth(sessionA), 'if-match': String(current.version) }, payload: {} }); expect(invalid.statusCode).toBe(409); expect(invalid.json().error.code).toBe('ILLEGAL_MODULE_STATUS_TRANSITION');

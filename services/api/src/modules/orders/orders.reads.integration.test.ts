@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import argon2 from 'argon2';
 import Fastify from 'fastify';
 
@@ -32,6 +32,7 @@ describeIntegration('orders API reads and table side effects against PostgreSQL'
   let tableA1 = '';
   let tableA2 = '';
   let areaB = '';
+  let productA = '';
 
   const authA = () => ({ authorization: `Bearer ${tokenA}` });
   const authB = () => ({ authorization: `Bearer ${tokenB}` });
@@ -58,7 +59,8 @@ describeIntegration('orders API reads and table side effects against PostgreSQL'
     
     const role = (await db.insertInto('roles').values({ organization_id: org, name: 'Manager' }).returning('id').executeTakeFirstOrThrow()).id;
     await db.insertInto('role_permissions').values([
-      'orders.visits.create', 'orders.visits.read_all', 'orders.visits.close', 'orders.orders.create', 'accounts.accounts.create'
+      'orders.visits.create', 'orders.visits.read_all', 'orders.visits.close', 'orders.orders.create', 'accounts.accounts.create',
+      'orders.lines.add', 'orders.lines.send', 'kitchen.tickets.read',
     ].map(p => ({ role_id: role, permission_name: p, scope: 'organization' as const }))).execute();
     
     await db.insertInto('staff_roles').values([{ location_id: locationA, staff_id: staffA, role_id: role }, { location_id: locationB, staff_id: staffB, role_id: role }]).execute();
@@ -83,7 +85,7 @@ describeIntegration('orders API reads and table side effects against PostgreSQL'
     areaB = (await db.insertInto('areas').values({ location_id: locationB, name: 'Main' }).returning('id').executeTakeFirstOrThrow()).id;
     await db.insertInto('tables').values({ location_id: locationB, area_id: areaB, name: 'T1', min_capacity: 1, max_capacity: 4, pos_x: 0, pos_y: 0 }).execute();
 
-    await db.insertInto('products').values({ organization_id: org, name: 'Burger', base_price: 1000 }).execute();
+    productA = (await db.insertInto('products').values({ organization_id: org, name: 'Burger', base_price: 1000 }).returning('id').executeTakeFirstOrThrow()).id;
   });
 
   afterAll(async () => {
@@ -164,5 +166,43 @@ describeIntegration('orders API reads and table side effects against PostgreSQL'
     expect(singleAccount.json().id).toBe(account.id);
     expect(singleAccount.json().payments).toBeDefined();
     expect(singleAccount.json().cancellations_and_voids).toBeDefined();
+  });
+
+  it('GET /order-lines lists sent kitchen tickets, filters by status, and enforces location scoping', async () => {
+    const visitRes = await app.inject({ method: 'POST', url: `/api/v1/locations/${locationA}/visits`, headers: authA(), payload: {} });
+    const visit = visitRes.json();
+    const orderRes = await app.inject({ method: 'POST', url: `/api/v1/locations/${locationA}/visits/${visit.id}/orders`, headers: { ...authA(), 'if-match': visit.version.toString() }, payload: { order_type: 'DINE_IN' } });
+    const order = orderRes.json();
+    const accountRes = await app.inject({ method: 'POST', url: `/api/v1/locations/${locationA}/visits/${visit.id}/accounts`, headers: authA(), payload: { name: 'Main' } });
+    const account = accountRes.json();
+
+    const addLinesRes = await app.inject({
+      method: 'POST', url: `/api/v1/locations/${locationA}/orders/${order.id}/lines`,
+      headers: { ...authA(), 'if-match': order.version.toString() },
+      payload: { lines: [{ product_id: productA, quantity: 2, account_id: account.id }] },
+    });
+    const created = addLinesRes.json();
+    const lineId = created.lines[0].id;
+
+    await app.inject({
+      method: 'POST', url: `/api/v1/locations/${locationA}/orders/${order.id}/send`,
+      headers: { ...authA(), 'if-match': created.order.version.toString(), 'idempotency-key': randomUUID() },
+      payload: { line_ids: [lineId] },
+    });
+
+    const sentLines = await app.inject({ method: 'GET', url: `/api/v1/locations/${locationA}/order-lines?status=SENT`, headers: authA() });
+    expect(sentLines.statusCode).toBe(200);
+    expect(sentLines.json().data.some((l: { id: string }) => l.id === lineId)).toBe(true);
+
+    const readyLines = await app.inject({ method: 'GET', url: `/api/v1/locations/${locationA}/order-lines?status=READY`, headers: authA() });
+    expect(readyLines.statusCode).toBe(200);
+    expect(readyLines.json().data.some((l: { id: string }) => l.id === lineId)).toBe(false);
+
+    const deniedFromB = await app.inject({ method: 'GET', url: `/api/v1/locations/${locationA}/order-lines`, headers: authB() });
+    expect(deniedFromB.statusCode).toBe(403);
+
+    const listB = await app.inject({ method: 'GET', url: `/api/v1/locations/${locationB}/order-lines`, headers: authB() });
+    expect(listB.statusCode).toBe(200);
+    expect(listB.json().data.some((l: { id: string }) => l.id === lineId)).toBe(false);
   });
 });

@@ -12,6 +12,9 @@
     "@restaurant-suite/ui-operations": "workspace:*",
     "@restaurant-suite/ui-primitives": "workspace:*",
     "@restaurant-suite/ui-tokens": "workspace:*",
+    "@restaurant-suite/contracts": "workspace:*",
+    "@tanstack/react-query": "^5.102.8",
+    "react-router-dom": "^7.18.4",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"
   }

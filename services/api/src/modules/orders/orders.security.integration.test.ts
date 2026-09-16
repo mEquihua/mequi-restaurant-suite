@@ -34,11 +34,11 @@ describeIntegration('orders API security boundaries against PostgreSQL', () => {
   beforeAll(async () => {
     for (const table of [
       'cash_drawer_movements', 'cash_drawer_sessions', 'command_idempotency', 'audit_events', 'account_discounts', 'outbox_events', 'refunds', 'cancellations_and_voids',
-      'payments', 'order_line_modifiers', 'order_lines', 'orders', 'accounts', 'visits',
+      'payments', 'order_fulfillments', 'order_line_modifiers', 'order_lines', 'orders', 'accounts', 'visits',
       'table_sections', 'sections', 'tables', 'areas', 'availability_rules', 'location_price_overrides',
       'product_combo_items', 'product_combo_groups', 'product_modifier_groups', 'modifiers', 'modifier_groups',
       'product_variants', 'products', 'categories', 'terminal_pin_attempts', 'staff_sessions',
-      'staff_roles', 'role_permissions', 'terminals', 'staff', 'roles', 'locations', 'organizations',
+      'staff_roles', 'role_permissions', 'terminals', 'staff', 'roles', 'customer_sessions', 'customers', 'locations', 'organizations',
     ] as const) await db.deleteFrom(table).execute();
 
     org = (await db.insertInto('organizations').values({ name: 'Security Org' }).returning('id').executeTakeFirstOrThrow()).id;

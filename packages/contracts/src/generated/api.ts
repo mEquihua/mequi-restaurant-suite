@@ -1403,6 +1403,321 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/organizations/{org_id}/customers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Register a new customer */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    org_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["RegisterCustomerRequest"];
+                };
+            };
+            responses: {
+                /** @description Customer created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Customer"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organizations/{org_id}/customer-sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Login customer */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    org_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["LoginCustomerRequest"];
+                };
+            };
+            responses: {
+                /** @description Login successful */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CustomerSessionResponse"];
+                    };
+                };
+                /** @description Invalid credentials */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organizations/{org_id}/customer-sessions/current": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get current customer profile */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    org_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Current customer profile */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Customer"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/locations/{loc_id}/online-orders/checkout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Checkout online order */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    loc_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["OnlineCheckoutRequest"];
+                };
+            };
+            responses: {
+                /** @description Order placed */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["OnlineCheckoutResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/locations/{loc_id}/online-orders/{order_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get online order detail */
+        get: {
+            parameters: {
+                query?: {
+                    order_token?: string;
+                };
+                header?: never;
+                path: {
+                    loc_id: string;
+                    order_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Order details */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["OnlineOrderDetailResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/locations/{loc_id}/orders/{order_id}/fulfillment/dispatch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Dispatch delivery order */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    loc_id: string;
+                    order_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["FulfillmentActionRequest"];
+                };
+            };
+            responses: {
+                /** @description Dispatched */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/locations/{loc_id}/orders/{order_id}/fulfillment/deliver": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Complete delivery order */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    loc_id: string;
+                    order_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["FulfillmentActionRequest"];
+                };
+            };
+            responses: {
+                /** @description Delivered */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2095,6 +2410,81 @@ export interface components {
                 [key: string]: unknown;
             }[];
         };
+        Customer: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            organization_id: string;
+            /** Format: email */
+            email: string;
+            name: string;
+            phone?: string | null;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        CustomerSessionResponse: {
+            token: string;
+            customer: components["schemas"]["Customer"];
+        };
+        RegisterCustomerRequest: {
+            /** Format: email */
+            email: string;
+            password: string;
+            name: string;
+            phone?: string;
+        };
+        LoginCustomerRequest: {
+            /** Format: email */
+            email: string;
+            password: string;
+        };
+        OnlineCheckoutRequest: {
+            items: components["schemas"]["CheckoutItem"][];
+            /** @enum {string} */
+            fulfillment_type: "PICKUP" | "DELIVERY";
+            /** Format: date-time */
+            scheduled_for?: string | null;
+            customer_name: string;
+            /** Format: email */
+            customer_email: string;
+            customer_phone: string;
+            delivery_address?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        OnlineCheckoutResponse: {
+            /** Format: uuid */
+            order_id: string;
+            order_token?: string | null;
+        };
+        OrderFulfillment: {
+            /** @enum {string} */
+            status: "PENDING" | "OUT_FOR_DELIVERY" | "DELIVERED" | "CANCELLED";
+            /** @enum {string} */
+            fulfillment_type: "PICKUP" | "DELIVERY";
+        };
+        OnlineOrderDetailResponse: {
+            order: components["schemas"]["Order"];
+            lines: components["schemas"]["OrderLine"][];
+            fulfillment: components["schemas"]["OrderFulfillment"];
+        };
+        FulfillmentActionRequest: {
+            version: number;
+        };
+        CheckoutModifier: {
+            /** Format: uuid */
+            modifier_id: string;
+            quantity: number;
+        };
+        CheckoutItem: {
+            /** Format: uuid */
+            product_id: string;
+            quantity: number;
+            notes?: string | null;
+            modifiers?: components["schemas"]["CheckoutModifier"][];
+        };
     };
     responses: {
         /** @description API error */
@@ -2458,7 +2848,10 @@ export interface operations {
     };
     listCategories: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Required for customer sessions to resolve location-specific prices. */
+                location_id?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -2549,6 +2942,8 @@ export interface operations {
                 service_type?: string;
                 /** @description Instant used to evaluate scheduled availability. */
                 at?: string;
+                /** @description Required for customer sessions to resolve location-specific prices. */
+                location_id?: string;
             };
             header?: never;
             path?: never;

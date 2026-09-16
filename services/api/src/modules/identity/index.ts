@@ -12,6 +12,7 @@ export {
 } from './persistence/repository.js';
 export {
   verifyPin,
+  hashPin,
   fingerprintPresentedCredential,
   retryAfterSeconds,
   nextFailedPinAttempt,

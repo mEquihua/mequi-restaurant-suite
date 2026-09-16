@@ -2,7 +2,62 @@ import { Kysely, PostgresDialect, sql, type Generated, type Transaction } from '
 import pg from 'pg';
 import type { FastifyInstance } from 'fastify';
 
+
+export interface CustomerTable {
+  id: Generated<string>;
+  organization_id: string;
+  email: string;
+  password_hash: string;
+  name: string;
+  phone: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
+export interface CustomerSessionTable {
+  id: Generated<string>;
+  organization_id: string;
+  customer_id: string;
+  token_hash: string;
+  created_at: Generated<Date>;
+  expires_at: Date;
+  revoked_at: Date | null;
+}
+
+export interface DeliveryZoneTable {
+  id: Generated<string>;
+  location_id: string;
+  name: string;
+  fee: number;
+  minimum_order_amount: Generated<number>;
+  active: Generated<boolean>;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
+export interface OrderFulfillmentTable {
+  id: Generated<string>;
+  location_id: string;
+  order_id: string;
+  fulfillment_type: 'PICKUP' | 'DELIVERY';
+  status: Generated<'PENDING' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'CANCELLED'>;
+  scheduled_for: Date | null;
+  customer_name: string;
+  customer_email: string;
+  customer_phone: string;
+  delivery_address: unknown | null;
+  delivery_driver_name: string | null;
+  guest_token_hash: string | null;
+  version: Generated<number>;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
 export interface Database {
+  customers: CustomerTable;
+  customer_sessions: CustomerSessionTable;
+  delivery_zones: DeliveryZoneTable;
+  order_fulfillments: OrderFulfillmentTable;
   organizations: OrganizationTable;
   locations: LocationTable;
   staff: StaffTable;
@@ -310,6 +365,7 @@ export interface VisitTable {
   id: Generated<string>;
   location_id: string;
   table_id: string | null;
+  customer_id: string | null;
   staff_id: string | null;
   guest_count: number | null;
   status: Generated<string>;

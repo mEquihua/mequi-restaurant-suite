@@ -7,6 +7,7 @@ import {
   withAuthenticatedSession,
 } from '../identity/index.js';
 import { GuestSessionHttpError, withGuestSession } from '../guest-sessions/index.js';
+import { withCustomerSession } from '../customers/index.js';
 import { effectivePrice, resolveAvailability, type AvailabilityStatus } from './availability.js';
 import {
   assertLocationInOrganization,
@@ -175,6 +176,20 @@ export const menuRoute: FastifyPluginAsync<MenuRouteOptions> = async (app, optio
       : undefined;
     if (token?.startsWith('guest.'))
       return withGuestSession(app, request, now(), (guest) => work(guest, true));
+    if (token?.startsWith('customer.'))
+      return withCustomerSession(app, request, now(), (customer) => {
+        const locationId = (request.query as { location_id?: string }).location_id;
+        if (!locationId)
+          throw new IdentityHttpError(
+            400,
+            'MISSING_LOCATION',
+            'location_id query parameter is required for customer sessions',
+          );
+        return work(
+          { trx: customer.trx, organizationId: customer.organizationId, locationId },
+          false,
+        );
+      });
     return withSession(request, async (staff) => {
       requirePermission(staff, 'menu.catalog.read');
       return work(staff, false);
@@ -341,17 +356,28 @@ export const menuRoute: FastifyPluginAsync<MenuRouteOptions> = async (app, optio
       });
   });
 
-  app.get('/api/v1/categories', async (request) =>
-    withMenuReadSession(request, async (actor) => {
-      const categories = await actor.trx
-        .selectFrom('categories')
-        .selectAll()
-        .where('organization_id', '=', actor.organizationId)
-        .orderBy('display_order')
-        .orderBy('name')
-        .execute();
-      return { data: categories.map(publicCategory) };
-    }),
+  app.get(
+    '/api/v1/categories',
+    {
+      schema: {
+        querystring: {
+          type: 'object',
+          additionalProperties: false,
+          properties: { location_id: { type: 'string', format: 'uuid' } },
+        },
+      },
+    },
+    async (request) =>
+      withMenuReadSession(request, async (actor) => {
+        const categories = await actor.trx
+          .selectFrom('categories')
+          .selectAll()
+          .where('organization_id', '=', actor.organizationId)
+          .orderBy('display_order')
+          .orderBy('name')
+          .execute();
+        return { data: categories.map(publicCategory) };
+      }),
   );
 
   app.post(
@@ -481,6 +507,7 @@ export const menuRoute: FastifyPluginAsync<MenuRouteOptions> = async (app, optio
           type: 'object',
           additionalProperties: false,
           properties: {
+            location_id: { type: 'string', format: 'uuid' },
             channel: { type: 'string' },
             service_type: { type: 'string' },
             at: { type: 'string', format: 'date-time' },

@@ -30,7 +30,7 @@ describeIntegration('identity API against PostgreSQL', () => {
     await db.deleteFrom('refunds').execute();
     await db.deleteFrom('cancellations_and_voids').execute();
     await db.deleteFrom('payments').execute();
-    await db.deleteFrom('order_line_modifiers').execute();
+    await db.deleteFrom('order_line_modifiers').execute(); await db.deleteFrom('order_fulfillments').execute();
     await db.deleteFrom('order_lines').execute();
     await db.deleteFrom('orders').execute();
     await db.deleteFrom('accounts').execute();
@@ -56,7 +56,7 @@ describeIntegration('identity API against PostgreSQL', () => {
     await db.deleteFrom('terminals').execute();
     await db.deleteFrom('staff').execute();
     await db.deleteFrom('roles').execute();
-    await db.deleteFrom('locations').execute();
+    await db.deleteFrom('customer_sessions').execute();    await db.deleteFrom('customers').execute();    await db.deleteFrom('locations').execute();
     await db.deleteFrom('organizations').execute();
 
     const organization = await db

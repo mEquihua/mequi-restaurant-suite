@@ -22,6 +22,10 @@ export interface Database {
   product_combo_items: ProductComboItemTable;
   location_price_overrides: LocationPriceOverrideTable;
   availability_rules: AvailabilityRuleTable;
+  areas: AreaTable;
+  tables: DiningTableTable;
+  sections: SectionTable;
+  table_sections: TableSectionTable;
 }
 
 export interface OrganizationTable {
@@ -205,6 +209,40 @@ export interface AvailabilityRuleTable {
   start_time: Date | null;
   end_time: Date | null;
   version: Generated<number>;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+export interface AreaTable {
+  id: Generated<string>;
+  location_id: string;
+  name: string;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+export interface DiningTableTable {
+  id: Generated<string>;
+  location_id: string;
+  area_id: string;
+  name: string;
+  min_capacity: Generated<number>;
+  max_capacity: number;
+  pos_x: Generated<number>;
+  pos_y: Generated<number>;
+  status: Generated<string>;
+  version: Generated<number>;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+export interface SectionTable {
+  id: Generated<string>;
+  location_id: string;
+  name: string;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+export interface TableSectionTable {
+  table_id: string;
+  section_id: string;
   created_at: Generated<Date>;
   updated_at: Generated<Date>;
 }

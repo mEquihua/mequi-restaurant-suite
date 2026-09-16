@@ -300,4 +300,63 @@ describeIntegration('menu API against PostgreSQL', () => {
     expect(conflict.json().error.details.current_version).toBe(product.version);
     expect(conflict.json().error.details.current_state.id).toBe(product.id);
   });
+
+  it('updates a category with optimistic concurrency', async () => {
+    const category = await app.inject({
+      method: 'POST',
+      url: '/api/v1/categories',
+      headers: auth(sessionA),
+      payload: { name: 'Desserts', display_order: 3 },
+    });
+    expect(category.statusCode).toBe(201);
+    const categoryId = category.json().id;
+
+    const noAuth = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/categories/${categoryId}`,
+      headers: { 'if-match': '1' },
+      payload: { name: 'Sweets' },
+    });
+    expect(noAuth.statusCode).toBe(401);
+
+    const conflict = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/categories/${categoryId}`,
+      headers: { ...auth(sessionA), 'if-match': '999' },
+      payload: { name: 'Sweets' },
+    });
+    expect(conflict.statusCode).toBe(409);
+
+    const update = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/categories/${categoryId}`,
+      headers: { ...auth(sessionA), 'if-match': '1' },
+      payload: { name: 'Sweets' },
+    });
+    expect(update.statusCode).toBe(200);
+    expect(update.json().name).toBe('Sweets');
+  });
+
+  it('lists availability rules for a product', async () => {
+    const product = await db
+      .selectFrom('products')
+      .select('id')
+      .where('name', '=', 'Classic Burger')
+      .executeTakeFirstOrThrow();
+
+    const noAuth = await app.inject({
+      method: 'GET',
+      url: `/api/v1/locations/${locationA}/products/${product.id}/availability-rules`,
+    });
+    expect(noAuth.statusCode).toBe(401);
+
+    const list = await app.inject({
+      method: 'GET',
+      url: `/api/v1/locations/${locationA}/products/${product.id}/availability-rules`,
+      headers: auth(sessionA),
+    });
+    expect(list.statusCode).toBe(200);
+    expect(list.json().data.length).toBeGreaterThan(0);
+    expect(list.json().data[0].status).toBe('EXHAUSTED');
+  });
 });

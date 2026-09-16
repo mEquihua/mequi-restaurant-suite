@@ -162,7 +162,7 @@ export interface paths {
         };
         get: operations["listRoles"];
         put?: never;
-        post?: never;
+        post: operations["createRole"];
         delete?: never;
         options?: never;
         head?: never;
@@ -195,6 +195,22 @@ export interface paths {
         get: operations["listCategories"];
         put?: never;
         post: operations["createCategory"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/categories/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["updateCategory"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -371,6 +387,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["markProductAvailable"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/locations/{locationId}/products/{productId}/availability-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listAvailabilityRules"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1457,6 +1489,7 @@ export interface components {
             last_name?: string;
             active?: boolean;
             pin?: string;
+            role_ids?: components["schemas"]["Uuid"][];
         };
         PermissionGrant: {
             permission_name: string;
@@ -1472,6 +1505,10 @@ export interface components {
         };
         RoleListResponse: {
             data: components["schemas"]["Role"][];
+        };
+        CreateRoleRequest: {
+            name: string;
+            description?: string | null;
         };
         ReplaceRolePermissionsRequest: {
             permissions: components["schemas"]["PermissionGrant"][];
@@ -1497,12 +1534,19 @@ export interface components {
             description: string | null;
             display_order: number;
             is_active: boolean;
+            version: number;
         };
         CategoryListResponse: {
             data: components["schemas"]["Category"][];
         };
         CreateCategoryRequest: {
             name: string;
+            description?: string | null;
+            display_order?: number;
+            is_active?: boolean;
+        };
+        UpdateCategoryRequest: {
+            name?: string;
             description?: string | null;
             display_order?: number;
             is_active?: boolean;
@@ -1663,6 +1707,9 @@ export interface components {
             /** Format: date-time */
             end_time: string | null;
             version: number;
+        };
+        AvailabilityRuleListResponse: {
+            data: components["schemas"]["AvailabilityRule"][];
         };
         MarkUnavailableRequest: {
             rule_id?: components["schemas"]["Uuid"];
@@ -2351,6 +2398,33 @@ export interface operations {
             403: components["responses"]["Error"];
         };
     };
+    createRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateRoleRequest"];
+            };
+        };
+        responses: {
+            /** @description Role created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Role"];
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+        };
+    };
     replaceRolePermissions: {
         parameters: {
             query?: never;
@@ -2427,6 +2501,41 @@ export interface operations {
             400: components["responses"]["Error"];
             401: components["responses"]["Error"];
             403: components["responses"]["Error"];
+        };
+    };
+    updateCategory: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Current category version */
+                "If-Match": string;
+            };
+            path: {
+                id: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCategoryRequest"];
+            };
+        };
+        responses: {
+            /** @description Updated category */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Category"];
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            428: components["responses"]["Error"];
         };
     };
     listProducts: {
@@ -2782,6 +2891,32 @@ export interface operations {
             401: components["responses"]["Error"];
             403: components["responses"]["Error"];
             409: components["responses"]["Error"];
+        };
+    };
+    listAvailabilityRules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                locationId: components["schemas"]["Uuid"];
+                productId: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Availability rules for the product at the location */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AvailabilityRuleListResponse"];
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
         };
     };
     listModuleDefinitions: {

@@ -1,0 +1,29 @@
+openapi: 3.1.0
+info:
+  title: Restaurant Suite API
+  version: 0.1.0
+  description: |
+    The API contract is versioned under /api/v1. This ping operation is the
+    minimal schema-first pattern for future modules.
+paths:
+  /api/v1/ping:
+    get:
+      operationId: ping
+      summary: Confirm that the API is reachable
+      responses:
+        '200':
+          description: The API is reachable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PingResponse'
+components:
+  schemas:
+    PingResponse:
+      type: object
+      additionalProperties: false
+      required: [ok]
+      properties:
+        ok:
+          type: boolean
+          const: true

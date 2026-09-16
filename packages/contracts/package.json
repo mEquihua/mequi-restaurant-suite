@@ -1,0 +1,21 @@
+{
+  "name": "@restaurant-suite/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "generate": "openapi-typescript openapi.yaml -o src/generated/api.ts",
+    "check:generated": "pnpm generate && git diff --exit-code -- src/generated/api.ts",
+    "typecheck": "tsc -b --pretty false"
+  },
+  "devDependencies": {
+    "openapi-typescript": "^7.10.1"
+  }
+}

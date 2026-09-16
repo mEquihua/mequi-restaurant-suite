@@ -1,0 +1,108 @@
+name: restaurant-suite
+
+services:
+  traefik:
+    image: traefik:v3.2
+    ports:
+      - '${TRAEFIK_HTTP_PORT:-80}:80'
+      - '${TRAEFIK_HTTPS_PORT:-443}:443'
+    volumes:
+      - ../traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ../traefik/dynamic:/etc/traefik/dynamic:ro
+    networks: [restaurant-internal]
+    depends_on:
+      api:
+        condition: service_started
+      web:
+        condition: service_started
+
+  web:
+    # Single-host installs build these immutable local images; CI can tag and publish the same Dockerfiles.
+    build:
+      context: ../..
+      dockerfile: apps/Dockerfile
+    image: restaurant-suite-web:local
+    networks: [restaurant-internal]
+
+  api:
+    build:
+      context: ../..
+      dockerfile: services/api/Dockerfile
+    image: restaurant-suite-api:local
+    environment:
+      NODE_ENV: production
+      PORT: '3000'
+      LOG_LEVEL: ${API_LOG_LEVEL:-info}
+    networks: [restaurant-internal]
+    depends_on:
+      postgres:
+        condition: service_started
+      valkey:
+        condition: service_started
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -q -O /dev/null http://127.0.0.1:3000/healthz']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  worker:
+    build:
+      context: ../..
+      dockerfile: services/worker/Dockerfile
+    image: restaurant-suite-worker:local
+    environment:
+      NODE_ENV: production
+    networks: [restaurant-internal]
+    depends_on:
+      postgres:
+        condition: service_started
+      valkey:
+        condition: service_started
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-restaurant_suite}
+      POSTGRES_USER: ${POSTGRES_USER:-restaurant_suite}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-development-only-change-me}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks: [restaurant-internal]
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  valkey:
+    image: valkey/valkey:8.0-alpine
+    command: valkey-server --save '' --appendonly no
+    networks: [restaurant-internal]
+    healthcheck:
+      test: ['CMD', 'valkey-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  local-connectivity:
+    image: busybox:1.37
+    command: sh -c 'echo local-connectivity placeholder started; trap exit TERM INT; while :; do sleep 3600 & wait $$!; done'
+    volumes:
+      - local-connectivity-data:/var/lib/restaurant-suite/local-connectivity
+    networks: [restaurant-internal]
+
+  cloudflared:
+    image: cloudflare/cloudflared:2025.2.1
+    command: tunnel --no-autoupdate run --token $${CLOUDFLARED_TUNNEL_TOKEN}
+    environment:
+      CLOUDFLARED_TUNNEL_TOKEN: ${CLOUDFLARED_TUNNEL_TOKEN:-}
+    profiles: [remote]
+    networks: [restaurant-internal]
+
+volumes:
+  postgres-data:
+  local-connectivity-data:
+
+networks:
+  restaurant-internal:
+    internal: true

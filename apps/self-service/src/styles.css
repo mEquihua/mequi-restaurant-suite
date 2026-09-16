@@ -1,0 +1,11 @@
+:root {
+  color: #24211e;
+  background: #f7f3ed;
+}
+body {
+  margin: 0;
+}
+button:focus-visible {
+  outline: 3px solid #2563eb;
+  outline-offset: 2px;
+}

@@ -1,0 +1,18 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/contracts" },
+    { "path": "./packages/domain" },
+    { "path": "./packages/ui-tokens" },
+    { "path": "./packages/ui-primitives" },
+    { "path": "./packages/ui-admin" },
+    { "path": "./packages/ui-operations" },
+    { "path": "./services/api" },
+    { "path": "./services/worker" },
+    { "path": "./apps/admin" },
+    { "path": "./apps/staff" },
+    { "path": "./apps/kitchen" },
+    { "path": "./apps/self-service" },
+    { "path": "./apps/customer" }
+  ]
+}

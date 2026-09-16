@@ -1,0 +1,11 @@
+{
+  "name": "@restaurant-suite/config",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./eslint": "./eslint.config.mjs",
+    "./prettier": "./prettier.config.mjs",
+    "./tsconfig": "./tsconfig.base.json"
+  }
+}

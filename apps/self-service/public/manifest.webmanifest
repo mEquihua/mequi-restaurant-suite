@@ -1,0 +1,12 @@
+{
+  "name": "Restaurant Suite — Self-Service",
+  "short_name": "RS Self-Service",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f7f3ed",
+  "theme_color": "#1f6b5c",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

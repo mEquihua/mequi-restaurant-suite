@@ -87,4 +87,44 @@ describeIntegration('guest table sessions against PostgreSQL', () => {
     expect(close.statusCode).toBe(200);
     expect((await app.inject({ method: 'GET', url: `/api/v1/locations/${location}/guest-sessions/current`, headers: guestAuth(session.token) })).statusCode).toBe(401);
   });
+
+  it('creates distinct tableless sessions for counter orders with correct order_type and rejects service requests', async () => {
+    const session1 = await app.inject({ method: 'POST', url: `/api/v1/locations/${location}/counter-sessions`, payload: { order_type: 'TAKEOUT' } });
+    const session2 = await app.inject({ method: 'POST', url: `/api/v1/locations/${location}/counter-sessions`, payload: { order_type: 'DINE_IN' } });
+    
+    expect(session1.statusCode).toBe(201);
+    expect(session2.statusCode).toBe(201);
+    
+    const token1 = session1.json().token;
+    const token2 = session2.json().token;
+    
+    expect(session1.json().visit_id).not.toBe(session2.json().visit_id);
+    expect(session1.json().table_id).toBeNull();
+    
+    const order1 = await app.inject({ method: 'GET', url: `/api/v1/locations/${location}/guest-sessions/current/order`, headers: guestAuth(token1) });
+    const order2 = await app.inject({ method: 'GET', url: `/api/v1/locations/${location}/guest-sessions/current/order`, headers: guestAuth(token2) });
+    
+    expect(order1.statusCode).toBe(200);
+    expect(order2.statusCode).toBe(200);
+    
+    const dbOrder1 = await db.selectFrom('orders').select('order_type').where('id', '=', order1.json().order.id).executeTakeFirstOrThrow();
+    const dbOrder2 = await db.selectFrom('orders').select('order_type').where('id', '=', order2.json().order.id).executeTakeFirstOrThrow();
+    
+    expect(dbOrder1.order_type).toBe('TAKEOUT');
+    expect(dbOrder2.order_type).toBe('DINE_IN');
+
+    const sessionDefault = await app.inject({ method: 'POST', url: `/api/v1/locations/${location}/counter-sessions`, payload: {} });
+    expect(sessionDefault.statusCode).toBe(201);
+    const orderDefault = await app.inject({ method: 'GET', url: `/api/v1/locations/${location}/guest-sessions/current/order`, headers: guestAuth(sessionDefault.json().token) });
+    const dbOrderDefault = await db.selectFrom('orders').select('order_type').where('id', '=', orderDefault.json().order.id).executeTakeFirstOrThrow();
+    expect(dbOrderDefault.order_type).toBe('TAKEOUT');
+
+    const current = await app.inject({ method: 'GET', url: `/api/v1/locations/${location}/guest-sessions/current`, headers: guestAuth(token1) });
+    expect(current.statusCode).toBe(200);
+    expect(current.json().table).toBeNull();
+    
+    const serviceRequest = await app.inject({ method: 'POST', url: `/api/v1/locations/${location}/guest-sessions/current/service-requests`, headers: guestAuth(token1), payload: { request_type: 'CALL_WAITER' } });
+    expect(serviceRequest.statusCode).toBe(400);
+    expect(serviceRequest.json().error.code).toBe('TABLE_REQUIRED');
+  });
 });

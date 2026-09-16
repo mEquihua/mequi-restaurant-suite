@@ -184,7 +184,7 @@ export interface GuestSessionTable {
   id: Generated<string>;
   location_id: string;
   visit_id: string;
-  table_id: string;
+  table_id: string | null;
   token_hash: string;
   device_info: string | null;
   created_at: Generated<Date>;

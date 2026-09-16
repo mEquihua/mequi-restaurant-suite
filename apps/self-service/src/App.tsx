@@ -36,7 +36,7 @@ import { useGuestRealtime } from './realtime.js';
 const queryClient = new QueryClient();
 type GuestInfo = {
   visit_id: string;
-  table: { id: string; name: string; status: string };
+  table: { id: string; name: string; status: string } | null;
   self_service: { enabled: boolean; guest_payment_mode: PaymentMode };
 };
 type OrderLine = { id: string; product_id: string; quantity: number; status: string };
@@ -428,7 +428,7 @@ function GuestExperience({ locationId, kiosk }: { locationId: string; kiosk: boo
     <main className="app-shell">
       <header>
         <div>
-          <p className="eyebrow">{kiosk ? 'Counter kiosk' : info.data.table.name}</p>
+          <p className="eyebrow">{kiosk ? 'Counter kiosk' : info.data.table?.name}</p>
           <h1>{kiosk ? 'Place your order' : 'Order from your table'}</h1>
         </div>
         <ConnectionNotice stale={stale} connected={connected} />
@@ -451,12 +451,6 @@ function GuestExperience({ locationId, kiosk }: { locationId: string; kiosk: boo
       {!kiosk && (
         <ServiceButtons locationId={locationId} billPrimary={requestBillIsPrimary(mode)} />
       )}
-      {kiosk && (
-        <p className="kiosk-note">
-          Kiosk orders currently use the configured counter pseudo-table. The backend records both
-          dine-in and takeout as TABLE_SELF_ORDER.
-        </p>
-      )}
     </main>
   );
 }
@@ -476,25 +470,60 @@ function TableScreen({
     </MintingScreen>
   );
 }
+function KioskMintingScreen({
+  locationId,
+  orderType,
+  children,
+}: {
+  locationId: string;
+  orderType: 'DINE_IN' | 'TAKEOUT';
+  children: () => React.ReactNode;
+}) {
+  const mint = useQuery({
+    queryKey: ['counter-session', locationId],
+    queryFn: async () => {
+      clearGuestToken();
+      const session = await apiFetch<GuestSessionMintResponse>(
+        `/api/v1/locations/${locationId}/counter-sessions`,
+        { method: 'POST', body: JSON.stringify({ order_type: orderType }) },
+      );
+      setGuestToken(session.token);
+      return session;
+    },
+    retry: false,
+  });
+  if (mint.isPending)
+    return (
+      <main className="centered">
+        <h1>Starting order…</h1>
+      </main>
+    );
+  if (mint.isError) {
+    const error = mint.error as ApiError;
+    return (
+      <main className="centered">
+        <h1>We could not start your order</h1>
+        <p>{error.message}</p>
+        <button onClick={() => mint.refetch()}>Try again</button>
+      </main>
+    );
+  }
+  return <>{children()}</>;
+}
+
 function KioskEntry() {
   const { locationId = '' } = useParams();
-  const [params] = useSearchParams();
   const navigate = useNavigate();
-  const [tableId, setTableId] = useState(
-    () =>
-      params.get('tableId') || localStorage.getItem(`self-service:kiosk-table:${locationId}`) || '',
-  );
   const [service, setService] = useState<'DINE_IN' | 'TAKEOUT' | null>(null);
   const start = () => {
-    localStorage.setItem(`self-service:kiosk-table:${locationId}`, tableId);
-    navigate(`/${locationId}/kiosk/order/${tableId}`);
+    navigate(`/${locationId}/kiosk/order?type=${service}`);
   };
   if (service)
     return (
       <main className="centered">
         <h1>{service === 'DINE_IN' ? 'Dine-in order' : 'Takeout order'}</h1>
         <p>Choose your items next.</p>
-        <button className="primary" onClick={start} disabled={!tableId}>
+        <button className="primary" onClick={start}>
           Browse menu
         </button>
         <button onClick={() => setService(null)}>Back</button>
@@ -504,22 +533,10 @@ function KioskEntry() {
     <main className="centered">
       <h1>Welcome</h1>
       <p>Start your order at the counter.</p>
-      <label className="setup-label">
-        Kiosk counter table ID
-        <input
-          value={tableId}
-          onChange={(event) => setTableId(event.target.value)}
-          placeholder="Configured pseudo-table UUID"
-        />
-      </label>
-      <p className="muted">
-        This one-time device setting is required because the current API only mints guest sessions
-        against a table.
-      </p>
-      <button className="primary" disabled={!tableId} onClick={() => setService('DINE_IN')}>
+      <button className="primary" onClick={() => setService('DINE_IN')}>
         Start dine-in order
       </button>
-      <button disabled={!tableId} onClick={() => setService('TAKEOUT')}>
+      <button onClick={() => setService('TAKEOUT')}>
         Start takeout order
       </button>
     </main>
@@ -581,8 +598,14 @@ function TableRoute() {
   return <TableScreen locationId={locationId} tableId={tableId} />;
 }
 function KioskOrderRoute() {
-  const { locationId = '', tableId = '' } = useParams();
-  return <TableScreen locationId={locationId} tableId={tableId} kiosk />;
+  const { locationId = '' } = useParams();
+  const [params] = useSearchParams();
+  const orderType = (params.get('type') as 'DINE_IN' | 'TAKEOUT') || 'TAKEOUT';
+  return (
+    <KioskMintingScreen locationId={locationId} orderType={orderType}>
+      {() => <GuestExperience locationId={locationId} kiosk />}
+    </KioskMintingScreen>
+  );
 }
 export function App() {
   return (
@@ -591,7 +614,7 @@ export function App() {
         <Routes>
           <Route path="/:locationId/table/:tableId" element={<TableRoute />} />
           <Route path="/:locationId/kiosk" element={<KioskEntry />} />
-          <Route path="/:locationId/kiosk/order/:tableId" element={<KioskOrderRoute />} />
+          <Route path="/:locationId/kiosk/order" element={<KioskOrderRoute />} />
           <Route path="/:locationId/status-board" element={<StatusBoard />} />
           <Route path="*" element={<NotFound />} />
         </Routes>

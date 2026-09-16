@@ -21,4 +21,9 @@ export type {
   StaffTable,
   TerminalPinAttemptTable,
   TerminalTable,
+  VisitTable,
+  AccountTable,
+  OrderTable,
+  OrderLineTable,
+  PaymentTable,
 } from './database.js';

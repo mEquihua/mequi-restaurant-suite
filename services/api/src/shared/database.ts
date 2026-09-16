@@ -28,6 +28,17 @@ export interface Database {
   table_sections: TableSectionTable;
   module_definitions: ModuleDefinitionTable;
   module_activations: ModuleActivationTable;
+  visits: VisitTable;
+  accounts: AccountTable;
+  orders: OrderTable;
+  order_lines: OrderLineTable;
+  order_line_modifiers: OrderLineModifierTable;
+  payments: PaymentTable;
+  cancellations_and_voids: CancellationAndVoidTable;
+  refunds: RefundTable;
+  outbox_events: OutboxEventTable;
+  audit_events: AuditEventTable;
+  command_idempotency: CommandIdempotencyTable;
 }
 
 export interface OrganizationTable {
@@ -264,14 +275,153 @@ export interface ModuleActivationTable {
   created_at: Generated<Date>;
   updated_at: Generated<Date>;
 }
+export interface VisitTable {
+  id: Generated<string>;
+  location_id: string;
+  table_id: string | null;
+  staff_id: string | null;
+  guest_count: number | null;
+  status: Generated<string>;
+  opened_at: Generated<Date>;
+  closed_at: Date | null;
+  version: Generated<number>;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+export interface AccountTable {
+  id: Generated<string>;
+  location_id: string;
+  visit_id: string;
+  name: string | null;
+  status: Generated<string>;
+  subtotal: Generated<number>;
+  tax: Generated<number>;
+  discount: Generated<number>;
+  total: Generated<number>;
+  paid_amount: Generated<number>;
+  version: Generated<number>;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+export interface OrderTable {
+  id: Generated<string>;
+  location_id: string;
+  visit_id: string;
+  order_type: string;
+  status: Generated<string>;
+  version: Generated<number>;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+export interface OrderLineTable {
+  id: Generated<string>;
+  location_id: string;
+  order_id: string;
+  account_id: string;
+  product_id: string;
+  variant_id: string | null;
+  seat_number: number | null;
+  course_name: string | null;
+  quantity: number;
+  unit_price: number;
+  status: Generated<string>;
+  version: Generated<number>;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+export interface OrderLineModifierTable {
+  id: Generated<string>;
+  location_id: string;
+  order_line_id: string;
+  modifier_id: string;
+  unit_price: number;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+export interface PaymentTable {
+  id: Generated<string>;
+  location_id: string;
+  account_id: string;
+  method: string;
+  amount: number;
+  tip_amount: Generated<number>;
+  status: string;
+  reference_code: string | null;
+  idempotency_key: string | null;
+  version: Generated<number>;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+export interface CancellationAndVoidTable {
+  id: Generated<string>;
+  location_id: string;
+  order_line_id: string;
+  operation_type: string;
+  amount: number;
+  reason: string;
+  authorized_by: string;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+export interface RefundTable {
+  id: Generated<string>;
+  location_id: string;
+  payment_id: string;
+  amount: number;
+  reason: string;
+  authorized_by: string;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+export interface OutboxEventTable {
+  id: Generated<string>;
+  location_id: string;
+  aggregate_type: string;
+  aggregate_id: string;
+  event_type: string;
+  payload: unknown;
+  schema_version: number;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  dispatched_at: Date | null;
+}
+export interface AuditEventTable {
+  id: Generated<string>;
+  location_id: string;
+  actor_id: string;
+  terminal_id: string;
+  action: string;
+  aggregate_type: string;
+  aggregate_id: string;
+  before_version: number | null;
+  after_version: number | null;
+  reason: string | null;
+  request_id: string;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+export interface CommandIdempotencyTable {
+  location_id: string;
+  command: string;
+  idempotency_key: string;
+  payload_hash: string;
+  response: unknown;
+  created_at: Generated<Date>;
+}
 
 export type DatabaseTransaction = Transaction<Database>;
 
 declare module 'fastify' {
   interface FastifyInstance {
     db: Kysely<Database>;
-    withLocationTransaction<T>(locationId: string, work: (trx: DatabaseTransaction) => Promise<T>): Promise<T>;
-    withOrganizationTransaction<T>(organizationId: string, work: (trx: DatabaseTransaction) => Promise<T>): Promise<T>;
+    withLocationTransaction<T>(
+      locationId: string,
+      work: (trx: DatabaseTransaction) => Promise<T>,
+    ): Promise<T>;
+    withOrganizationTransaction<T>(
+      organizationId: string,
+      work: (trx: DatabaseTransaction) => Promise<T>,
+    ): Promise<T>;
   }
 }
 
@@ -292,19 +442,25 @@ export function installDatabase(app: FastifyInstance, options: DatabaseOptions =
   const db = createDatabase(options);
 
   app.decorate('db', db);
-  app.decorate('withLocationTransaction', async <T>(locationId: string, work: (trx: DatabaseTransaction) => Promise<T>) =>
-    db.transaction().execute(async (trx) => {
-      await sql`SET LOCAL ROLE application_runtime_role`.execute(trx);
-      await sql`SELECT set_config('app.current_location_id', ${locationId}, true)`.execute(trx);
-      return work(trx);
-    }),
+  app.decorate(
+    'withLocationTransaction',
+    async <T>(locationId: string, work: (trx: DatabaseTransaction) => Promise<T>) =>
+      db.transaction().execute(async (trx) => {
+        await sql`SET LOCAL ROLE application_runtime_role`.execute(trx);
+        await sql`SELECT set_config('app.current_location_id', ${locationId}, true)`.execute(trx);
+        return work(trx);
+      }),
   );
-  app.decorate('withOrganizationTransaction', async <T>(organizationId: string, work: (trx: DatabaseTransaction) => Promise<T>) =>
-    db.transaction().execute(async (trx) => {
-      await sql`SET LOCAL ROLE application_runtime_role`.execute(trx);
-      await sql`SELECT set_config('app.current_organization_id', ${organizationId}, true)`.execute(trx);
-      return work(trx);
-    }),
+  app.decorate(
+    'withOrganizationTransaction',
+    async <T>(organizationId: string, work: (trx: DatabaseTransaction) => Promise<T>) =>
+      db.transaction().execute(async (trx) => {
+        await sql`SET LOCAL ROLE application_runtime_role`.execute(trx);
+        await sql`SELECT set_config('app.current_organization_id', ${organizationId}, true)`.execute(
+          trx,
+        );
+        return work(trx);
+      }),
   );
   app.addHook('onClose', async () => db.destroy());
 }

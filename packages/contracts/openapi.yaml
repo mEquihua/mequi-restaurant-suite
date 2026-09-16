@@ -9,15 +9,35 @@ paths:
       operationId: ping
       summary: Confirm that the API is reachable
       responses:
-        '200': { description: The API is reachable, content: { application/json: { schema: { $ref: '#/components/schemas/PingResponse' } } } }
+        '200':
+          {
+            description: The API is reachable,
+            content:
+              { application/json: { schema: { $ref: '#/components/schemas/PingResponse' } } },
+          }
   /api/v1/terminals/enroll:
     post:
       operationId: enrollTerminal
       x-required-permission: iam.terminals.enroll
       security: [{ staffSession: [] }]
-      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/EnrollTerminalRequest' } } } }
+      requestBody:
+        {
+          required: true,
+          content:
+            {
+              application/json: { schema: { $ref: '#/components/schemas/EnrollTerminalRequest' } },
+            },
+        }
       responses:
-        '201': { description: Terminal enrolled; credential is returned once, content: { application/json: { schema: { $ref: '#/components/schemas/EnrollTerminalResponse' } } } }
+        '201':
+          {
+            description: Terminal enrolled; credential is returned once,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: '#/components/schemas/EnrollTerminalResponse' } },
+              },
+          }
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
   /api/v1/terminals:
@@ -26,7 +46,14 @@ paths:
       x-required-permission: iam.terminals.read
       security: [{ staffSession: [] }]
       responses:
-        '200': { description: Terminals in the authenticated session location, content: { application/json: { schema: { $ref: '#/components/schemas/TerminalListResponse' } } } }
+        '200':
+          {
+            description: Terminals in the authenticated session location,
+            content:
+              {
+                application/json: { schema: { $ref: '#/components/schemas/TerminalListResponse' } },
+              },
+          }
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
   /api/v1/auth/pin-unlock:
@@ -35,17 +62,38 @@ paths:
       summary: Verify a staff PIN on an enrolled terminal
       description: Requires the enrollment credential in X-Terminal-Credential. Failed attempts back off per terminal and presented staff credential; 429 includes Retry-After.
       parameters: [{ $ref: '#/components/parameters/TerminalCredential' }]
-      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/PinUnlockRequest' } } } }
+      requestBody:
+        {
+          required: true,
+          content:
+            { application/json: { schema: { $ref: '#/components/schemas/PinUnlockRequest' } } },
+        }
       responses:
-        '201': { description: New opaque staff session, content: { application/json: { schema: { $ref: '#/components/schemas/SessionResponse' } } } }
+        '201':
+          {
+            description: New opaque staff session,
+            content:
+              { application/json: { schema: { $ref: '#/components/schemas/SessionResponse' } } },
+          }
         '401': { $ref: '#/components/responses/Error' }
-        '429': { description: Per-terminal PIN backoff is active, headers: { Retry-After: { schema: { type: integer, minimum: 1 } } }, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '429':
+          {
+            description: Per-terminal PIN backoff is active,
+            headers: { Retry-After: { schema: { type: integer, minimum: 1 } } },
+            content:
+              { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } },
+          }
   /api/v1/auth/refresh:
     post:
       operationId: refreshSession
       security: [{ staffSession: [] }]
       responses:
-        '200': { description: Rotated staff session, content: { application/json: { schema: { $ref: '#/components/schemas/SessionResponse' } } } }
+        '200':
+          {
+            description: Rotated staff session,
+            content:
+              { application/json: { schema: { $ref: '#/components/schemas/SessionResponse' } } },
+          }
         '401': { $ref: '#/components/responses/Error' }
   /api/v1/auth/logout:
     post:
@@ -59,7 +107,11 @@ paths:
       operationId: getCurrentStaffSession
       security: [{ staffSession: [] }]
       responses:
-        '200': { description: Current staff identity and effective RBAC grants, content: { application/json: { schema: { $ref: '#/components/schemas/MeResponse' } } } }
+        '200':
+          {
+            description: Current staff identity and effective RBAC grants,
+            content: { application/json: { schema: { $ref: '#/components/schemas/MeResponse' } } },
+          }
         '401': { $ref: '#/components/responses/Error' }
   /api/v1/staff:
     get:
@@ -67,16 +119,30 @@ paths:
       x-required-permission: iam.staff.read
       security: [{ staffSession: [] }]
       responses:
-        '200': { description: Staff assigned to current location or organization-wide, content: { application/json: { schema: { $ref: '#/components/schemas/StaffListResponse' } } } }
+        '200':
+          {
+            description: Staff assigned to current location or organization-wide,
+            content:
+              { application/json: { schema: { $ref: '#/components/schemas/StaffListResponse' } } },
+          }
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
     post:
       operationId: createStaff
       x-required-permission: iam.staff.write
       security: [{ staffSession: [] }]
-      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreateStaffRequest' } } } }
+      requestBody:
+        {
+          required: true,
+          content:
+            { application/json: { schema: { $ref: '#/components/schemas/CreateStaffRequest' } } },
+        }
       responses:
-        '201': { description: Staff created and assigned at current location, content: { application/json: { schema: { $ref: '#/components/schemas/Staff' } } } }
+        '201':
+          {
+            description: Staff created and assigned at current location,
+            content: { application/json: { schema: { $ref: '#/components/schemas/Staff' } } },
+          }
         '400': { $ref: '#/components/responses/Error' }
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
@@ -87,11 +153,33 @@ paths:
       security: [{ staffSession: [] }]
       parameters:
         - { name: id, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }
-        - { name: If-Match, in: header, required: true, description: Current staff version, schema: { type: string, pattern: '^"?[1-9][0-9]*"?$' } }
-      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/UpdateStaffRequest' } } } }
+        - {
+            name: If-Match,
+            in: header,
+            required: true,
+            description: Current staff version,
+            schema: { type: string, pattern: '^"?[1-9][0-9]*"?$' },
+          }
+      requestBody:
+        {
+          required: true,
+          content:
+            { application/json: { schema: { $ref: '#/components/schemas/UpdateStaffRequest' } } },
+        }
       responses:
-        '200': { description: Updated staff, content: { application/json: { schema: { $ref: '#/components/schemas/Staff' } } } }
-        '409': { description: Optimistic concurrency conflict with current staff state, content: { application/json: { schema: { $ref: '#/components/schemas/ConcurrencyConflict' } } } }
+        '200':
+          {
+            description: Updated staff,
+            content: { application/json: { schema: { $ref: '#/components/schemas/Staff' } } },
+          }
+        '409':
+          {
+            description: Optimistic concurrency conflict with current staff state,
+            content:
+              {
+                application/json: { schema: { $ref: '#/components/schemas/ConcurrencyConflict' } },
+              },
+          }
         '428': { $ref: '#/components/responses/Error' }
   /api/v1/roles:
     get:
@@ -99,7 +187,12 @@ paths:
       x-required-permission: iam.roles.read
       security: [{ staffSession: [] }]
       responses:
-        '200': { description: Roles and grants for organization, content: { application/json: { schema: { $ref: '#/components/schemas/RoleListResponse' } } } }
+        '200':
+          {
+            description: Roles and grants for organization,
+            content:
+              { application/json: { schema: { $ref: '#/components/schemas/RoleListResponse' } } },
+          }
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
   /api/v1/roles/{id}/permissions:
@@ -107,10 +200,27 @@ paths:
       operationId: replaceRolePermissions
       x-required-permission: iam.permissions.grant
       security: [{ staffSession: [] }]
-      parameters: [{ name: id, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }]
-      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ReplaceRolePermissionsRequest' } } } }
+      parameters:
+        [{ name: id, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }]
+      requestBody:
+        {
+          required: true,
+          content:
+            {
+              application/json:
+                { schema: { $ref: '#/components/schemas/ReplaceRolePermissionsRequest' } },
+            },
+        }
       responses:
-        '200': { description: Role permission set replaced, content: { application/json: { schema: { $ref: '#/components/schemas/RolePermissionsResponse' } } } }
+        '200':
+          {
+            description: Role permission set replaced,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: '#/components/schemas/RolePermissionsResponse' } },
+              },
+          }
         '400': { $ref: '#/components/responses/Error' }
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
@@ -120,16 +230,34 @@ paths:
       x-required-permission: menu.catalog.read
       security: [{ staffSession: [] }]
       responses:
-        '200': { description: Organization categories, content: { application/json: { schema: { $ref: '#/components/schemas/CategoryListResponse' } } } }
+        '200':
+          {
+            description: Organization categories,
+            content:
+              {
+                application/json: { schema: { $ref: '#/components/schemas/CategoryListResponse' } },
+              },
+          }
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
     post:
       operationId: createCategory
       x-required-permission: menu.products.write
       security: [{ staffSession: [] }]
-      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreateCategoryRequest' } } } }
+      requestBody:
+        {
+          required: true,
+          content:
+            {
+              application/json: { schema: { $ref: '#/components/schemas/CreateCategoryRequest' } },
+            },
+        }
       responses:
-        '201': { description: Category created, content: { application/json: { schema: { $ref: '#/components/schemas/Category' } } } }
+        '201':
+          {
+            description: Category created,
+            content: { application/json: { schema: { $ref: '#/components/schemas/Category' } } },
+          }
         '400': { $ref: '#/components/responses/Error' }
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
@@ -139,20 +267,51 @@ paths:
       x-required-permission: menu.catalog.read
       security: [{ staffSession: [] }]
       parameters:
-        - { name: channel, in: query, schema: { type: string }, description: Channel for server-resolved availability. }
-        - { name: service_type, in: query, schema: { type: string }, description: Service type for server-resolved availability. }
-        - { name: at, in: query, schema: { type: string, format: date-time }, description: Instant used to evaluate scheduled availability. }
+        - {
+            name: channel,
+            in: query,
+            schema: { type: string },
+            description: Channel for server-resolved availability.,
+          }
+        - {
+            name: service_type,
+            in: query,
+            schema: { type: string },
+            description: Service type for server-resolved availability.,
+          }
+        - {
+            name: at,
+            in: query,
+            schema: { type: string, format: date-time },
+            description: Instant used to evaluate scheduled availability.,
+          }
       responses:
-        '200': { description: Products priced and resolved for the authenticated location, content: { application/json: { schema: { $ref: '#/components/schemas/ProductListResponse' } } } }
+        '200':
+          {
+            description: Products priced and resolved for the authenticated location,
+            content:
+              {
+                application/json: { schema: { $ref: '#/components/schemas/ProductListResponse' } },
+              },
+          }
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
     post:
       operationId: createProduct
       x-required-permission: menu.products.write
       security: [{ staffSession: [] }]
-      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreateProductRequest' } } } }
+      requestBody:
+        {
+          required: true,
+          content:
+            { application/json: { schema: { $ref: '#/components/schemas/CreateProductRequest' } } },
+        }
       responses:
-        '201': { description: Product created with server-resolved location price, content: { application/json: { schema: { $ref: '#/components/schemas/Product' } } } }
+        '201':
+          {
+            description: Product created with server-resolved location price,
+            content: { application/json: { schema: { $ref: '#/components/schemas/Product' } } },
+          }
         '400': { $ref: '#/components/responses/Error' }
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
@@ -163,10 +322,25 @@ paths:
       security: [{ staffSession: [] }]
       parameters:
         - { name: id, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }
-        - { name: If-Match, in: header, required: true, description: Current product version, schema: { type: string, pattern: '^"?[1-9][0-9]*"?$' } }
-      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/UpdateProductRequest' } } } }
+        - {
+            name: If-Match,
+            in: header,
+            required: true,
+            description: Current product version,
+            schema: { type: string, pattern: '^"?[1-9][0-9]*"?$' },
+          }
+      requestBody:
+        {
+          required: true,
+          content:
+            { application/json: { schema: { $ref: '#/components/schemas/UpdateProductRequest' } } },
+        }
       responses:
-        '200': { description: Updated product, content: { application/json: { schema: { $ref: '#/components/schemas/Product' } } } }
+        '200':
+          {
+            description: Updated product,
+            content: { application/json: { schema: { $ref: '#/components/schemas/Product' } } },
+          }
         '409': { $ref: '#/components/responses/Error' }
         '428': { $ref: '#/components/responses/Error' }
   /api/v1/products/{id}/variants:
@@ -174,69 +348,249 @@ paths:
       operationId: createProductVariant
       x-required-permission: menu.products.write
       security: [{ staffSession: [] }]
-      parameters: [{ name: id, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }]
-      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreateVariantRequest' } } } }
-      responses: { '201': { description: Variant created, content: { application/json: { schema: { $ref: '#/components/schemas/Variant' } } } }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' }, '404': { $ref: '#/components/responses/Error' } }
+      parameters:
+        [{ name: id, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }]
+      requestBody:
+        {
+          required: true,
+          content:
+            { application/json: { schema: { $ref: '#/components/schemas/CreateVariantRequest' } } },
+        }
+      responses:
+        {
+          '201':
+            {
+              description: Variant created,
+              content: { application/json: { schema: { $ref: '#/components/schemas/Variant' } } },
+            },
+          '401': { $ref: '#/components/responses/Error' },
+          '403': { $ref: '#/components/responses/Error' },
+          '404': { $ref: '#/components/responses/Error' },
+        }
   /api/v1/products/{id}/modifier-groups:
     post:
       operationId: attachProductModifierGroup
       x-required-permission: menu.products.write
       security: [{ staffSession: [] }]
-      parameters: [{ name: id, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }]
-      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AttachModifierGroupRequest' } } } }
-      responses: { '201': { description: Modifier group attached, content: { application/json: { schema: { $ref: '#/components/schemas/ProductModifierGroup' } } } }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' }, '404': { $ref: '#/components/responses/Error' } }
+      parameters:
+        [{ name: id, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }]
+      requestBody:
+        {
+          required: true,
+          content:
+            {
+              application/json:
+                { schema: { $ref: '#/components/schemas/AttachModifierGroupRequest' } },
+            },
+        }
+      responses:
+        {
+          '201':
+            {
+              description: Modifier group attached,
+              content:
+                {
+                  application/json:
+                    { schema: { $ref: '#/components/schemas/ProductModifierGroup' } },
+                },
+            },
+          '401': { $ref: '#/components/responses/Error' },
+          '403': { $ref: '#/components/responses/Error' },
+          '404': { $ref: '#/components/responses/Error' },
+        }
   /api/v1/products/{id}/combo-groups:
     post:
       operationId: createProductComboGroup
       x-required-permission: menu.products.write
       security: [{ staffSession: [] }]
-      parameters: [{ name: id, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }]
-      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreateComboGroupRequest' } } } }
-      responses: { '201': { description: Combo group created, content: { application/json: { schema: { $ref: '#/components/schemas/ComboGroup' } } } }, '400': { $ref: '#/components/responses/Error' }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' }, '404': { $ref: '#/components/responses/Error' } }
+      parameters:
+        [{ name: id, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }]
+      requestBody:
+        {
+          required: true,
+          content:
+            {
+              application/json:
+                { schema: { $ref: '#/components/schemas/CreateComboGroupRequest' } },
+            },
+        }
+      responses:
+        {
+          '201':
+            {
+              description: Combo group created,
+              content:
+                { application/json: { schema: { $ref: '#/components/schemas/ComboGroup' } } },
+            },
+          '400': { $ref: '#/components/responses/Error' },
+          '401': { $ref: '#/components/responses/Error' },
+          '403': { $ref: '#/components/responses/Error' },
+          '404': { $ref: '#/components/responses/Error' },
+        }
   /api/v1/products/{id}/duplicate:
     post:
       operationId: duplicateProduct
       x-required-permission: menu.products.write
       security: [{ staffSession: [] }]
-      parameters: [{ name: id, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }]
-      responses: { '201': { description: Product copy created, content: { application/json: { schema: { $ref: '#/components/schemas/Product' } } } }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' }, '404': { $ref: '#/components/responses/Error' } }
+      parameters:
+        [{ name: id, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }]
+      responses:
+        {
+          '201':
+            {
+              description: Product copy created,
+              content: { application/json: { schema: { $ref: '#/components/schemas/Product' } } },
+            },
+          '401': { $ref: '#/components/responses/Error' },
+          '403': { $ref: '#/components/responses/Error' },
+          '404': { $ref: '#/components/responses/Error' },
+        }
   /api/v1/modifier-groups:
     post:
       operationId: createModifierGroup
       x-required-permission: menu.products.write
       security: [{ staffSession: [] }]
-      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreateModifierGroupRequest' } } } }
-      responses: { '201': { description: Modifier group created, content: { application/json: { schema: { $ref: '#/components/schemas/ModifierGroup' } } } }, '400': { $ref: '#/components/responses/Error' }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' } }
+      requestBody:
+        {
+          required: true,
+          content:
+            {
+              application/json:
+                { schema: { $ref: '#/components/schemas/CreateModifierGroupRequest' } },
+            },
+        }
+      responses:
+        {
+          '201':
+            {
+              description: Modifier group created,
+              content:
+                { application/json: { schema: { $ref: '#/components/schemas/ModifierGroup' } } },
+            },
+          '400': { $ref: '#/components/responses/Error' },
+          '401': { $ref: '#/components/responses/Error' },
+          '403': { $ref: '#/components/responses/Error' },
+        }
   /api/v1/modifier-groups/{id}/modifiers:
     post:
       operationId: createModifier
       x-required-permission: menu.products.write
       security: [{ staffSession: [] }]
-      parameters: [{ name: id, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }]
-      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreateModifierRequest' } } } }
-      responses: { '201': { description: Modifier created, content: { application/json: { schema: { $ref: '#/components/schemas/Modifier' } } } }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' }, '404': { $ref: '#/components/responses/Error' } }
+      parameters:
+        [{ name: id, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }]
+      requestBody:
+        {
+          required: true,
+          content:
+            {
+              application/json: { schema: { $ref: '#/components/schemas/CreateModifierRequest' } },
+            },
+        }
+      responses:
+        {
+          '201':
+            {
+              description: Modifier created,
+              content: { application/json: { schema: { $ref: '#/components/schemas/Modifier' } } },
+            },
+          '401': { $ref: '#/components/responses/Error' },
+          '403': { $ref: '#/components/responses/Error' },
+          '404': { $ref: '#/components/responses/Error' },
+        }
   /api/v1/locations/{locationId}/price-overrides/{productId}:
     put:
       operationId: putLocationPriceOverride
       x-required-permission: menu.prices.update
       security: [{ staffSession: [] }]
       parameters:
-        - { name: locationId, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }
-        - { name: productId, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }
-        - { name: If-Match, in: header, required: true, description: Override version; use 0 when creating the first override, schema: { type: string, pattern: '^"?[0-9]+"?$' } }
-      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/PutPriceOverrideRequest' } } } }
-      responses: { '200': { description: Stored location override, content: { application/json: { schema: { $ref: '#/components/schemas/LocationPriceOverride' } } } }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' }, '409': { $ref: '#/components/responses/Error' } }
+        - {
+            name: locationId,
+            in: path,
+            required: true,
+            schema: { $ref: '#/components/schemas/Uuid' },
+          }
+        - {
+            name: productId,
+            in: path,
+            required: true,
+            schema: { $ref: '#/components/schemas/Uuid' },
+          }
+        - {
+            name: If-Match,
+            in: header,
+            required: true,
+            description: Override version; use 0 when creating the first override,
+            schema: { type: string, pattern: '^"?[0-9]+"?$' },
+          }
+      requestBody:
+        {
+          required: true,
+          content:
+            {
+              application/json:
+                { schema: { $ref: '#/components/schemas/PutPriceOverrideRequest' } },
+            },
+        }
+      responses:
+        {
+          '200':
+            {
+              description: Stored location override,
+              content:
+                {
+                  application/json:
+                    { schema: { $ref: '#/components/schemas/LocationPriceOverride' } },
+                },
+            },
+          '401': { $ref: '#/components/responses/Error' },
+          '403': { $ref: '#/components/responses/Error' },
+          '409': { $ref: '#/components/responses/Error' },
+        }
   /api/v1/locations/{locationId}/products/{productId}/mark-unavailable:
     post:
       operationId: markProductUnavailable
       x-required-permission: menu.availability.update
       security: [{ staffSession: [] }]
       parameters:
-        - { name: locationId, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }
-        - { name: productId, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }
-        - { name: If-Match, in: header, required: true, description: Availability-rule version; use 0 to create a scoped rule, schema: { type: string, pattern: '^"?[0-9]+"?$' } }
-      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/MarkUnavailableRequest' } } } }
-      responses: { '200': { description: Explicit availability operation recorded, content: { application/json: { schema: { $ref: '#/components/schemas/AvailabilityRule' } } } }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' }, '409': { $ref: '#/components/responses/Error' } }
+        - {
+            name: locationId,
+            in: path,
+            required: true,
+            schema: { $ref: '#/components/schemas/Uuid' },
+          }
+        - {
+            name: productId,
+            in: path,
+            required: true,
+            schema: { $ref: '#/components/schemas/Uuid' },
+          }
+        - {
+            name: If-Match,
+            in: header,
+            required: true,
+            description: Availability-rule version; use 0 to create a scoped rule,
+            schema: { type: string, pattern: '^"?[0-9]+"?$' },
+          }
+      requestBody:
+        {
+          required: true,
+          content:
+            {
+              application/json: { schema: { $ref: '#/components/schemas/MarkUnavailableRequest' } },
+            },
+        }
+      responses:
+        {
+          '200':
+            {
+              description: Explicit availability operation recorded,
+              content:
+                { application/json: { schema: { $ref: '#/components/schemas/AvailabilityRule' } } },
+            },
+          '401': { $ref: '#/components/responses/Error' },
+          '403': { $ref: '#/components/responses/Error' },
+          '409': { $ref: '#/components/responses/Error' },
+        }
   /api/v1/locations/{locationId}/products/{productId}/mark-available:
     post:
       operationId: markProductAvailable
@@ -301,29 +655,113 @@ paths:
       operationId: listAreas
       x-required-permission: floor.layout.read
       security: [{ staffSession: [] }]
-      parameters: [{ name: locationId, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }]
-      responses: { '200': { description: Areas in the authenticated session location, content: { application/json: { schema: { $ref: '#/components/schemas/AreaListResponse' } } } }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' } }
+      parameters:
+        [
+          {
+            name: locationId,
+            in: path,
+            required: true,
+            schema: { $ref: '#/components/schemas/Uuid' },
+          },
+        ]
+      responses:
+        {
+          '200':
+            {
+              description: Areas in the authenticated session location,
+              content:
+                { application/json: { schema: { $ref: '#/components/schemas/AreaListResponse' } } },
+            },
+          '401': { $ref: '#/components/responses/Error' },
+          '403': { $ref: '#/components/responses/Error' },
+        }
     post:
       operationId: createArea
       x-required-permission: floor.layout.write
       security: [{ staffSession: [] }]
-      parameters: [{ name: locationId, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }]
-      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreateAreaRequest' } } } }
-      responses: { '201': { description: Area created, content: { application/json: { schema: { $ref: '#/components/schemas/Area' } } } }, '400': { $ref: '#/components/responses/Error' }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' } }
+      parameters:
+        [
+          {
+            name: locationId,
+            in: path,
+            required: true,
+            schema: { $ref: '#/components/schemas/Uuid' },
+          },
+        ]
+      requestBody:
+        {
+          required: true,
+          content:
+            { application/json: { schema: { $ref: '#/components/schemas/CreateAreaRequest' } } },
+        }
+      responses:
+        {
+          '201':
+            {
+              description: Area created,
+              content: { application/json: { schema: { $ref: '#/components/schemas/Area' } } },
+            },
+          '400': { $ref: '#/components/responses/Error' },
+          '401': { $ref: '#/components/responses/Error' },
+          '403': { $ref: '#/components/responses/Error' },
+        }
   /api/v1/locations/{locationId}/tables:
     get:
       operationId: listTables
       x-required-permission: floor.layout.read
       security: [{ staffSession: [] }]
-      parameters: [{ name: locationId, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }]
-      responses: { '200': { description: Tables in the authenticated session location, content: { application/json: { schema: { $ref: '#/components/schemas/TableListResponse' } } } }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' } }
+      parameters:
+        [
+          {
+            name: locationId,
+            in: path,
+            required: true,
+            schema: { $ref: '#/components/schemas/Uuid' },
+          },
+        ]
+      responses:
+        {
+          '200':
+            {
+              description: Tables in the authenticated session location,
+              content:
+                {
+                  application/json: { schema: { $ref: '#/components/schemas/TableListResponse' } },
+                },
+            },
+          '401': { $ref: '#/components/responses/Error' },
+          '403': { $ref: '#/components/responses/Error' },
+        }
     post:
       operationId: createTable
       x-required-permission: floor.layout.write
       security: [{ staffSession: [] }]
-      parameters: [{ name: locationId, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }]
-      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreateTableRequest' } } } }
-      responses: { '201': { description: Table created, content: { application/json: { schema: { $ref: '#/components/schemas/Table' } } } }, '400': { $ref: '#/components/responses/Error' }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' } }
+      parameters:
+        [
+          {
+            name: locationId,
+            in: path,
+            required: true,
+            schema: { $ref: '#/components/schemas/Uuid' },
+          },
+        ]
+      requestBody:
+        {
+          required: true,
+          content:
+            { application/json: { schema: { $ref: '#/components/schemas/CreateTableRequest' } } },
+        }
+      responses:
+        {
+          '201':
+            {
+              description: Table created,
+              content: { application/json: { schema: { $ref: '#/components/schemas/Table' } } },
+            },
+          '400': { $ref: '#/components/responses/Error' },
+          '401': { $ref: '#/components/responses/Error' },
+          '403': { $ref: '#/components/responses/Error' },
+        }
   /api/v1/tables/{id}:
     put:
       operationId: updateTable
@@ -331,9 +769,33 @@ paths:
       security: [{ staffSession: [] }]
       parameters:
         - { name: id, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }
-        - { name: If-Match, in: header, required: true, description: Current table version, schema: { type: string, pattern: '^"?[1-9][0-9]*"?$' } }
-      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/UpdateTableRequest' } } } }
-      responses: { '200': { description: Updated table, content: { application/json: { schema: { $ref: '#/components/schemas/Table' } } } }, '400': { $ref: '#/components/responses/Error' }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' }, '404': { $ref: '#/components/responses/Error' }, '409': { $ref: '#/components/responses/Error' }, '428': { $ref: '#/components/responses/Error' } }
+        - {
+            name: If-Match,
+            in: header,
+            required: true,
+            description: Current table version,
+            schema: { type: string, pattern: '^"?[1-9][0-9]*"?$' },
+          }
+      requestBody:
+        {
+          required: true,
+          content:
+            { application/json: { schema: { $ref: '#/components/schemas/UpdateTableRequest' } } },
+        }
+      responses:
+        {
+          '200':
+            {
+              description: Updated table,
+              content: { application/json: { schema: { $ref: '#/components/schemas/Table' } } },
+            },
+          '400': { $ref: '#/components/responses/Error' },
+          '401': { $ref: '#/components/responses/Error' },
+          '403': { $ref: '#/components/responses/Error' },
+          '404': { $ref: '#/components/responses/Error' },
+          '409': { $ref: '#/components/responses/Error' },
+          '428': { $ref: '#/components/responses/Error' },
+        }
   /api/v1/tables/{id}/mark-needs-cleaning:
     post:
       operationId: markTableNeedsCleaning
@@ -341,9 +803,32 @@ paths:
       security: [{ staffSession: [] }]
       parameters:
         - { name: id, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }
-        - { name: If-Match, in: header, required: true, description: Current table version, schema: { type: string, pattern: '^"?[1-9][0-9]*"?$' } }
-      requestBody: { content: { application/json: { schema: { $ref: '#/components/schemas/EmptyObjectRequest' } } } }
-      responses: { '200': { description: Table marked as needing cleaning, content: { application/json: { schema: { $ref: '#/components/schemas/Table' } } } }, '400': { $ref: '#/components/responses/Error' }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' }, '404': { $ref: '#/components/responses/Error' }, '409': { $ref: '#/components/responses/Error' }, '428': { $ref: '#/components/responses/Error' } }
+        - {
+            name: If-Match,
+            in: header,
+            required: true,
+            description: Current table version,
+            schema: { type: string, pattern: '^"?[1-9][0-9]*"?$' },
+          }
+      requestBody:
+        {
+          content:
+            { application/json: { schema: { $ref: '#/components/schemas/EmptyObjectRequest' } } },
+        }
+      responses:
+        {
+          '200':
+            {
+              description: Table marked as needing cleaning,
+              content: { application/json: { schema: { $ref: '#/components/schemas/Table' } } },
+            },
+          '400': { $ref: '#/components/responses/Error' },
+          '401': { $ref: '#/components/responses/Error' },
+          '403': { $ref: '#/components/responses/Error' },
+          '404': { $ref: '#/components/responses/Error' },
+          '409': { $ref: '#/components/responses/Error' },
+          '428': { $ref: '#/components/responses/Error' },
+        }
   /api/v1/tables/{id}/mark-available:
     post:
       operationId: markTableAvailable
@@ -351,9 +836,32 @@ paths:
       security: [{ staffSession: [] }]
       parameters:
         - { name: id, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }
-        - { name: If-Match, in: header, required: true, description: Current table version, schema: { type: string, pattern: '^"?[1-9][0-9]*"?$' } }
-      requestBody: { content: { application/json: { schema: { $ref: '#/components/schemas/EmptyObjectRequest' } } } }
-      responses: { '200': { description: Table marked as available, content: { application/json: { schema: { $ref: '#/components/schemas/Table' } } } }, '400': { $ref: '#/components/responses/Error' }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' }, '404': { $ref: '#/components/responses/Error' }, '409': { $ref: '#/components/responses/Error' }, '428': { $ref: '#/components/responses/Error' } }
+        - {
+            name: If-Match,
+            in: header,
+            required: true,
+            description: Current table version,
+            schema: { type: string, pattern: '^"?[1-9][0-9]*"?$' },
+          }
+      requestBody:
+        {
+          content:
+            { application/json: { schema: { $ref: '#/components/schemas/EmptyObjectRequest' } } },
+        }
+      responses:
+        {
+          '200':
+            {
+              description: Table marked as available,
+              content: { application/json: { schema: { $ref: '#/components/schemas/Table' } } },
+            },
+          '400': { $ref: '#/components/responses/Error' },
+          '401': { $ref: '#/components/responses/Error' },
+          '403': { $ref: '#/components/responses/Error' },
+          '404': { $ref: '#/components/responses/Error' },
+          '409': { $ref: '#/components/responses/Error' },
+          '428': { $ref: '#/components/responses/Error' },
+        }
   /api/v1/tables/{id}/mark-out-of-service:
     post:
       operationId: markTableOutOfService
@@ -361,38 +869,633 @@ paths:
       security: [{ staffSession: [] }]
       parameters:
         - { name: id, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }
-        - { name: If-Match, in: header, required: true, description: Current table version, schema: { type: string, pattern: '^"?[1-9][0-9]*"?$' } }
-      requestBody: { content: { application/json: { schema: { $ref: '#/components/schemas/EmptyObjectRequest' } } } }
-      responses: { '200': { description: Table marked as out of service, content: { application/json: { schema: { $ref: '#/components/schemas/Table' } } } }, '400': { $ref: '#/components/responses/Error' }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' }, '404': { $ref: '#/components/responses/Error' }, '409': { $ref: '#/components/responses/Error' }, '428': { $ref: '#/components/responses/Error' } }
+        - {
+            name: If-Match,
+            in: header,
+            required: true,
+            description: Current table version,
+            schema: { type: string, pattern: '^"?[1-9][0-9]*"?$' },
+          }
+      requestBody:
+        {
+          content:
+            { application/json: { schema: { $ref: '#/components/schemas/EmptyObjectRequest' } } },
+        }
+      responses:
+        {
+          '200':
+            {
+              description: Table marked as out of service,
+              content: { application/json: { schema: { $ref: '#/components/schemas/Table' } } },
+            },
+          '400': { $ref: '#/components/responses/Error' },
+          '401': { $ref: '#/components/responses/Error' },
+          '403': { $ref: '#/components/responses/Error' },
+          '404': { $ref: '#/components/responses/Error' },
+          '409': { $ref: '#/components/responses/Error' },
+          '428': { $ref: '#/components/responses/Error' },
+        }
   /api/v1/locations/{locationId}/sections:
     get:
       operationId: listSections
       x-required-permission: floor.layout.read
       security: [{ staffSession: [] }]
-      parameters: [{ name: locationId, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }]
-      responses: { '200': { description: Sections in the authenticated session location, content: { application/json: { schema: { $ref: '#/components/schemas/SectionListResponse' } } } }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' } }
+      parameters:
+        [
+          {
+            name: locationId,
+            in: path,
+            required: true,
+            schema: { $ref: '#/components/schemas/Uuid' },
+          },
+        ]
+      responses:
+        {
+          '200':
+            {
+              description: Sections in the authenticated session location,
+              content:
+                {
+                  application/json:
+                    { schema: { $ref: '#/components/schemas/SectionListResponse' } },
+                },
+            },
+          '401': { $ref: '#/components/responses/Error' },
+          '403': { $ref: '#/components/responses/Error' },
+        }
     post:
       operationId: createSection
       x-required-permission: floor.layout.write
       security: [{ staffSession: [] }]
-      parameters: [{ name: locationId, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }]
-      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreateSectionRequest' } } } }
-      responses: { '201': { description: Section created, content: { application/json: { schema: { $ref: '#/components/schemas/Section' } } } }, '400': { $ref: '#/components/responses/Error' }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' } }
+      parameters:
+        [
+          {
+            name: locationId,
+            in: path,
+            required: true,
+            schema: { $ref: '#/components/schemas/Uuid' },
+          },
+        ]
+      requestBody:
+        {
+          required: true,
+          content:
+            { application/json: { schema: { $ref: '#/components/schemas/CreateSectionRequest' } } },
+        }
+      responses:
+        {
+          '201':
+            {
+              description: Section created,
+              content: { application/json: { schema: { $ref: '#/components/schemas/Section' } } },
+            },
+          '400': { $ref: '#/components/responses/Error' },
+          '401': { $ref: '#/components/responses/Error' },
+          '403': { $ref: '#/components/responses/Error' },
+        }
+  /api/v1/locations/{locationId}/visits:
+    post:
+      operationId: openVisit
+      x-required-permission: orders.visits.create
+      security: [{ staffSession: [] }]
+      parameters:
+        [
+          {
+            name: locationId,
+            in: path,
+            required: true,
+            schema: { $ref: '#/components/schemas/Uuid' },
+          },
+        ]
+      requestBody:
+        {
+          required: true,
+          content:
+            { application/json: { schema: { $ref: '#/components/schemas/OpenVisitRequest' } } },
+        }
+      responses:
+        {
+          '201':
+            {
+              description: Open visit,
+              content: { application/json: { schema: { $ref: '#/components/schemas/Visit' } } },
+            },
+          '400': { $ref: '#/components/responses/Error' },
+          '403': { $ref: '#/components/responses/Error' },
+        }
+  /api/v1/locations/{locationId}/visits/{visitId}/orders:
+    post:
+      operationId: createOrder
+      x-required-permission: orders.orders.create
+      security: [{ staffSession: [] }]
+      parameters:
+        [
+          {
+            name: locationId,
+            in: path,
+            required: true,
+            schema: { $ref: '#/components/schemas/Uuid' },
+          },
+          {
+            name: visitId,
+            in: path,
+            required: true,
+            schema: { $ref: '#/components/schemas/Uuid' },
+          },
+          { name: If-Match, in: header, required: true, schema: { type: string } },
+        ]
+      requestBody:
+        {
+          required: true,
+          content:
+            { application/json: { schema: { $ref: '#/components/schemas/CreateOrderRequest' } } },
+        }
+      responses:
+        {
+          '201':
+            {
+              description: Draft order,
+              content: { application/json: { schema: { $ref: '#/components/schemas/Order' } } },
+            },
+          '409': { $ref: '#/components/responses/Error' },
+        }
+  /api/v1/locations/{locationId}/visits/{visitId}/accounts:
+    post:
+      operationId: createAccount
+      x-required-permission: accounts.accounts.create
+      security: [{ staffSession: [] }]
+      parameters:
+        [
+          {
+            name: locationId,
+            in: path,
+            required: true,
+            schema: { $ref: '#/components/schemas/Uuid' },
+          },
+          {
+            name: visitId,
+            in: path,
+            required: true,
+            schema: { $ref: '#/components/schemas/Uuid' },
+          },
+        ]
+      requestBody:
+        {
+          required: true,
+          content:
+            { application/json: { schema: { $ref: '#/components/schemas/CreateAccountRequest' } } },
+        }
+      responses:
+        {
+          '201':
+            {
+              description: Account,
+              content: { application/json: { schema: { $ref: '#/components/schemas/Account' } } },
+            },
+        }
+  /api/v1/locations/{locationId}/visits/{visitId}/close:
+    post:
+      operationId: closeVisit
+      x-required-permission: orders.visits.close
+      security: [{ staffSession: [] }]
+      parameters:
+        [
+          {
+            name: locationId,
+            in: path,
+            required: true,
+            schema: { $ref: '#/components/schemas/Uuid' },
+          },
+          {
+            name: visitId,
+            in: path,
+            required: true,
+            schema: { $ref: '#/components/schemas/Uuid' },
+          },
+          { name: If-Match, in: header, required: true, schema: { type: string } },
+        ]
+      responses:
+        {
+          '200':
+            {
+              description: Completed visit,
+              content: { application/json: { schema: { $ref: '#/components/schemas/Visit' } } },
+            },
+          '409': { $ref: '#/components/responses/Error' },
+        }
+  /api/v1/locations/{locationId}/orders/{orderId}/lines:
+    post:
+      operationId: addOrderLines
+      x-required-permission: orders.lines.add
+      security: [{ staffSession: [] }]
+      parameters:
+        [
+          {
+            name: locationId,
+            in: path,
+            required: true,
+            schema: { $ref: '#/components/schemas/Uuid' },
+          },
+          {
+            name: orderId,
+            in: path,
+            required: true,
+            schema: { $ref: '#/components/schemas/Uuid' },
+          },
+          { name: If-Match, in: header, required: true, schema: { type: string } },
+        ]
+      requestBody:
+        {
+          required: true,
+          content:
+            { application/json: { schema: { $ref: '#/components/schemas/AddOrderLinesRequest' } } },
+        }
+      responses:
+        {
+          '201':
+            {
+              description: Server-priced lines,
+              content: { application/json: { schema: { type: object } } },
+            },
+          '409': { $ref: '#/components/responses/Error' },
+        }
+  /api/v1/locations/{locationId}/orders/{orderId}/send:
+    post:
+      operationId: sendOrderLines
+      x-required-permission: orders.lines.send
+      security: [{ staffSession: [] }]
+      parameters:
+        [
+          {
+            name: locationId,
+            in: path,
+            required: true,
+            schema: { $ref: '#/components/schemas/Uuid' },
+          },
+          {
+            name: orderId,
+            in: path,
+            required: true,
+            schema: { $ref: '#/components/schemas/Uuid' },
+          },
+          { name: If-Match, in: header, required: true, schema: { type: string } },
+          { name: Idempotency-Key, in: header, required: true, schema: { type: string } },
+        ]
+      requestBody:
+        {
+          required: true,
+          content:
+            {
+              application/json: { schema: { $ref: '#/components/schemas/SendOrderLinesRequest' } },
+            },
+        }
+      responses:
+        {
+          '200':
+            {
+              description: Sent or idempotently replayed response,
+              content: { application/json: { schema: { type: object } } },
+            },
+          '409': { $ref: '#/components/responses/Error' },
+        }
+  /api/v1/locations/{locationId}/orders/{orderId}/transfer-lines:
+    post:
+      operationId: transferOrderLines
+      x-required-permission: orders.visits.transfer
+      security: [{ staffSession: [] }]
+      parameters:
+        [
+          {
+            name: locationId,
+            in: path,
+            required: true,
+            schema: { $ref: '#/components/schemas/Uuid' },
+          },
+          {
+            name: orderId,
+            in: path,
+            required: true,
+            schema: { $ref: '#/components/schemas/Uuid' },
+          },
+          { name: If-Match, in: header, required: true, schema: { type: string } },
+        ]
+      requestBody:
+        {
+          required: true,
+          content:
+            { application/json: { schema: { $ref: '#/components/schemas/TransferLinesRequest' } } },
+        }
+      responses:
+        {
+          '200':
+            {
+              description: Lines transferred,
+              content: { application/json: { schema: { type: object } } },
+            },
+        }
+  /api/v1/locations/{locationId}/orders/{orderId}/cancel:
+    post: &cancelOrder
+      operationId: cancelOrder
+      x-required-permission: orders.orders.cancel
+      security: [{ staffSession: [] }]
+      parameters:
+        [
+          {
+            name: locationId,
+            in: path,
+            required: true,
+            schema: { $ref: '#/components/schemas/Uuid' },
+          },
+          {
+            name: orderId,
+            in: path,
+            required: true,
+            schema: { $ref: '#/components/schemas/Uuid' },
+          },
+          { name: If-Match, in: header, required: true, schema: { type: string } },
+        ]
+      requestBody:
+        {
+          required: true,
+          content: { application/json: { schema: { $ref: '#/components/schemas/ReasonRequest' } } },
+        }
+      responses:
+        {
+          '200':
+            {
+              description: Cancelled order,
+              content: { application/json: { schema: { $ref: '#/components/schemas/Order' } } },
+            },
+          '409': { $ref: '#/components/responses/Error' },
+        }
+  /api/v1/locations/{locationId}/orders/{orderId}/cancel-override:
+    post:
+      <<: *cancelOrder
+      operationId: cancelOrderOverride
+      x-required-permission: orders.orders.cancel_override
+      requestBody:
+        {
+          required: true,
+          content:
+            {
+              application/json: { schema: { $ref: '#/components/schemas/OverrideReasonRequest' } },
+            },
+        }
+  /api/v1/locations/{locationId}/order-lines/{lineId}/hold:
+    post: &lineCommand
+      operationId: holdOrderLine
+      x-required-permission: orders.lines.hold
+      security: [{ staffSession: [] }]
+      parameters:
+        [
+          {
+            name: locationId,
+            in: path,
+            required: true,
+            schema: { $ref: '#/components/schemas/Uuid' },
+          },
+          { name: lineId, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } },
+          { name: If-Match, in: header, required: true, schema: { type: string } },
+        ]
+      responses:
+        {
+          '200':
+            {
+              description: Changed line,
+              content: { application/json: { schema: { $ref: '#/components/schemas/OrderLine' } } },
+            },
+        }
+  /api/v1/locations/{locationId}/order-lines/{lineId}/mark-preparing:
+    post:
+      {
+        <<: *lineCommand,
+        operationId: markOrderLinePreparing,
+        x-required-permission: kitchen.tickets.update_status,
+      }
+  /api/v1/locations/{locationId}/order-lines/{lineId}/mark-ready:
+    post:
+      {
+        <<: *lineCommand,
+        operationId: markOrderLineReady,
+        x-required-permission: kitchen.tickets.update_status,
+      }
+  /api/v1/locations/{locationId}/order-lines/{lineId}/mark-fulfilled:
+    post:
+      {
+        <<: *lineCommand,
+        operationId: markOrderLineFulfilled,
+        x-required-permission: kitchen.tickets.update_status,
+      }
+  /api/v1/locations/{locationId}/order-lines/{lineId}/void:
+    post:
+      {
+        <<: *lineCommand,
+        operationId: voidOrderLine,
+        x-required-permission: orders.lines.void,
+        requestBody:
+          {
+            required: true,
+            content:
+              { application/json: { schema: { $ref: '#/components/schemas/ReasonRequest' } } },
+          },
+      }
+  /api/v1/locations/{locationId}/order-lines/{lineId}/void-override:
+    post:
+      {
+        <<: *lineCommand,
+        operationId: voidOrderLineOverride,
+        x-required-permission: orders.lines.void_override,
+        requestBody:
+          {
+            required: true,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: '#/components/schemas/OverrideReasonRequest' } },
+              },
+          },
+      }
+  /api/v1/locations/{locationId}/accounts/{accountId}/split:
+    post:
+      operationId: splitAccount
+      x-required-permission: accounts.accounts.split
+      security: [{ staffSession: [] }]
+      parameters:
+        [
+          {
+            name: locationId,
+            in: path,
+            required: true,
+            schema: { $ref: '#/components/schemas/Uuid' },
+          },
+          {
+            name: accountId,
+            in: path,
+            required: true,
+            schema: { $ref: '#/components/schemas/Uuid' },
+          },
+          { name: If-Match, in: header, required: true, schema: { type: string } },
+        ]
+      requestBody:
+        {
+          required: true,
+          content:
+            { application/json: { schema: { $ref: '#/components/schemas/SplitAccountRequest' } } },
+        }
+      responses:
+        {
+          '201':
+            {
+              description: Split accounts,
+              content: { application/json: { schema: { type: object } } },
+            },
+        }
+  /api/v1/locations/{locationId}/accounts/{accountId}/reopen:
+    post:
+      operationId: reopenAccount
+      x-required-permission: accounts.accounts.reopen
+      security: [{ staffSession: [] }]
+      parameters:
+        [
+          {
+            name: locationId,
+            in: path,
+            required: true,
+            schema: { $ref: '#/components/schemas/Uuid' },
+          },
+          {
+            name: accountId,
+            in: path,
+            required: true,
+            schema: { $ref: '#/components/schemas/Uuid' },
+          },
+          { name: If-Match, in: header, required: true, schema: { type: string } },
+        ]
+      responses:
+        {
+          '200':
+            {
+              description: Reopened account,
+              content: { application/json: { schema: { $ref: '#/components/schemas/Account' } } },
+            },
+        }
+  /api/v1/locations/{locationId}/accounts/{accountId}/payments:
+    post:
+      operationId: recordPayment
+      x-required-permission: payments.payments.create
+      security: [{ staffSession: [] }]
+      parameters:
+        [
+          {
+            name: locationId,
+            in: path,
+            required: true,
+            schema: { $ref: '#/components/schemas/Uuid' },
+          },
+          {
+            name: accountId,
+            in: path,
+            required: true,
+            schema: { $ref: '#/components/schemas/Uuid' },
+          },
+          { name: If-Match, in: header, required: true, schema: { type: string } },
+          { name: Idempotency-Key, in: header, required: true, schema: { type: string } },
+        ]
+      requestBody:
+        {
+          required: true,
+          content:
+            { application/json: { schema: { $ref: '#/components/schemas/RecordPaymentRequest' } } },
+        }
+      responses:
+        {
+          '201':
+            {
+              description: Completed payment or idempotent replay,
+              content: { application/json: { schema: { type: object } } },
+            },
+          '409': { $ref: '#/components/responses/Error' },
+        }
+  /api/v1/locations/{locationId}/payments/{paymentId}/refund:
+    post:
+      operationId: refundPayment
+      x-required-permission: payments.refunds.create
+      security: [{ staffSession: [] }]
+      parameters:
+        [
+          {
+            name: locationId,
+            in: path,
+            required: true,
+            schema: { $ref: '#/components/schemas/Uuid' },
+          },
+          {
+            name: paymentId,
+            in: path,
+            required: true,
+            schema: { $ref: '#/components/schemas/Uuid' },
+          },
+        ]
+      requestBody:
+        {
+          required: true,
+          content: { application/json: { schema: { $ref: '#/components/schemas/RefundRequest' } } },
+        }
+      responses:
+        {
+          '201':
+            { description: Refund, content: { application/json: { schema: { type: object } } } },
+        }
   /api/v1/sections/{id}/tables:
     put:
       operationId: replaceSectionTables
       x-required-permission: floor.sections.assign
       security: [{ staffSession: [] }]
-      parameters: [{ name: id, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }]
-      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ReplaceSectionTablesRequest' } } } }
-      responses: { '200': { description: Section table assignments replaced, content: { application/json: { schema: { $ref: '#/components/schemas/SectionTablesResponse' } } } }, '400': { $ref: '#/components/responses/Error' }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' }, '404': { $ref: '#/components/responses/Error' } }
+      parameters:
+        [{ name: id, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }]
+      requestBody:
+        {
+          required: true,
+          content:
+            {
+              application/json:
+                { schema: { $ref: '#/components/schemas/ReplaceSectionTablesRequest' } },
+            },
+        }
+      responses:
+        {
+          '200':
+            {
+              description: Section table assignments replaced,
+              content:
+                {
+                  application/json:
+                    { schema: { $ref: '#/components/schemas/SectionTablesResponse' } },
+                },
+            },
+          '400': { $ref: '#/components/responses/Error' },
+          '401': { $ref: '#/components/responses/Error' },
+          '403': { $ref: '#/components/responses/Error' },
+          '404': { $ref: '#/components/responses/Error' },
+        }
 components:
   securitySchemes:
     staffSession: { type: http, scheme: bearer, bearerFormat: opaque }
   parameters:
-    TerminalCredential: { name: X-Terminal-Credential, in: header, required: true, schema: { type: string, minLength: 70 }, description: Enrollment credential returned once by terminal enrollment. }
+    TerminalCredential:
+      {
+        name: X-Terminal-Credential,
+        in: header,
+        required: true,
+        schema: { type: string, minLength: 70 },
+        description: Enrollment credential returned once by terminal enrollment.,
+      }
   responses:
-    Error: { description: API error, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+    Error:
+      {
+        description: API error,
+        content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } },
+      }
   schemas:
     Uuid: { type: string, format: uuid }
     PingResponse: { type: object, additionalProperties: false, required: [ok], properties: { ok: { type: boolean, const: true } } }
@@ -450,10 +1553,308 @@ components:
     CreateTableRequest: { type: object, additionalProperties: false, required: [area_id, name, max_capacity], properties: { area_id: { $ref: '#/components/schemas/Uuid' }, name: { type: string, minLength: 1, maxLength: 160 }, min_capacity: { type: integer, minimum: 1 }, max_capacity: { type: integer, minimum: 1 }, pos_x: { type: integer }, pos_y: { type: integer } } }
     UpdateTableRequest: { type: object, additionalProperties: false, minProperties: 1, properties: { area_id: { $ref: '#/components/schemas/Uuid' }, name: { type: string, minLength: 1, maxLength: 160 }, min_capacity: { type: integer, minimum: 1 }, max_capacity: { type: integer, minimum: 1 }, pos_x: { type: integer }, pos_y: { type: integer } } }
     EmptyObjectRequest: { type: object, additionalProperties: false, maxProperties: 0 }
-    Section: { type: object, additionalProperties: false, required: [id, location_id, name, created_at, updated_at], properties: { id: { $ref: '#/components/schemas/Uuid' }, location_id: { $ref: '#/components/schemas/Uuid' }, name: { type: string }, created_at: { type: string, format: date-time }, updated_at: { type: string, format: date-time } } }
-    SectionListResponse: { type: object, additionalProperties: false, required: [data], properties: { data: { type: array, items: { $ref: '#/components/schemas/Section' } } } }
-    CreateSectionRequest: { type: object, additionalProperties: false, required: [name], properties: { name: { type: string, minLength: 1, maxLength: 160 } } }
-    ReplaceSectionTablesRequest: { type: object, additionalProperties: false, required: [table_ids], properties: { table_ids: { type: array, uniqueItems: true, items: { $ref: '#/components/schemas/Uuid' } } } }
-    SectionTablesResponse: { type: object, additionalProperties: false, required: [section_id, table_ids], properties: { section_id: { $ref: '#/components/schemas/Uuid' }, table_ids: { type: array, items: { $ref: '#/components/schemas/Uuid' } } } }
-    ErrorResponse: { type: object, additionalProperties: false, required: [error], properties: { error: { type: object, additionalProperties: true, required: [status, code, message, request_id], properties: { status: { type: integer }, code: { type: string }, message: { type: string }, request_id: { type: string }, details: {} } } } }
-    ConcurrencyConflict: { type: object, additionalProperties: false, required: [error], properties: { error: { type: object, additionalProperties: false, required: [status, code, message, request_id, details], properties: { status: { const: 409 }, code: { const: OPTIMISTIC_CONCURRENCY_CONFLICT }, message: { type: string }, request_id: { type: string }, details: { type: object, additionalProperties: false, required: [current_version, current_state], properties: { current_version: { type: integer }, current_state: { $ref: '#/components/schemas/Staff' } } } } } } }
+    Section:
+      {
+        type: object,
+        additionalProperties: false,
+        required: [id, location_id, name, created_at, updated_at],
+        properties:
+          {
+            id: { $ref: '#/components/schemas/Uuid' },
+            location_id: { $ref: '#/components/schemas/Uuid' },
+            name: { type: string },
+            created_at: { type: string, format: date-time },
+            updated_at: { type: string, format: date-time },
+          },
+      }
+    SectionListResponse:
+      {
+        type: object,
+        additionalProperties: false,
+        required: [data],
+        properties: { data: { type: array, items: { $ref: '#/components/schemas/Section' } } },
+      }
+    CreateSectionRequest:
+      {
+        type: object,
+        additionalProperties: false,
+        required: [name],
+        properties: { name: { type: string, minLength: 1, maxLength: 160 } },
+      }
+    ReplaceSectionTablesRequest:
+      {
+        type: object,
+        additionalProperties: false,
+        required: [table_ids],
+        properties:
+          {
+            table_ids:
+              { type: array, uniqueItems: true, items: { $ref: '#/components/schemas/Uuid' } },
+          },
+      }
+    SectionTablesResponse:
+      {
+        type: object,
+        additionalProperties: false,
+        required: [section_id, table_ids],
+        properties:
+          {
+            section_id: { $ref: '#/components/schemas/Uuid' },
+            table_ids: { type: array, items: { $ref: '#/components/schemas/Uuid' } },
+          },
+      }
+    Visit:
+      {
+        type: object,
+        additionalProperties: true,
+        required: [id, location_id, status, version],
+        properties:
+          {
+            id: { $ref: '#/components/schemas/Uuid' },
+            location_id: { $ref: '#/components/schemas/Uuid' },
+            table_id: { type: [string, 'null'] },
+            guest_count: { type: [integer, 'null'] },
+            status: { type: string, enum: [OPEN, COMPLETED, CANCELLED] },
+            version: { type: integer },
+          },
+      }
+    Account:
+      {
+        type: object,
+        additionalProperties: true,
+        required: [id, location_id, visit_id, status, total, paid_amount, version],
+        properties:
+          {
+            id: { $ref: '#/components/schemas/Uuid' },
+            location_id: { $ref: '#/components/schemas/Uuid' },
+            visit_id: { $ref: '#/components/schemas/Uuid' },
+            status: { type: string, enum: [OPEN, PARTIALLY_PAID, PAID, CLOSED, REFUNDED] },
+            total: { type: integer },
+            paid_amount: { type: integer },
+            version: { type: integer },
+          },
+      }
+    Order:
+      {
+        type: object,
+        additionalProperties: true,
+        required: [id, location_id, visit_id, order_type, status, version],
+        properties:
+          {
+            id: { $ref: '#/components/schemas/Uuid' },
+            location_id: { $ref: '#/components/schemas/Uuid' },
+            visit_id: { $ref: '#/components/schemas/Uuid' },
+            order_type: { type: string },
+            status: { type: string, enum: [DRAFT, HELD, SENT, COMPLETED, CANCELLED] },
+            version: { type: integer },
+          },
+      }
+    OrderLine:
+      {
+        type: object,
+        additionalProperties: true,
+        required: [id, order_id, account_id, product_id, quantity, unit_price, status, version],
+        properties:
+          {
+            id: { $ref: '#/components/schemas/Uuid' },
+            order_id: { $ref: '#/components/schemas/Uuid' },
+            account_id: { $ref: '#/components/schemas/Uuid' },
+            product_id: { $ref: '#/components/schemas/Uuid' },
+            quantity: { type: integer },
+            unit_price: { type: integer, description: Server-computed cents },
+            status:
+              {
+                type: string,
+                enum: [DRAFT, HELD, SENT, PREPARING, READY, FULFILLED, CANCELLED, VOIDED],
+              },
+            version: { type: integer },
+          },
+      }
+    OpenVisitRequest:
+      {
+        type: object,
+        additionalProperties: false,
+        properties:
+          {
+            table_id: { $ref: '#/components/schemas/Uuid' },
+            guest_count: { type: integer, minimum: 1 },
+          },
+      }
+    CreateOrderRequest:
+      {
+        type: object,
+        additionalProperties: false,
+        required: [order_type],
+        properties:
+          {
+            order_type:
+              { type: string, enum: [DINE_IN, TAKEOUT, PICKUP, DELIVERY, TABLE_SELF_ORDER] },
+          },
+      }
+    CreateAccountRequest:
+      { type: object, additionalProperties: false, properties: { name: { type: string } } }
+    AddOrderLinesRequest:
+      {
+        type: object,
+        additionalProperties: false,
+        required: [lines],
+        properties:
+          {
+            lines:
+              {
+                type: array,
+                minItems: 1,
+                items:
+                  {
+                    type: object,
+                    additionalProperties: false,
+                    required: [account_id, product_id, quantity],
+                    properties:
+                      {
+                        account_id: { $ref: '#/components/schemas/Uuid' },
+                        product_id: { $ref: '#/components/schemas/Uuid' },
+                        variant_id: { $ref: '#/components/schemas/Uuid' },
+                        modifier_ids: { type: array, items: { $ref: '#/components/schemas/Uuid' } },
+                        seat_number: { type: [integer, 'null'] },
+                        course_name: { type: [string, 'null'] },
+                        quantity: { type: integer, minimum: 1 },
+                      },
+                  },
+              },
+          },
+      }
+    SendOrderLinesRequest:
+      {
+        type: object,
+        additionalProperties: false,
+        required: [line_ids],
+        properties:
+          {
+            line_ids:
+              {
+                type: array,
+                minItems: 1,
+                uniqueItems: true,
+                items: { $ref: '#/components/schemas/Uuid' },
+              },
+          },
+      }
+    TransferLinesRequest:
+      {
+        type: object,
+        additionalProperties: false,
+        required: [line_ids],
+        properties:
+          {
+            line_ids: { type: array, minItems: 1, items: { $ref: '#/components/schemas/Uuid' } },
+            target_order_id: { $ref: '#/components/schemas/Uuid' },
+            target_account_id: { $ref: '#/components/schemas/Uuid' },
+          },
+      }
+    ReasonRequest:
+      {
+        type: object,
+        additionalProperties: false,
+        required: [reason],
+        properties: { reason: { type: string, minLength: 1 } },
+      }
+    OverrideReasonRequest:
+      {
+        type: object,
+        additionalProperties: false,
+        required: [reason, authorized_by],
+        properties:
+          {
+            reason: { type: string, minLength: 1 },
+            authorized_by: { $ref: '#/components/schemas/Uuid' },
+          },
+      }
+    SplitAccountRequest:
+      {
+        type: object,
+        additionalProperties: false,
+        required: [method],
+        properties:
+          {
+            method: { type: string, enum: [BY_SEAT, BY_ITEM, EQUALLY] },
+            order_line_ids: { type: array, items: { $ref: '#/components/schemas/Uuid' } },
+            count: { type: integer, minimum: 2 },
+          },
+      }
+    RecordPaymentRequest:
+      {
+        type: object,
+        additionalProperties: false,
+        required: [method, amount],
+        properties:
+          {
+            method: { type: string, enum: [CASH, CARD, TRANSFER, OTHER] },
+            amount: { type: integer, minimum: 1 },
+            tip_amount: { type: integer, minimum: 0 },
+            reference_code: { type: string },
+          },
+      }
+    RefundRequest:
+      {
+        type: object,
+        additionalProperties: false,
+        required: [reason],
+        properties:
+          { reason: { type: string, minLength: 1 }, amount: { type: integer, minimum: 1 } },
+      }
+    ErrorResponse:
+      {
+        type: object,
+        additionalProperties: false,
+        required: [error],
+        properties:
+          {
+            error:
+              {
+                type: object,
+                additionalProperties: true,
+                required: [status, code, message, request_id],
+                properties:
+                  {
+                    status: { type: integer },
+                    code: { type: string },
+                    message: { type: string },
+                    request_id: { type: string },
+                    details: {},
+                  },
+              },
+          },
+      }
+    ConcurrencyConflict:
+      {
+        type: object,
+        additionalProperties: false,
+        required: [error],
+        properties:
+          {
+            error:
+              {
+                type: object,
+                additionalProperties: false,
+                required: [status, code, message, request_id, details],
+                properties:
+                  {
+                    status: { const: 409 },
+                    code: { const: OPTIMISTIC_CONCURRENCY_CONFLICT },
+                    message: { type: string },
+                    request_id: { type: string },
+                    details:
+                      {
+                        type: object,
+                        additionalProperties: false,
+                        required: [current_version, current_state],
+                        properties:
+                          {
+                            current_version: { type: integer },
+                            current_state: { $ref: '#/components/schemas/Staff' },
+                          },
+                      },
+                  },
+              },
+          },
+      }

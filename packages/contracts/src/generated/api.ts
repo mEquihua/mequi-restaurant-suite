@@ -585,6 +585,310 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/locations/{locationId}/visits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["openVisit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/locations/{locationId}/visits/{visitId}/orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["createOrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/locations/{locationId}/visits/{visitId}/accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["createAccount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/locations/{locationId}/visits/{visitId}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["closeVisit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/locations/{locationId}/orders/{orderId}/lines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["addOrderLines"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/locations/{locationId}/orders/{orderId}/send": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["sendOrderLines"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/locations/{locationId}/orders/{orderId}/transfer-lines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["transferOrderLines"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/locations/{locationId}/orders/{orderId}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["cancelOrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/locations/{locationId}/orders/{orderId}/cancel-override": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["cancelOrderOverride"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/locations/{locationId}/order-lines/{lineId}/hold": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["holdOrderLine"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/locations/{locationId}/order-lines/{lineId}/mark-preparing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["markOrderLinePreparing"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/locations/{locationId}/order-lines/{lineId}/mark-ready": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["markOrderLineReady"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/locations/{locationId}/order-lines/{lineId}/mark-fulfilled": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["markOrderLineFulfilled"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/locations/{locationId}/order-lines/{lineId}/void": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["voidOrderLine"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/locations/{locationId}/order-lines/{lineId}/void-override": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["voidOrderLineOverride"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/locations/{locationId}/accounts/{accountId}/split": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["splitAccount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/locations/{locationId}/accounts/{accountId}/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["reopenAccount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/locations/{locationId}/accounts/{accountId}/payments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["recordPayment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/locations/{locationId}/payments/{paymentId}/refund": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["refundPayment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/sections/{id}/tables": {
         parameters: {
             query?: never;
@@ -1007,6 +1311,108 @@ export interface components {
         SectionTablesResponse: {
             section_id: components["schemas"]["Uuid"];
             table_ids: components["schemas"]["Uuid"][];
+        };
+        Visit: {
+            id: components["schemas"]["Uuid"];
+            location_id: components["schemas"]["Uuid"];
+            table_id?: string | null;
+            guest_count?: number | null;
+            /** @enum {string} */
+            status: "OPEN" | "COMPLETED" | "CANCELLED";
+            version: number;
+        } & {
+            [key: string]: unknown;
+        };
+        Account: {
+            id: components["schemas"]["Uuid"];
+            location_id: components["schemas"]["Uuid"];
+            visit_id: components["schemas"]["Uuid"];
+            /** @enum {string} */
+            status: "OPEN" | "PARTIALLY_PAID" | "PAID" | "CLOSED" | "REFUNDED";
+            total: number;
+            paid_amount: number;
+            version: number;
+        } & {
+            [key: string]: unknown;
+        };
+        Order: {
+            id: components["schemas"]["Uuid"];
+            location_id: components["schemas"]["Uuid"];
+            visit_id: components["schemas"]["Uuid"];
+            order_type: string;
+            /** @enum {string} */
+            status: "DRAFT" | "HELD" | "SENT" | "COMPLETED" | "CANCELLED";
+            version: number;
+        } & {
+            [key: string]: unknown;
+        };
+        OrderLine: {
+            id: components["schemas"]["Uuid"];
+            order_id: components["schemas"]["Uuid"];
+            account_id: components["schemas"]["Uuid"];
+            product_id: components["schemas"]["Uuid"];
+            quantity: number;
+            /** @description Server-computed cents */
+            unit_price: number;
+            /** @enum {string} */
+            status: "DRAFT" | "HELD" | "SENT" | "PREPARING" | "READY" | "FULFILLED" | "CANCELLED" | "VOIDED";
+            version: number;
+        } & {
+            [key: string]: unknown;
+        };
+        OpenVisitRequest: {
+            table_id?: components["schemas"]["Uuid"];
+            guest_count?: number;
+        };
+        CreateOrderRequest: {
+            /** @enum {string} */
+            order_type: "DINE_IN" | "TAKEOUT" | "PICKUP" | "DELIVERY" | "TABLE_SELF_ORDER";
+        };
+        CreateAccountRequest: {
+            name?: string;
+        };
+        AddOrderLinesRequest: {
+            lines: {
+                account_id: components["schemas"]["Uuid"];
+                product_id: components["schemas"]["Uuid"];
+                variant_id?: components["schemas"]["Uuid"];
+                modifier_ids?: components["schemas"]["Uuid"][];
+                seat_number?: number | null;
+                course_name?: string | null;
+                quantity: number;
+            }[];
+        };
+        SendOrderLinesRequest: {
+            line_ids: components["schemas"]["Uuid"][];
+        };
+        TransferLinesRequest: {
+            line_ids: components["schemas"]["Uuid"][];
+            target_order_id?: components["schemas"]["Uuid"];
+            target_account_id?: components["schemas"]["Uuid"];
+        };
+        ReasonRequest: {
+            reason: string;
+        };
+        OverrideReasonRequest: {
+            reason: string;
+            authorized_by: components["schemas"]["Uuid"];
+        };
+        SplitAccountRequest: {
+            /** @enum {string} */
+            method: "BY_SEAT" | "BY_ITEM" | "EQUALLY";
+            order_line_ids?: components["schemas"]["Uuid"][];
+            count?: number;
+        };
+        RecordPaymentRequest: {
+            /** @enum {string} */
+            method: "CASH" | "CARD" | "TRANSFER" | "OTHER";
+            amount: number;
+            tip_amount?: number;
+            reference_code?: string;
+        };
+        RefundRequest: {
+            reason: string;
+            amount?: number;
         };
         ErrorResponse: {
             error: {
@@ -2249,6 +2655,537 @@ export interface operations {
             400: components["responses"]["Error"];
             401: components["responses"]["Error"];
             403: components["responses"]["Error"];
+        };
+    };
+    openVisit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                locationId: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OpenVisitRequest"];
+            };
+        };
+        responses: {
+            /** @description Open visit */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Visit"];
+                };
+            };
+            400: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+        };
+    };
+    createOrder: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": string;
+            };
+            path: {
+                locationId: components["schemas"]["Uuid"];
+                visitId: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateOrderRequest"];
+            };
+        };
+        responses: {
+            /** @description Draft order */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Order"];
+                };
+            };
+            409: components["responses"]["Error"];
+        };
+    };
+    createAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                locationId: components["schemas"]["Uuid"];
+                visitId: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAccountRequest"];
+            };
+        };
+        responses: {
+            /** @description Account */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Account"];
+                };
+            };
+        };
+    };
+    closeVisit: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": string;
+            };
+            path: {
+                locationId: components["schemas"]["Uuid"];
+                visitId: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Completed visit */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Visit"];
+                };
+            };
+            409: components["responses"]["Error"];
+        };
+    };
+    addOrderLines: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": string;
+            };
+            path: {
+                locationId: components["schemas"]["Uuid"];
+                orderId: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddOrderLinesRequest"];
+            };
+        };
+        responses: {
+            /** @description Server-priced lines */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            409: components["responses"]["Error"];
+        };
+    };
+    sendOrderLines: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": string;
+                "Idempotency-Key": string;
+            };
+            path: {
+                locationId: components["schemas"]["Uuid"];
+                orderId: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SendOrderLinesRequest"];
+            };
+        };
+        responses: {
+            /** @description Sent or idempotently replayed response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            409: components["responses"]["Error"];
+        };
+    };
+    transferOrderLines: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": string;
+            };
+            path: {
+                locationId: components["schemas"]["Uuid"];
+                orderId: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransferLinesRequest"];
+            };
+        };
+        responses: {
+            /** @description Lines transferred */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    cancelOrder: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": string;
+            };
+            path: {
+                locationId: components["schemas"]["Uuid"];
+                orderId: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReasonRequest"];
+            };
+        };
+        responses: {
+            /** @description Cancelled order */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Order"];
+                };
+            };
+            409: components["responses"]["Error"];
+        };
+    };
+    cancelOrderOverride: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": string;
+            };
+            path: {
+                locationId: components["schemas"]["Uuid"];
+                orderId: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OverrideReasonRequest"];
+            };
+        };
+        responses: {
+            /** @description Cancelled order */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Order"];
+                };
+            };
+            409: components["responses"]["Error"];
+        };
+    };
+    holdOrderLine: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": string;
+            };
+            path: {
+                locationId: components["schemas"]["Uuid"];
+                lineId: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Changed line */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderLine"];
+                };
+            };
+        };
+    };
+    markOrderLinePreparing: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": string;
+            };
+            path: {
+                locationId: components["schemas"]["Uuid"];
+                lineId: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Changed line */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderLine"];
+                };
+            };
+        };
+    };
+    markOrderLineReady: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": string;
+            };
+            path: {
+                locationId: components["schemas"]["Uuid"];
+                lineId: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Changed line */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderLine"];
+                };
+            };
+        };
+    };
+    markOrderLineFulfilled: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": string;
+            };
+            path: {
+                locationId: components["schemas"]["Uuid"];
+                lineId: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Changed line */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderLine"];
+                };
+            };
+        };
+    };
+    voidOrderLine: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": string;
+            };
+            path: {
+                locationId: components["schemas"]["Uuid"];
+                lineId: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReasonRequest"];
+            };
+        };
+        responses: {
+            /** @description Changed line */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderLine"];
+                };
+            };
+        };
+    };
+    voidOrderLineOverride: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": string;
+            };
+            path: {
+                locationId: components["schemas"]["Uuid"];
+                lineId: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OverrideReasonRequest"];
+            };
+        };
+        responses: {
+            /** @description Changed line */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderLine"];
+                };
+            };
+        };
+    };
+    splitAccount: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": string;
+            };
+            path: {
+                locationId: components["schemas"]["Uuid"];
+                accountId: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SplitAccountRequest"];
+            };
+        };
+        responses: {
+            /** @description Split accounts */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    reopenAccount: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": string;
+            };
+            path: {
+                locationId: components["schemas"]["Uuid"];
+                accountId: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Reopened account */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Account"];
+                };
+            };
+        };
+    };
+    recordPayment: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": string;
+                "Idempotency-Key": string;
+            };
+            path: {
+                locationId: components["schemas"]["Uuid"];
+                accountId: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordPaymentRequest"];
+            };
+        };
+        responses: {
+            /** @description Completed payment or idempotent replay */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            409: components["responses"]["Error"];
+        };
+    };
+    refundPayment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                locationId: components["schemas"]["Uuid"];
+                paymentId: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RefundRequest"];
+            };
+        };
+        responses: {
+            /** @description Refund */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
         };
     };
     replaceSectionTables: {

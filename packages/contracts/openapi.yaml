@@ -1473,6 +1473,60 @@ paths:
           '201':
             { description: Refund, content: { application/json: { schema: { type: object } } } },
         }
+  /api/v1/locations/{locationId}/reports/sales/by-day:
+    get: &salesReport
+      operationId: reportSalesByDay
+      x-required-permission: reports.sales.read
+      security: [{ staffSession: [] }]
+      parameters: [{ $ref: '#/components/parameters/ReportLocationId' }, { $ref: '#/components/parameters/ReportFrom' }, { $ref: '#/components/parameters/ReportTo' }, { $ref: '#/components/parameters/ReportFormat' }]
+      responses: &reportResponses
+        '200': { description: Report data or CSV export, content: { application/json: { schema: { $ref: '#/components/schemas/ReportResponse' } }, text/csv: { schema: { type: string } } } }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+  /api/v1/locations/{locationId}/reports/sales/by-hour:
+    get:
+      <<: *salesReport
+      operationId: reportSalesByHour
+  /api/v1/locations/{locationId}/reports/sales/by-product:
+    get:
+      <<: *salesReport
+      operationId: reportSalesByProduct
+      parameters: [{ $ref: '#/components/parameters/ReportLocationId' }, { $ref: '#/components/parameters/ReportFrom' }, { $ref: '#/components/parameters/ReportTo' }, { $ref: '#/components/parameters/ReportFormat' }, { $ref: '#/components/parameters/ReportLimit' }, { $ref: '#/components/parameters/ReportOffset' }]
+  /api/v1/locations/{locationId}/reports/sales/by-category:
+    get:
+      <<: *salesReport
+      operationId: reportSalesByCategory
+  /api/v1/locations/{locationId}/reports/sales/by-employee:
+    get:
+      <<: *salesReport
+      operationId: reportSalesByEmployee
+  /api/v1/locations/{locationId}/reports/orders/summary:
+    get:
+      <<: *salesReport
+      operationId: reportOrdersSummary
+  /api/v1/locations/{locationId}/reports/payments/by-method:
+    get:
+      <<: *salesReport
+      operationId: reportPaymentsByMethod
+  /api/v1/locations/{locationId}/reports/discounts:
+    get:
+      <<: *salesReport
+      operationId: reportDiscounts
+  /api/v1/locations/{locationId}/reports/voids-and-cancellations:
+    get: &auditReport
+      operationId: reportVoidsAndCancellations
+      x-required-permission: reports.audit.read
+      security: [{ staffSession: [] }]
+      parameters: [{ $ref: '#/components/parameters/ReportLocationId' }, { $ref: '#/components/parameters/ReportFrom' }, { $ref: '#/components/parameters/ReportTo' }, { $ref: '#/components/parameters/ReportFormat' }]
+      responses: *reportResponses
+  /api/v1/locations/{locationId}/reports/refunds:
+    get:
+      <<: *auditReport
+      operationId: reportRefunds
+  /api/v1/locations/{locationId}/reports/tips:
+    get:
+      <<: *salesReport
+      operationId: reportTips
   /api/v1/sections/{id}/tables:
     put:
       operationId: replaceSectionTables
@@ -1509,6 +1563,12 @@ components:
   securitySchemes:
     staffSession: { type: http, scheme: bearer, bearerFormat: opaque }
   parameters:
+    ReportLocationId: { name: locationId, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }
+    ReportFrom: { name: from, in: query, required: true, schema: { type: string, format: date-time } }
+    ReportTo: { name: to, in: query, required: true, schema: { type: string, format: date-time } }
+    ReportFormat: { name: format, in: query, required: false, schema: { type: string, enum: [json, csv], default: json } }
+    ReportLimit: { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 500 } }
+    ReportOffset: { name: offset, in: query, required: false, schema: { type: integer, minimum: 0, default: 0 } }
     TerminalCredential:
       {
         name: X-Terminal-Credential,
@@ -1524,6 +1584,7 @@ components:
         content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } },
       }
   schemas:
+    ReportResponse: { type: object, additionalProperties: false, required: [data], properties: { data: { type: array, items: { type: object, additionalProperties: true } } } }
     Uuid: { type: string, format: uuid }
     PingResponse: { type: object, additionalProperties: false, required: [ok], properties: { ok: { type: boolean, const: true } } }
     Terminal: { type: object, additionalProperties: false, required: [id, location_id, name, device_profile, is_active, version], properties: { id: { $ref: '#/components/schemas/Uuid' }, location_id: { $ref: '#/components/schemas/Uuid' }, name: { type: string }, device_profile: { type: [string, 'null'] }, is_active: { type: boolean }, version: { type: integer, minimum: 1 } } }

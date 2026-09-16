@@ -1559,6 +1559,56 @@ paths:
           '403': { $ref: '#/components/responses/Error' },
           '404': { $ref: '#/components/responses/Error' },
         }
+  /api/v1/locations/{locationId}/terminals/{terminalId}/cash-drawer/open:
+    post:
+      operationId: openCashDrawer
+      x-required-permission: payments.cash.open_drawer
+      security: [{ staffSession: [] }]
+      parameters:
+        - { name: locationId, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }
+        - { name: terminalId, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/OpenCashDrawerRequest' } } } }
+      responses: { '201': { description: Cash drawer session opened, content: { application/json: { schema: { $ref: '#/components/schemas/CashDrawerSession' } } } }, '400': { $ref: '#/components/responses/Error' }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' }, '409': { $ref: '#/components/responses/Error' } }
+  /api/v1/locations/{locationId}/cash-drawer-sessions/{sessionId}/movements:
+    post:
+      operationId: recordCashDrawerMovement
+      x-required-permission: payments.cash.open_drawer
+      security: [{ staffSession: [] }]
+      parameters:
+        - { name: locationId, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }
+        - { name: sessionId, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/RecordCashDrawerMovementRequest' } } } }
+      responses: { '201': { description: Cash drawer movement recorded, content: { application/json: { schema: { $ref: '#/components/schemas/CashDrawerMovement' } } } }, '400': { $ref: '#/components/responses/Error' }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' }, '404': { $ref: '#/components/responses/Error' }, '409': { $ref: '#/components/responses/Error' } }
+  /api/v1/locations/{locationId}/cash-drawer-sessions/{sessionId}/close:
+    post:
+      operationId: closeCashDrawer
+      x-required-permission: payments.cash.reconcile
+      security: [{ staffSession: [] }]
+      parameters:
+        - { name: locationId, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }
+        - { name: sessionId, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }
+        - { name: If-Match, in: header, required: true, description: Current cash drawer session version., schema: { type: string, pattern: '^"?[1-9][0-9]*"?$' } }
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CloseCashDrawerRequest' } } } }
+      responses: { '200': { description: Cash drawer session closed with computed expected amount and variance, content: { application/json: { schema: { $ref: '#/components/schemas/CashDrawerSession' } } } }, '400': { $ref: '#/components/responses/Error' }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' }, '404': { $ref: '#/components/responses/Error' }, '409': { description: Optimistic concurrency conflict, content: { application/json: { schema: { $ref: '#/components/schemas/ConcurrencyConflict' } } } }, '428': { $ref: '#/components/responses/Error' } }
+  /api/v1/locations/{locationId}/cash-drawer-sessions:
+    get:
+      operationId: listCashDrawerSessions
+      x-required-permission: payments.cash.open_drawer
+      security: [{ staffSession: [] }]
+      parameters:
+        - { name: locationId, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }
+        - { name: terminal_id, in: query, required: false, schema: { $ref: '#/components/schemas/Uuid' } }
+        - { name: status, in: query, required: false, schema: { type: string, enum: [OPEN, CLOSED] } }
+      responses: { '200': { description: Cash drawer session history for this location, content: { application/json: { schema: { $ref: '#/components/schemas/CashDrawerSessionListResponse' } } } }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' } }
+  /api/v1/locations/{locationId}/cash-drawer-sessions/{sessionId}:
+    get:
+      operationId: getCashDrawerSession
+      x-required-permission: payments.cash.open_drawer
+      security: [{ staffSession: [] }]
+      parameters:
+        - { name: locationId, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }
+        - { name: sessionId, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }
+      responses: { '200': { description: Cash drawer session with its movements, content: { application/json: { schema: { $ref: '#/components/schemas/CashDrawerSessionDetail' } } } }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' }, '404': { $ref: '#/components/responses/Error' } }
 components:
   securitySchemes:
     staffSession: { type: http, scheme: bearer, bearerFormat: opaque }
@@ -2001,3 +2051,10 @@ components:
               },
           },
       }
+    OpenCashDrawerRequest: { type: object, additionalProperties: false, required: [opening_float], properties: { opening_float: { type: integer, minimum: 0 } } }
+    RecordCashDrawerMovementRequest: { type: object, additionalProperties: false, required: [movement_type, amount, reason], properties: { movement_type: { type: string, enum: [CASH_IN, CASH_OUT] }, amount: { type: integer, minimum: 1 }, reason: { type: string, minLength: 1 } } }
+    CloseCashDrawerRequest: { type: object, additionalProperties: false, required: [counted_amount], properties: { counted_amount: { type: integer, minimum: 0 } } }
+    CashDrawerSession: { type: object, additionalProperties: false, required: [id, location_id, terminal_id, opened_by, opening_float, status, opened_at, closed_by, closed_at, counted_amount, expected_amount, variance, version], properties: { id: { $ref: '#/components/schemas/Uuid' }, location_id: { $ref: '#/components/schemas/Uuid' }, terminal_id: { $ref: '#/components/schemas/Uuid' }, opened_by: { $ref: '#/components/schemas/Uuid' }, opening_float: { type: integer }, status: { type: string, enum: [OPEN, CLOSED] }, opened_at: { type: string, format: date-time }, closed_by: { anyOf: [{ $ref: '#/components/schemas/Uuid' }, { type: 'null' }] }, closed_at: { type: [string, 'null'], format: date-time }, counted_amount: { type: [integer, 'null'] }, expected_amount: { type: [integer, 'null'] }, variance: { type: [integer, 'null'] }, version: { type: integer, minimum: 1 } } }
+    CashDrawerSessionListResponse: { type: object, additionalProperties: false, required: [items], properties: { items: { type: array, items: { $ref: '#/components/schemas/CashDrawerSession' } } } }
+    CashDrawerMovement: { type: object, additionalProperties: false, required: [id, location_id, drawer_session_id, movement_type, amount, reason, recorded_by, created_at], properties: { id: { $ref: '#/components/schemas/Uuid' }, location_id: { $ref: '#/components/schemas/Uuid' }, drawer_session_id: { $ref: '#/components/schemas/Uuid' }, movement_type: { type: string, enum: [CASH_IN, CASH_OUT] }, amount: { type: integer }, reason: { type: string }, recorded_by: { $ref: '#/components/schemas/Uuid' }, created_at: { type: string, format: date-time } } }
+    CashDrawerSessionDetail: { type: object, additionalProperties: true, required: [id, location_id, terminal_id, opened_by, opening_float, status, opened_at, version, movements], properties: { id: { $ref: '#/components/schemas/Uuid' }, location_id: { $ref: '#/components/schemas/Uuid' }, terminal_id: { $ref: '#/components/schemas/Uuid' }, opened_by: { $ref: '#/components/schemas/Uuid' }, opening_float: { type: integer }, status: { type: string, enum: [OPEN, CLOSED] }, opened_at: { type: string, format: date-time }, version: { type: integer }, movements: { type: array, items: { $ref: '#/components/schemas/CashDrawerMovement' } } } }

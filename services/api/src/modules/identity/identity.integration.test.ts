@@ -21,6 +21,8 @@ describeIntegration('identity API against PostgreSQL', () => {
   let ownerSession = '';
 
   beforeAll(async () => {
+    await db.deleteFrom('cash_drawer_movements').execute();
+    await db.deleteFrom('cash_drawer_sessions').execute();
     await db.deleteFrom('command_idempotency').execute();
     await db.deleteFrom('audit_events').execute();
     await db.deleteFrom('account_discounts').execute();

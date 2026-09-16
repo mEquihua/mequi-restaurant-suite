@@ -1115,6 +1115,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/locations/{locationId}/terminals/{terminalId}/cash-drawer/open": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["openCashDrawer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/locations/{locationId}/cash-drawer-sessions/{sessionId}/movements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["recordCashDrawerMovement"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/locations/{locationId}/cash-drawer-sessions/{sessionId}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["closeCashDrawer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/locations/{locationId}/cash-drawer-sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listCashDrawerSessions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/locations/{locationId}/cash-drawer-sessions/{sessionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getCashDrawerSession"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1686,6 +1766,66 @@ export interface components {
                     current_state: components["schemas"]["Staff"];
                 };
             };
+        };
+        OpenCashDrawerRequest: {
+            opening_float: number;
+        };
+        RecordCashDrawerMovementRequest: {
+            /** @enum {string} */
+            movement_type: "CASH_IN" | "CASH_OUT";
+            amount: number;
+            reason: string;
+        };
+        CloseCashDrawerRequest: {
+            counted_amount: number;
+        };
+        CashDrawerSession: {
+            id: components["schemas"]["Uuid"];
+            location_id: components["schemas"]["Uuid"];
+            terminal_id: components["schemas"]["Uuid"];
+            opened_by: components["schemas"]["Uuid"];
+            opening_float: number;
+            /** @enum {string} */
+            status: "OPEN" | "CLOSED";
+            /** Format: date-time */
+            opened_at: string;
+            closed_by: components["schemas"]["Uuid"] | null;
+            /** Format: date-time */
+            closed_at: string | null;
+            counted_amount: number | null;
+            expected_amount: number | null;
+            variance: number | null;
+            version: number;
+        };
+        CashDrawerSessionListResponse: {
+            items: components["schemas"]["CashDrawerSession"][];
+        };
+        CashDrawerMovement: {
+            id: components["schemas"]["Uuid"];
+            location_id: components["schemas"]["Uuid"];
+            drawer_session_id: components["schemas"]["Uuid"];
+            /** @enum {string} */
+            movement_type: "CASH_IN" | "CASH_OUT";
+            amount: number;
+            reason: string;
+            recorded_by: components["schemas"]["Uuid"];
+            /** Format: date-time */
+            created_at: string;
+        };
+        CashDrawerSessionDetail: {
+            id: components["schemas"]["Uuid"];
+            location_id: components["schemas"]["Uuid"];
+            terminal_id: components["schemas"]["Uuid"];
+            opened_by: components["schemas"]["Uuid"];
+            opening_float: number;
+            /** @enum {string} */
+            status: "OPEN" | "CLOSED";
+            /** Format: date-time */
+            opened_at: string;
+            version: number;
+            movements: components["schemas"]["CashDrawerMovement"][];
+        } & {
+            [key: string]: unknown;
         };
     };
     responses: {
@@ -3848,6 +3988,166 @@ export interface operations {
                 };
             };
             400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    openCashDrawer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                locationId: components["schemas"]["Uuid"];
+                terminalId: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OpenCashDrawerRequest"];
+            };
+        };
+        responses: {
+            /** @description Cash drawer session opened */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashDrawerSession"];
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    recordCashDrawerMovement: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                locationId: components["schemas"]["Uuid"];
+                sessionId: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordCashDrawerMovementRequest"];
+            };
+        };
+        responses: {
+            /** @description Cash drawer movement recorded */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashDrawerMovement"];
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    closeCashDrawer: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Current cash drawer session version. */
+                "If-Match": string;
+            };
+            path: {
+                locationId: components["schemas"]["Uuid"];
+                sessionId: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CloseCashDrawerRequest"];
+            };
+        };
+        responses: {
+            /** @description Cash drawer session closed with computed expected amount and variance */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashDrawerSession"];
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            /** @description Optimistic concurrency conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConcurrencyConflict"];
+                };
+            };
+            428: components["responses"]["Error"];
+        };
+    };
+    listCashDrawerSessions: {
+        parameters: {
+            query?: {
+                terminal_id?: components["schemas"]["Uuid"];
+                status?: "OPEN" | "CLOSED";
+            };
+            header?: never;
+            path: {
+                locationId: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cash drawer session history for this location */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashDrawerSessionListResponse"];
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+        };
+    };
+    getCashDrawerSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                locationId: components["schemas"]["Uuid"];
+                sessionId: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cash drawer session with its movements */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashDrawerSessionDetail"];
+                };
+            };
             401: components["responses"]["Error"];
             403: components["responses"]["Error"];
             404: components["responses"]["Error"];

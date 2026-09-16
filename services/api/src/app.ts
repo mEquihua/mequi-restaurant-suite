@@ -6,6 +6,7 @@ import { menuModule, type MenuRouteOptions } from './modules/menu/index.js';
 import { floorModule, type FloorRouteOptions } from './modules/floor/index.js';
 import { moduleCenterModule, type ModuleCenterRouteOptions } from './modules/module-center/index.js';
 import { ordersModule, type OrdersRouteOptions } from './modules/orders/index.js';
+import { customersModule } from './modules/customers/index.js';
 import { guestSessionsModule, type GuestSessionsRouteOptions } from './modules/guest-sessions/index.js';
 import { reportsModule, type ReportsRouteOptions } from './modules/reports/index.js';
 import { cashDrawerModule, type CashDrawerRouteOptions } from './modules/cash-drawer/index.js';
@@ -59,6 +60,7 @@ export function createApp(options: AppOptions = {}): FastifyInstance {
   app.register(moduleCenterModule, options.moduleCenter ?? {});
   app.register(ordersModule, options.orders ?? {});
   app.register(guestSessionsModule, options.guestSessions ?? {});
+  app.register(customersModule, {});
   app.register(reportsModule, options.reports ?? {});
   app.register(cashDrawerModule, options.cashDrawer ?? {});
   app.register(realtimeModule);

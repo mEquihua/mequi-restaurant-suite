@@ -194,6 +194,13 @@ $$\text{\textbf{Legend: }}\mathbf{X} = \text{Granted by default} \quad \vert \qu
 
 ---
 
+
+### 4.7 Fulfillment (New)
+| Permission | Description |
+| :--- | :--- |
+| `orders.fulfillment.dispatch` | Dispatch a delivery order |
+| `orders.fulfillment.deliver` | Mark a delivery order as delivered |
+
 ## 5. Out-of-Scope Domains & Deferred Modules
 
 To preserve modular architectural boundaries and prevent premature schema complexity, permissions for domains outside the Foundation scope are **deliberately omitted** from this document:

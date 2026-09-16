@@ -3,6 +3,7 @@ import { sql, type RawBuilder } from 'kysely';
 
 import { IdentityHttpError, requirePermission, withAuthenticatedSession } from '../identity/index.js';
 import { GuestSessionHttpError, withGuestSession } from '../guest-sessions/index.js';
+import { withCustomerSession } from '../customers/index.js';
 import { effectivePrice, resolveAvailability, type AvailabilityStatus } from './availability.js';
 import { assertLocationInOrganization, findOrganizationCategory, findOrganizationModifierGroup, findOrganizationProduct } from './persistence/repository.js';
 
@@ -67,6 +68,11 @@ export const menuRoute: FastifyPluginAsync<MenuRouteOptions> = async (app, optio
   const withMenuReadSession = async <T>(request: FastifyRequest, work: (actor: { trx: Parameters<typeof findOrganizationProduct>[0]; organizationId: string; locationId: string }, guest: boolean) => Promise<T>) => {
     const token = request.headers.authorization?.startsWith('Bearer ') ? request.headers.authorization.slice(7) : undefined;
     if (token?.startsWith('guest.')) return withGuestSession(app, request, now(), (guest) => work(guest, true));
+    if (token?.startsWith('customer.')) return withCustomerSession(app, request, now(), (customer) => {
+      const locationId = (request.query as { location_id?: string }).location_id;
+      if (!locationId) throw new IdentityHttpError(400, 'MISSING_LOCATION', 'location_id query parameter is required for customer sessions');
+      return work({ trx: customer.trx, organizationId: customer.organizationId, locationId }, false);
+    });
     return withSession(request, async (staff) => { requirePermission(staff, 'menu.catalog.read'); return work(staff, false); });
   };
 
@@ -110,7 +116,7 @@ export const menuRoute: FastifyPluginAsync<MenuRouteOptions> = async (app, optio
     return reply.status(500).send({ error: { status: 500, code: 'INTERNAL_ERROR', message: 'An unexpected error occurred.', request_id: request.id } });
   });
 
-  app.get('/api/v1/categories', async (request) => withMenuReadSession(request, async (actor) => {
+  app.get('/api/v1/categories', { schema: { querystring: { type: 'object', additionalProperties: false, properties: { location_id: { type: 'string', format: 'uuid' } } } } }, async (request) => withMenuReadSession(request, async (actor) => {
     const categories = await actor.trx.selectFrom('categories').selectAll().where('organization_id', '=', actor.organizationId).orderBy('display_order').orderBy('name').execute();
     return { data: categories.map(publicCategory) };
   }));
@@ -140,7 +146,7 @@ export const menuRoute: FastifyPluginAsync<MenuRouteOptions> = async (app, optio
     return reply.send(publicCategory(updated));
   }));
 
-  app.get('/api/v1/products', { schema: { querystring: { type: 'object', additionalProperties: false, properties: { channel: { type: 'string' }, service_type: { type: 'string' }, at: { type: 'string', format: 'date-time' } } } } }, async (request) => withMenuReadSession(request, async (actor, guest) => {
+  app.get('/api/v1/products', { schema: { querystring: { type: 'object', additionalProperties: false, properties: { location_id: { type: 'string', format: 'uuid' }, channel: { type: 'string' }, service_type: { type: 'string' }, at: { type: 'string', format: 'date-time' } } } } }, async (request) => withMenuReadSession(request, async (actor, guest) => {
     const query = request.query as { channel?: string; service_type?: string; at?: string };
     const at = query.at ? new Date(query.at) : undefined;
     if (at && Number.isNaN(at.getTime())) throw new IdentityHttpError(400, 'VALIDATION_ERROR', 'at must be a valid date-time.');

@@ -30,7 +30,7 @@ describeIntegration('identity API against PostgreSQL', () => {
     await db.deleteFrom('refunds').execute();
     await db.deleteFrom('cancellations_and_voids').execute();
     await db.deleteFrom('payments').execute();
-    await db.deleteFrom('order_line_modifiers').execute();
+    await db.deleteFrom('order_line_modifiers').execute(); await db.deleteFrom('order_fulfillments').execute();
     await db.deleteFrom('order_lines').execute();
     await db.deleteFrom('orders').execute();
     await db.deleteFrom('accounts').execute();

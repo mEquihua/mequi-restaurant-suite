@@ -2,6 +2,7 @@ import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 import { sql, type RawBuilder } from 'kysely';
 
 import { IdentityHttpError, requirePermission, withAuthenticatedSession } from '../identity/index.js';
+import { GuestSessionHttpError, withGuestSession } from '../guest-sessions/index.js';
 import { effectivePrice, resolveAvailability, type AvailabilityStatus } from './availability.js';
 import { assertLocationInOrganization, findOrganizationCategory, findOrganizationModifierGroup, findOrganizationProduct } from './persistence/repository.js';
 
@@ -63,6 +64,11 @@ export const menuRoute: FastifyPluginAsync<MenuRouteOptions> = async (app, optio
   const now = options.now ?? (() => new Date());
   const sessionIdleMs = options.sessionIdleMs ?? 15 * 60 * 1000;
   const withSession = <T>(request: FastifyRequest, work: Parameters<typeof withAuthenticatedSession<T>>[4]) => withAuthenticatedSession(app, request, now(), sessionIdleMs, work);
+  const withMenuReadSession = async <T>(request: FastifyRequest, work: (actor: { trx: Parameters<typeof findOrganizationProduct>[0]; organizationId: string; locationId: string }, guest: boolean) => Promise<T>) => {
+    const token = request.headers.authorization?.startsWith('Bearer ') ? request.headers.authorization.slice(7) : undefined;
+    if (token?.startsWith('guest.')) return withGuestSession(app, request, now(), (guest) => work(guest, true));
+    return withSession(request, async (staff) => { requirePermission(staff, 'menu.catalog.read'); return work(staff, false); });
+  };
 
   async function productRepresentation(trx: Parameters<typeof findOrganizationProduct>[0], organizationId: string, locationId: string, productId: string, context: { channel?: string; serviceType?: string; at?: Date } = {}) {
     const product = await findOrganizationProduct(trx, organizationId, productId);
@@ -98,14 +104,13 @@ export const menuRoute: FastifyPluginAsync<MenuRouteOptions> = async (app, optio
   }
 
   app.setErrorHandler((error, request, reply) => {
-    if (error instanceof IdentityHttpError) return fail(reply, request, error);
+    if (error instanceof IdentityHttpError || error instanceof GuestSessionHttpError) return fail(reply, request, error as IdentityHttpError);
     if (typeof error === 'object' && error !== null && 'validation' in error && (error as { validation?: unknown }).validation) return reply.status(400).send({ error: { status: 400, code: 'VALIDATION_ERROR', message: 'The request does not match the required schema.', request_id: request.id } });
     request.log.error({ err: error }, 'menu request failed');
     return reply.status(500).send({ error: { status: 500, code: 'INTERNAL_ERROR', message: 'An unexpected error occurred.', request_id: request.id } });
   });
 
-  app.get('/api/v1/categories', async (request) => withSession(request, async (actor) => {
-    requirePermission(actor, 'menu.catalog.read');
+  app.get('/api/v1/categories', async (request) => withMenuReadSession(request, async (actor) => {
     const categories = await actor.trx.selectFrom('categories').selectAll().where('organization_id', '=', actor.organizationId).orderBy('display_order').orderBy('name').execute();
     return { data: categories.map(publicCategory) };
   }));
@@ -117,13 +122,12 @@ export const menuRoute: FastifyPluginAsync<MenuRouteOptions> = async (app, optio
     return reply.status(201).send(publicCategory(category));
   }));
 
-  app.get('/api/v1/products', { schema: { querystring: { type: 'object', additionalProperties: false, properties: { channel: { type: 'string' }, service_type: { type: 'string' }, at: { type: 'string', format: 'date-time' } } } } }, async (request) => withSession(request, async (actor) => {
-    requirePermission(actor, 'menu.catalog.read');
+  app.get('/api/v1/products', { schema: { querystring: { type: 'object', additionalProperties: false, properties: { channel: { type: 'string' }, service_type: { type: 'string' }, at: { type: 'string', format: 'date-time' } } } } }, async (request) => withMenuReadSession(request, async (actor, guest) => {
     const query = request.query as { channel?: string; service_type?: string; at?: string };
     const at = query.at ? new Date(query.at) : undefined;
     if (at && Number.isNaN(at.getTime())) throw new IdentityHttpError(400, 'VALIDATION_ERROR', 'at must be a valid date-time.');
     const rows = await actor.trx.selectFrom('products').select('id').where('organization_id', '=', actor.organizationId).orderBy('name').execute();
-    return { data: (await Promise.all(rows.map((row) => productRepresentation(actor.trx, actor.organizationId, actor.locationId, row.id, { channel: query.channel, serviceType: query.service_type, at })))).filter((product): product is NonNullable<typeof product> => product !== undefined) };
+    return { data: (await Promise.all(rows.map((row) => productRepresentation(actor.trx, actor.organizationId, actor.locationId, row.id, { channel: query.channel ?? (guest ? 'TABLE_SELF_ORDER' : undefined), serviceType: query.service_type, at })))).filter((product): product is NonNullable<typeof product> => product !== undefined) };
   }));
 
   app.post('/api/v1/products', { schema: { body: { type: 'object', additionalProperties: false, required: ['name', 'base_price'], properties: { category_id: { anyOf: [uuidSchema, { type: 'null' }] }, name: { type: 'string', minLength: 1, maxLength: 200 }, internal_name: nullableString, description: nullableString, photo_url: nullableString, notes: nullableString, allergens: { type: 'array', items: { type: 'string' } }, tags: { type: 'array', items: { type: 'string' } }, base_price: { type: 'integer', minimum: 0 }, is_active: { type: 'boolean' } } } } }, async (request, reply) => withSession(request, async (actor) => {

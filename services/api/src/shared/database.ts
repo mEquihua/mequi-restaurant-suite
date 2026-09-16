@@ -11,6 +11,7 @@ export interface Database {
   staff_roles: StaffRoleTable;
   terminals: TerminalTable;
   staff_sessions: StaffSessionTable;
+  guest_sessions: GuestSessionTable;
   terminal_pin_attempts: TerminalPinAttemptTable;
   categories: CategoryTable;
   products: ProductTable;
@@ -28,6 +29,7 @@ export interface Database {
   table_sections: TableSectionTable;
   module_definitions: ModuleDefinitionTable;
   module_activations: ModuleActivationTable;
+  table_service_requests: TableServiceRequestTable;
   visits: VisitTable;
   accounts: AccountTable;
   orders: OrderTable;
@@ -119,6 +121,17 @@ export interface StaffSessionTable {
   last_seen_at: Generated<Date>;
   created_at: Generated<Date>;
   updated_at: Generated<Date>;
+}
+export interface GuestSessionTable {
+  id: Generated<string>;
+  location_id: string;
+  visit_id: string;
+  table_id: string;
+  token_hash: string;
+  device_info: string | null;
+  created_at: Generated<Date>;
+  expires_at: Date;
+  revoked_at: Date | null;
 }
 export interface TerminalPinAttemptTable {
   terminal_id: string;
@@ -276,9 +289,21 @@ export interface ModuleActivationTable {
   module_key: string;
   status: string;
   attention_reason: string | null;
+  guest_payment_mode: Generated<'ORDER_ONLY' | 'REQUEST_BILL' | 'ORDER_AND_PAY'>;
   version: Generated<number>;
   created_at: Generated<Date>;
   updated_at: Generated<Date>;
+}
+export interface TableServiceRequestTable {
+  id: Generated<string>;
+  location_id: string;
+  visit_id: string;
+  table_id: string;
+  request_type: 'CALL_WAITER' | 'REQUEST_BILL' | 'NEED_WATER' | 'NEED_UTENSILS';
+  status: Generated<'PENDING' | 'RESOLVED'>;
+  created_at: Generated<Date>;
+  resolved_at: Date | null;
+  resolved_by_staff_id: string | null;
 }
 export interface VisitTable {
   id: Generated<string>;

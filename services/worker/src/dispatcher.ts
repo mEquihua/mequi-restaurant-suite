@@ -1,17 +1,17 @@
-import { Kysely, PostgresDialect, sql } from 'kysely';
+import { Kysely, PostgresDialect, sql, type Generated } from 'kysely';
 import pg from 'pg';
 import { Redis } from 'ioredis';
 
 export interface OutboxEventTable {
-  id: string;
+  id: Generated<string>;
   location_id: string;
   aggregate_type: string;
   aggregate_id: string;
   event_type: string;
   payload: unknown;
   schema_version: number;
-  created_at: Date;
-  updated_at: Date;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
   dispatched_at: Date | null;
 }
 
@@ -43,10 +43,13 @@ export class OutboxDispatcher {
     this.pollIntervalMs = options.pollIntervalMs ?? 500;
     this.batchSize = options.batchSize ?? 50;
     
-    // We document the choice of application_migration_role:
+    // We document the choice of application_worker_role:
     // The worker must read outbox_events across every location. Since RLS is
-    // enforced on location_id for the runtime role, we use the migration role
-    // which has BYPASSRLS, effectively giving this worker global access.
+    // enforced on location_id for the runtime role, this worker uses a
+    // dedicated BYPASSRLS role scoped to exactly SELECT+UPDATE on
+    // outbox_events (see migration 014) rather than application_migration_role,
+    // which holds ALL PRIVILEGES on every table for schema migrations — far
+    // more access than a continuously-running background process should carry.
   }
 
   public start() {
@@ -94,7 +97,7 @@ export class OutboxDispatcher {
 
   public async processBatch(): Promise<number> {
     return this.db.transaction().execute(async (trx) => {
-      await sql`SET LOCAL ROLE application_migration_role`.execute(trx);
+      await sql`SET LOCAL ROLE application_worker_role`.execute(trx);
       
       const rows = await trx.selectFrom('outbox_events')
         .selectAll()

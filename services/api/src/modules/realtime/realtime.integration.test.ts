@@ -1,10 +1,14 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { createHash } from 'node:crypto';
+import type { AddressInfo } from 'node:net';
+import argon2 from 'argon2';
 import Fastify from 'fastify';
-import WebSocket from 'ws';
+import WebSocket, { type RawData } from 'ws';
 import { Redis } from 'ioredis';
 import { createDatabase, installDatabase } from '../../shared/index.js';
-import { hashSecret, hashPin } from '../identity/security.js';
 import { realtimeModule } from './index.js';
+
+const hashSecret = (value: string) => createHash('sha256').update(value).digest('hex');
 
 const databaseUrl = process.env.DATABASE_URL;
 const redisUrl = process.env.VALKEY_URL || process.env.REDIS_URL || 'redis://localhost:6379';
@@ -43,7 +47,7 @@ describeIntegration('realtime WebSocket gateway', () => {
 
     // Create staff
     const staffId = await db.insertInto('staff')
-      .values({ organization_id: org.id, first_name: 'Test', last_name: 'Worker', pin_hash: await hashPin('1234') })
+      .values({ organization_id: org.id, first_name: 'Test', last_name: 'Worker', pin_hash: await argon2.hash('1234') })
       .returning('id').executeTakeFirstOrThrow();
 
     // Create terminals
@@ -56,13 +60,9 @@ describeIntegration('realtime WebSocket gateway', () => {
       .returning('id').executeTakeFirstOrThrow();
 
     // Create sessions
-    const now = new Date();
-    const expiresAt = new Date(now.getTime() + 24 * 3600 * 1000);
-    
     // Session A
-    const rawTokenA = 'session_token_a_1234567890';
     const secretA = 'a'.repeat(32);
-    const sessionAObj = await db.insertInto('staff_sessions')
+    await db.insertInto('staff_sessions')
       .values({
         location_id: locationA,
         staff_id: staffId.id,
@@ -74,7 +74,7 @@ describeIntegration('realtime WebSocket gateway', () => {
     sessionA = `${locationA}.${secretA}`;
 
     const secretB = 'b'.repeat(32);
-    const sessionBObj = await db.insertInto('staff_sessions')
+    await db.insertInto('staff_sessions')
       .values({
         location_id: locationB,
         staff_id: staffId.id,
@@ -99,7 +99,7 @@ describeIntegration('realtime WebSocket gateway', () => {
   });
 
   it('rejects unauthenticated connections', async () => {
-    const address = app.server.address() as any;
+    const address = app.server.address() as AddressInfo;
     const ws = new WebSocket(`ws://127.0.0.1:${address.port}/api/v1/realtime`);
     
     return new Promise<void>((resolve, reject) => {
@@ -112,7 +112,7 @@ describeIntegration('realtime WebSocket gateway', () => {
   });
 
   it('connects successfully with a valid session token', async () => {
-    const address = app.server.address() as any;
+    const address = app.server.address() as AddressInfo;
     const ws = new WebSocket(`ws://127.0.0.1:${address.port}/api/v1/realtime`, {
       headers: { authorization: `Bearer ${sessionA}` }
     });
@@ -127,7 +127,7 @@ describeIntegration('realtime WebSocket gateway', () => {
   });
 
   it('receives messages for its location and isolates cross-location events', async () => {
-    const address = app.server.address() as any;
+    const address = app.server.address() as AddressInfo;
     const wsA = new WebSocket(`ws://127.0.0.1:${address.port}/api/v1/realtime`, {
       headers: { authorization: `Bearer ${sessionA}` }
     });
@@ -145,13 +145,13 @@ describeIntegration('realtime WebSocket gateway', () => {
     const messageA = { id: 'evt_1', aggregate_type: 'order', aggregate_id: 'ord_1', event_type: 'OrderCreated', payload: {}, schema_version: 1, created_at: new Date().toISOString() };
     const messageB = { id: 'evt_2', aggregate_type: 'order', aggregate_id: 'ord_2', event_type: 'OrderCreated', payload: {}, schema_version: 1, created_at: new Date().toISOString() };
 
-    const msgsForA: any[] = [];
-    wsA.on('message', (data) => {
+    const msgsForA: Array<{ id: string }> = [];
+    wsA.on('message', (data: RawData) => {
       msgsForA.push(JSON.parse(data.toString()));
     });
-    
-    const msgsForB: any[] = [];
-    wsB.on('message', (data) => {
+
+    const msgsForB: Array<{ id: string }> = [];
+    wsB.on('message', (data: RawData) => {
       msgsForB.push(JSON.parse(data.toString()));
     });
 

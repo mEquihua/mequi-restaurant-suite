@@ -2,10 +2,11 @@ import type { FastifyPluginAsync } from 'fastify';
 import fastifyWebsocket from '@fastify/websocket';
 import { withAuthenticatedSession } from '../identity/index.js';
 import { Redis } from 'ioredis';
+import type { WebSocket } from 'ws';
 
 // We use a shared redis subscriber per API instance to avoid one connection per websocket client.
 let redisSubscriber: Redis | null = null;
-const clientMap = new Map<string, Set<any>>(); // locationId -> Set of websocket connections
+const clientMap = new Map<string, Set<WebSocket>>(); // locationId -> Set of websocket connections
 
 export const realtimeRoute: FastifyPluginAsync = async (app) => {
   await app.register(fastifyWebsocket);

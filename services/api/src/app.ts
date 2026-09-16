@@ -4,6 +4,7 @@ import { installDatabase } from './shared/index.js';
 import { identityModule, type IdentityRouteOptions } from './modules/identity/index.js';
 import { menuModule, type MenuRouteOptions } from './modules/menu/index.js';
 import { floorModule, type FloorRouteOptions } from './modules/floor/index.js';
+import { moduleCenterModule, type ModuleCenterRouteOptions } from './modules/module-center/index.js';
 import { pingModule } from './modules/ping/index.js';
 
 export interface AppOptions {
@@ -12,6 +13,7 @@ export interface AppOptions {
   identity?: IdentityRouteOptions;
   menu?: MenuRouteOptions;
   floor?: FloorRouteOptions;
+  moduleCenter?: ModuleCenterRouteOptions;
 }
 
 /** Creates the HTTP application without binding a network port. */
@@ -45,6 +47,7 @@ export function createApp(options: AppOptions = {}): FastifyInstance {
   app.register(identityModule, options.identity ?? {});
   app.register(menuModule, options.menu ?? {});
   app.register(floorModule, options.floor ?? {});
+  app.register(moduleCenterModule, options.moduleCenter ?? {});
 
   return app;
 }

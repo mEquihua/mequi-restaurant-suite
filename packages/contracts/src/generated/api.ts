@@ -377,6 +377,102 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/module-definitions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listModuleDefinitions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/locations/{locationId}/modules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listLocationModules"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/locations/{locationId}/modules/{moduleKey}/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["activateModule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/locations/{locationId}/modules/{moduleKey}/pause": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["pauseModule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/locations/{locationId}/modules/{moduleKey}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["deactivateModule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/locations/{locationId}/modules/{moduleKey}/flag-attention": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["flagModuleAttention"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/locations/{locationId}/areas": {
         parameters: {
             query?: never;
@@ -795,6 +891,48 @@ export interface components {
             start_time?: string | null;
             /** Format: date-time */
             end_time?: string | null;
+        };
+        ModuleDefinition: {
+            key: string;
+            display_name: string;
+            description: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        ModuleDefinitionListResponse: {
+            data: components["schemas"]["ModuleDefinition"][];
+        };
+        /** @enum {string} */
+        ModuleStatus: "DISABLED" | "PENDING_CONFIGURATION" | "READY" | "ACTIVE" | "PAUSED" | "NEEDS_ATTENTION";
+        ModuleActivation: {
+            location_id: components["schemas"]["Uuid"];
+            module_key: string;
+            status: components["schemas"]["ModuleStatus"];
+            attention_reason: string | null;
+            version: number;
+        };
+        LocationModule: {
+            key: string;
+            display_name: string;
+            description: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+            location_id: components["schemas"]["Uuid"];
+            module_key: string;
+            status: components["schemas"]["ModuleStatus"];
+            attention_reason: string | null;
+            /** @description Zero means this disabled default has no persisted activation row. */
+            version: number;
+        };
+        LocationModuleListResponse: {
+            data: components["schemas"]["LocationModule"][];
+        };
+        FlagModuleAttentionRequest: {
+            reason: string;
         };
         Area: {
             id: components["schemas"]["Uuid"];
@@ -1625,6 +1763,193 @@ export interface operations {
             401: components["responses"]["Error"];
             403: components["responses"]["Error"];
             409: components["responses"]["Error"];
+        };
+    };
+    listModuleDefinitions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Fixed Module Center catalog */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModuleDefinitionListResponse"];
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+        };
+    };
+    listLocationModules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                locationId: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Fixed catalog with the current status for this location; missing rows are DISABLED */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LocationModuleListResponse"];
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+        };
+    };
+    activateModule: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Current activation version; required when an activation row already exists */
+                "If-Match"?: string;
+            };
+            path: {
+                locationId: components["schemas"]["Uuid"];
+                moduleKey: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmptyObjectRequest"];
+            };
+        };
+        responses: {
+            /** @description Module activated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModuleActivation"];
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            428: components["responses"]["Error"];
+        };
+    };
+    pauseModule: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Current activation version; required when an activation row already exists */
+                "If-Match"?: string;
+            };
+            path: {
+                locationId: components["schemas"]["Uuid"];
+                moduleKey: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmptyObjectRequest"];
+            };
+        };
+        responses: {
+            /** @description Active module paused */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModuleActivation"];
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            428: components["responses"]["Error"];
+        };
+    };
+    deactivateModule: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Current activation version; required when an activation row already exists */
+                "If-Match"?: string;
+            };
+            path: {
+                locationId: components["schemas"]["Uuid"];
+                moduleKey: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmptyObjectRequest"];
+            };
+        };
+        responses: {
+            /** @description Module disabled without deleting its data */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModuleActivation"];
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            428: components["responses"]["Error"];
+        };
+    };
+    flagModuleAttention: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Current activation version; required when an activation row already exists */
+                "If-Match"?: string;
+            };
+            path: {
+                locationId: components["schemas"]["Uuid"];
+                moduleKey: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FlagModuleAttentionRequest"];
+            };
+        };
+        responses: {
+            /** @description Module marked as requiring attention */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModuleActivation"];
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            428: components["responses"]["Error"];
         };
     };
     listAreas: {

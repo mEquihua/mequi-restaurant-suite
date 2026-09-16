@@ -248,6 +248,54 @@ paths:
         - { name: If-Match, in: header, required: true, description: Availability-rule version; use 0 to create a scoped rule, schema: { type: string, pattern: '^"?[0-9]+"?$' } }
       requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/MarkAvailableRequest' } } } }
       responses: { '200': { description: Explicit availability operation recorded, content: { application/json: { schema: { $ref: '#/components/schemas/AvailabilityRule' } } } }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' }, '409': { $ref: '#/components/responses/Error' } }
+  /api/v1/module-definitions:
+    get:
+      operationId: listModuleDefinitions
+      x-required-permission: module_center.modules.read
+      security: [{ staffSession: [] }]
+      responses: { '200': { description: Fixed Module Center catalog, content: { application/json: { schema: { $ref: '#/components/schemas/ModuleDefinitionListResponse' } } } }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' } }
+  /api/v1/locations/{locationId}/modules:
+    get:
+      operationId: listLocationModules
+      x-required-permission: module_center.modules.read
+      security: [{ staffSession: [] }]
+      parameters: [{ name: locationId, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }]
+      responses: { '200': { description: Fixed catalog with the current status for this location; missing rows are DISABLED, content: { application/json: { schema: { $ref: '#/components/schemas/LocationModuleListResponse' } } } }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' } }
+  /api/v1/locations/{locationId}/modules/{moduleKey}/activate:
+    post:
+      operationId: activateModule
+      x-required-permission: module_center.modules.write
+      security: [{ staffSession: [] }]
+      parameters: &moduleCommandParameters
+        - { name: locationId, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }
+        - { name: moduleKey, in: path, required: true, schema: { type: string, pattern: '^[a-z][a-z0-9_]*$' } }
+        - { name: If-Match, in: header, required: false, description: Current activation version; required when an activation row already exists, schema: { type: string, pattern: '^"?[1-9][0-9]*"?$' } }
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/EmptyObjectRequest' } } } }
+      responses: { '200': { description: Module activated, content: { application/json: { schema: { $ref: '#/components/schemas/ModuleActivation' } } } }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' }, '404': { $ref: '#/components/responses/Error' }, '409': { $ref: '#/components/responses/Error' }, '428': { $ref: '#/components/responses/Error' } }
+  /api/v1/locations/{locationId}/modules/{moduleKey}/pause:
+    post:
+      operationId: pauseModule
+      x-required-permission: module_center.modules.write
+      security: [{ staffSession: [] }]
+      parameters: *moduleCommandParameters
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/EmptyObjectRequest' } } } }
+      responses: { '200': { description: Active module paused, content: { application/json: { schema: { $ref: '#/components/schemas/ModuleActivation' } } } }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' }, '404': { $ref: '#/components/responses/Error' }, '409': { $ref: '#/components/responses/Error' }, '428': { $ref: '#/components/responses/Error' } }
+  /api/v1/locations/{locationId}/modules/{moduleKey}/deactivate:
+    post:
+      operationId: deactivateModule
+      x-required-permission: module_center.modules.write
+      security: [{ staffSession: [] }]
+      parameters: *moduleCommandParameters
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/EmptyObjectRequest' } } } }
+      responses: { '200': { description: Module disabled without deleting its data, content: { application/json: { schema: { $ref: '#/components/schemas/ModuleActivation' } } } }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' }, '404': { $ref: '#/components/responses/Error' }, '409': { $ref: '#/components/responses/Error' }, '428': { $ref: '#/components/responses/Error' } }
+  /api/v1/locations/{locationId}/modules/{moduleKey}/flag-attention:
+    post:
+      operationId: flagModuleAttention
+      x-required-permission: module_center.modules.write
+      security: [{ staffSession: [] }]
+      parameters: *moduleCommandParameters
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/FlagModuleAttentionRequest' } } } }
+      responses: { '200': { description: Module marked as requiring attention, content: { application/json: { schema: { $ref: '#/components/schemas/ModuleActivation' } } } }, '400': { $ref: '#/components/responses/Error' }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' }, '404': { $ref: '#/components/responses/Error' }, '409': { $ref: '#/components/responses/Error' }, '428': { $ref: '#/components/responses/Error' } }
   /api/v1/locations/{locationId}/areas:
     get:
       operationId: listAreas
@@ -387,6 +435,13 @@ components:
     AvailabilityRule: { type: object, additionalProperties: false, required: [id, location_id, product_id, status, channel_scope, service_type_scope, days_of_week, start_time, end_time, version], properties: { id: { $ref: '#/components/schemas/Uuid' }, location_id: { $ref: '#/components/schemas/Uuid' }, product_id: { $ref: '#/components/schemas/Uuid' }, status: { type: string, enum: [AVAILABLE, EXHAUSTED, HIDDEN, SCHEDULED] }, channel_scope: { type: [string, 'null'] }, service_type_scope: { type: [string, 'null'] }, days_of_week: { type: ['array', 'null'], items: { type: integer, minimum: 1, maximum: 7 } }, start_time: { type: [string, 'null'], format: date-time }, end_time: { type: [string, 'null'], format: date-time }, version: { type: integer, minimum: 1 } } }
     MarkUnavailableRequest: { type: object, additionalProperties: false, properties: { rule_id: { $ref: '#/components/schemas/Uuid' }, status: { type: string, enum: [EXHAUSTED, HIDDEN, SCHEDULED] }, channel_scope: { type: [string, 'null'] }, service_type_scope: { type: [string, 'null'] }, days_of_week: { type: ['array', 'null'], items: { type: integer, minimum: 1, maximum: 7 } }, start_time: { type: [string, 'null'], format: date-time }, end_time: { type: [string, 'null'], format: date-time } } }
     MarkAvailableRequest: { type: object, additionalProperties: false, properties: { rule_id: { $ref: '#/components/schemas/Uuid' }, channel_scope: { type: [string, 'null'] }, service_type_scope: { type: [string, 'null'] }, days_of_week: { type: ['array', 'null'], items: { type: integer, minimum: 1, maximum: 7 } }, start_time: { type: [string, 'null'], format: date-time }, end_time: { type: [string, 'null'], format: date-time } } }
+    ModuleDefinition: { type: object, additionalProperties: false, required: [key, display_name, description, created_at, updated_at], properties: { key: { type: string }, display_name: { type: string }, description: { type: string }, created_at: { type: string, format: date-time }, updated_at: { type: string, format: date-time } } }
+    ModuleDefinitionListResponse: { type: object, additionalProperties: false, required: [data], properties: { data: { type: array, items: { $ref: '#/components/schemas/ModuleDefinition' } } } }
+    ModuleStatus: { type: string, enum: [DISABLED, PENDING_CONFIGURATION, READY, ACTIVE, PAUSED, NEEDS_ATTENTION] }
+    ModuleActivation: { type: object, additionalProperties: false, required: [location_id, module_key, status, attention_reason, version], properties: { location_id: { $ref: '#/components/schemas/Uuid' }, module_key: { type: string }, status: { $ref: '#/components/schemas/ModuleStatus' }, attention_reason: { type: [string, 'null'] }, version: { type: integer, minimum: 1 } } }
+    LocationModule: { type: object, additionalProperties: false, required: [key, display_name, description, created_at, updated_at, location_id, module_key, status, attention_reason, version], properties: { key: { type: string }, display_name: { type: string }, description: { type: string }, created_at: { type: string, format: date-time }, updated_at: { type: string, format: date-time }, location_id: { $ref: '#/components/schemas/Uuid' }, module_key: { type: string }, status: { $ref: '#/components/schemas/ModuleStatus' }, attention_reason: { type: [string, 'null'] }, version: { type: integer, minimum: 0, description: Zero means this disabled default has no persisted activation row. } } }
+    LocationModuleListResponse: { type: object, additionalProperties: false, required: [data], properties: { data: { type: array, items: { $ref: '#/components/schemas/LocationModule' } } } }
+    FlagModuleAttentionRequest: { type: object, additionalProperties: false, required: [reason], properties: { reason: { type: string, minLength: 1, maxLength: 2000 } } }
     Area: { type: object, additionalProperties: false, required: [id, location_id, name, created_at, updated_at], properties: { id: { $ref: '#/components/schemas/Uuid' }, location_id: { $ref: '#/components/schemas/Uuid' }, name: { type: string }, created_at: { type: string, format: date-time }, updated_at: { type: string, format: date-time } } }
     AreaListResponse: { type: object, additionalProperties: false, required: [data], properties: { data: { type: array, items: { $ref: '#/components/schemas/Area' } } } }
     CreateAreaRequest: { type: object, additionalProperties: false, required: [name], properties: { name: { type: string, minLength: 1, maxLength: 160 } } }

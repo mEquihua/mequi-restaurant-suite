@@ -1,0 +1,17 @@
+{
+  "name": "@restaurant-suite/customer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -b && vite build && node scripts/generate-sw.mjs",
+    "dev": "vite",
+    "typecheck": "tsc -b --pretty false"
+  },
+  "dependencies": {
+    "@restaurant-suite/ui-primitives": "workspace:*",
+    "@restaurant-suite/ui-tokens": "workspace:*",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
+  }
+}

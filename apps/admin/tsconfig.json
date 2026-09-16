@@ -1,0 +1,14 @@
+{
+  "extends": "../../packages/config/tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "noEmit": true,
+    "jsx": "react-jsx"
+  },
+  "references": [
+    { "path": "../../packages/ui-admin" },
+    { "path": "../../packages/ui-primitives" },
+    { "path": "../../packages/ui-tokens" }
+  ],
+  "include": ["src/**/*.ts", "src/**/*.tsx"]
+}

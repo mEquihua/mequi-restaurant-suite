@@ -2211,6 +2211,7 @@ components:
           {
             reason: { type: string, minLength: 1 },
             authorized_by: { $ref: '#/components/schemas/Uuid' },
+            authorized_by_pin: { type: string, minLength: 4, maxLength: 12 },
           },
       }
     DiscountRequest:
@@ -2234,7 +2235,10 @@ components:
             {
               type: object,
               required: [authorized_by],
-              properties: { authorized_by: { $ref: '#/components/schemas/Uuid' } },
+              properties: { 
+                authorized_by: { $ref: '#/components/schemas/Uuid' },
+                authorized_by_pin: { type: string, minLength: 4, maxLength: 12 }
+              },
             },
           ],
       }

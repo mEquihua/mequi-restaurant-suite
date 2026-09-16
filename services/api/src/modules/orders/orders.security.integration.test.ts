@@ -210,4 +210,47 @@ describeIntegration('orders API security boundaries against PostgreSQL', () => {
     expect(crossVisitAttempt.statusCode).toBe(400);
     expect(crossVisitAttempt.json().error.code).toBe('INVALID_ACCOUNT_FOR_VISIT');
   });
+  it('requires PIN re-authentication when authorizing as a different manager', async () => {
+    const visit = (await app.inject({ method: 'POST', url: `/api/v1/locations/${location}/visits`, headers: { authorization: `Bearer ${token}` }, payload: { guest_count: 2 } })).json();
+    const account = (await app.inject({ method: 'POST', url: `/api/v1/locations/${location}/visits/${visit.id}/accounts`, headers: { authorization: `Bearer ${managerToken}` }, payload: {} })).json();
+    const order = (await app.inject({ method: 'POST', url: `/api/v1/locations/${location}/visits/${visit.id}/orders`, headers: { authorization: `Bearer ${token}`, 'if-match': String(visit.version) }, payload: { order_type: 'DINE_IN' } })).json();
+    const addLines = (await app.inject({ method: 'POST', url: `/api/v1/locations/${location}/orders/${order.id}/lines`, headers: { authorization: `Bearer ${token}`, 'if-match': String(order.version) }, payload: { lines: [{ account_id: account.id, product_id: product, quantity: 1 }] } })).json();
+    const lineId = addLines.lines[0].id;
+    await app.inject({ method: 'POST', url: `/api/v1/locations/${location}/orders/${order.id}/send`, headers: { authorization: `Bearer ${token}`, 'if-match': String(addLines.order.version), 'idempotency-key': 'reauth-send-1' }, payload: { line_ids: [lineId] } });
+    const afterSend = await db.selectFrom('order_lines').selectAll().where('id', '=', lineId).executeTakeFirstOrThrow();
+    await app.inject({ method: 'POST', url: `/api/v1/locations/${location}/order-lines/${lineId}/mark-preparing`, headers: { authorization: `Bearer ${managerToken}`, 'if-match': String(afterSend.version) }, payload: {} });
+    const preparingLine = await db.selectFrom('order_lines').selectAll().where('id', '=', lineId).executeTakeFirstOrThrow();
+
+    // 1. Missing PIN fails with 400
+    const missingPin = await app.inject({
+      method: 'POST',
+      url: `/api/v1/locations/${location}/order-lines/${lineId}/void-override`,
+      headers: { authorization: `Bearer ${managerToken}`, 'if-match': String(preparingLine.version) },
+      payload: { reason: 'burnt', authorized_by: staff },
+    });
+    expect(missingPin.statusCode).toBe(400);
+    
+    // 2. Wrong PIN fails with 401
+    const wrongPin = await app.inject({
+      method: 'POST',
+      url: `/api/v1/locations/${location}/order-lines/${lineId}/void-override`,
+      headers: { authorization: `Bearer ${managerToken}`, 'if-match': String(preparingLine.version) },
+      payload: { reason: 'burnt', authorized_by: staff, authorized_by_pin: '9999' },
+    });
+    expect(wrongPin.statusCode).toBe(401);
+
+    // 3. Second wrong attempt might trigger backoff if limit is reached, or just another 401. We check terminal_pin_attempts.
+    const attempts = await db.selectFrom('terminal_pin_attempts').selectAll().execute();
+    expect(attempts.length).toBeGreaterThan(0);
+
+    // 4. Wait for backoff to expire, then correct PIN succeeds
+    await new Promise((resolve) => setTimeout(resolve, 2100));
+    const correctPin = await app.inject({
+      method: 'POST',
+      url: `/api/v1/locations/${location}/order-lines/${lineId}/void-override`,
+      headers: { authorization: `Bearer ${managerToken}`, 'if-match': String(preparingLine.version) },
+      payload: { reason: 'burnt', authorized_by: staff, authorized_by_pin: '1111' },
+    });
+    expect(correctPin.statusCode).toBe(200);
+  });
 });

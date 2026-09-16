@@ -592,9 +592,25 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: operations["listVisits"];
         put?: never;
         post: operations["openVisit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/locations/{locationId}/visits/{visitId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getVisit"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -643,6 +659,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["closeVisit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/locations/{locationId}/orders/{orderId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getOrder"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -835,6 +867,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["splitAccount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/locations/{locationId}/accounts/{accountId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getAccount"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1826,6 +1874,30 @@ export interface components {
             movements: components["schemas"]["CashDrawerMovement"][];
         } & {
             [key: string]: unknown;
+        };
+        VisitListResponse: {
+            data: components["schemas"]["Visit"][];
+        };
+        VisitDetailResponse: components["schemas"]["Visit"] & {
+            orders?: {
+                [key: string]: unknown;
+            }[];
+            accounts?: {
+                [key: string]: unknown;
+            }[];
+        };
+        OrderDetailResponse: components["schemas"]["Order"] & {
+            order_lines?: {
+                [key: string]: unknown;
+            }[];
+        };
+        AccountDetailResponse: components["schemas"]["Account"] & {
+            payments?: {
+                [key: string]: unknown;
+            }[];
+            cancellations_and_voids?: {
+                [key: string]: unknown;
+            }[];
         };
     };
     responses: {
@@ -3051,6 +3123,33 @@ export interface operations {
             403: components["responses"]["Error"];
         };
     };
+    listVisits: {
+        parameters: {
+            query?: {
+                status?: "OPEN" | "COMPLETED" | "CANCELLED";
+                table_id?: components["schemas"]["Uuid"];
+            };
+            header?: never;
+            path: {
+                locationId: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Visits matching criteria */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VisitListResponse"];
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+        };
+    };
     openVisit: {
         parameters: {
             query?: never;
@@ -3077,6 +3176,32 @@ export interface operations {
             };
             400: components["responses"]["Error"];
             403: components["responses"]["Error"];
+        };
+    };
+    getVisit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                locationId: components["schemas"]["Uuid"];
+                visitId: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Single visit detail */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VisitDetailResponse"];
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
         };
     };
     createOrder: {
@@ -3160,6 +3285,32 @@ export interface operations {
                 };
             };
             409: components["responses"]["Error"];
+        };
+    };
+    getOrder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                locationId: components["schemas"]["Uuid"];
+                orderId: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Single order detail */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderDetailResponse"];
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
         };
     };
     addOrderLines: {
@@ -3497,6 +3648,32 @@ export interface operations {
                     "application/json": Record<string, never>;
                 };
             };
+        };
+    };
+    getAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                locationId: components["schemas"]["Uuid"];
+                accountId: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Single account detail */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountDetailResponse"];
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
         };
     };
     applyAccountDiscount: {

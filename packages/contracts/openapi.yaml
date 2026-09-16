@@ -954,6 +954,44 @@ paths:
           '403': { $ref: '#/components/responses/Error' },
         }
   /api/v1/locations/{locationId}/visits:
+    get:
+      operationId: listVisits
+      x-required-permission: orders.visits.read_all
+      security: [{ staffSession: [] }]
+      parameters:
+        [
+          {
+            name: locationId,
+            in: path,
+            required: true,
+            schema: { $ref: '#/components/schemas/Uuid' },
+          },
+          {
+            name: status,
+            in: query,
+            required: false,
+            schema: { type: string, enum: [OPEN, COMPLETED, CANCELLED] },
+          },
+          {
+            name: table_id,
+            in: query,
+            required: false,
+            schema: { $ref: '#/components/schemas/Uuid' },
+          }
+        ]
+      responses:
+        {
+          '200':
+            {
+              description: Visits matching criteria,
+              content:
+                {
+                  application/json: { schema: { $ref: '#/components/schemas/VisitListResponse' } },
+                },
+            },
+          '401': { $ref: '#/components/responses/Error' },
+          '403': { $ref: '#/components/responses/Error' },
+        }
     post:
       operationId: openVisit
       x-required-permission: orders.visits.create
@@ -982,6 +1020,40 @@ paths:
             },
           '400': { $ref: '#/components/responses/Error' },
           '403': { $ref: '#/components/responses/Error' },
+        }
+  /api/v1/locations/{locationId}/visits/{visitId}:
+    get:
+      operationId: getVisit
+      x-required-permission: orders.visits.read_all
+      security: [{ staffSession: [] }]
+      parameters:
+        [
+          {
+            name: locationId,
+            in: path,
+            required: true,
+            schema: { $ref: '#/components/schemas/Uuid' },
+          },
+          {
+            name: visitId,
+            in: path,
+            required: true,
+            schema: { $ref: '#/components/schemas/Uuid' },
+          },
+        ]
+      responses:
+        {
+          '200':
+            {
+              description: Single visit detail,
+              content:
+                {
+                  application/json: { schema: { $ref: '#/components/schemas/VisitDetailResponse' } },
+                },
+            },
+          '401': { $ref: '#/components/responses/Error' },
+          '403': { $ref: '#/components/responses/Error' },
+          '404': { $ref: '#/components/responses/Error' },
         }
   /api/v1/locations/{locationId}/visits/{visitId}/orders:
     post:
@@ -1082,6 +1154,40 @@ paths:
               content: { application/json: { schema: { $ref: '#/components/schemas/Visit' } } },
             },
           '409': { $ref: '#/components/responses/Error' },
+        }
+  /api/v1/locations/{locationId}/orders/{orderId}:
+    get:
+      operationId: getOrder
+      x-required-permission: orders.visits.read_all
+      security: [{ staffSession: [] }]
+      parameters:
+        [
+          {
+            name: locationId,
+            in: path,
+            required: true,
+            schema: { $ref: '#/components/schemas/Uuid' },
+          },
+          {
+            name: orderId,
+            in: path,
+            required: true,
+            schema: { $ref: '#/components/schemas/Uuid' },
+          },
+        ]
+      responses:
+        {
+          '200':
+            {
+              description: Single order detail,
+              content:
+                {
+                  application/json: { schema: { $ref: '#/components/schemas/OrderDetailResponse' } },
+                },
+            },
+          '401': { $ref: '#/components/responses/Error' },
+          '403': { $ref: '#/components/responses/Error' },
+          '404': { $ref: '#/components/responses/Error' },
         }
   /api/v1/locations/{locationId}/orders/{orderId}/lines:
     post:
@@ -1349,6 +1455,40 @@ paths:
               description: Split accounts,
               content: { application/json: { schema: { type: object } } },
             },
+        }
+  /api/v1/locations/{locationId}/accounts/{accountId}:
+    get:
+      operationId: getAccount
+      x-required-permission: orders.visits.read_all
+      security: [{ staffSession: [] }]
+      parameters:
+        [
+          {
+            name: locationId,
+            in: path,
+            required: true,
+            schema: { $ref: '#/components/schemas/Uuid' },
+          },
+          {
+            name: accountId,
+            in: path,
+            required: true,
+            schema: { $ref: '#/components/schemas/Uuid' },
+          },
+        ]
+      responses:
+        {
+          '200':
+            {
+              description: Single account detail,
+              content:
+                {
+                  application/json: { schema: { $ref: '#/components/schemas/AccountDetailResponse' } },
+                },
+            },
+          '401': { $ref: '#/components/responses/Error' },
+          '403': { $ref: '#/components/responses/Error' },
+          '404': { $ref: '#/components/responses/Error' },
         }
   /api/v1/locations/{locationId}/accounts/{accountId}/discounts:
     post: &applyAccountDiscount
@@ -2058,3 +2198,51 @@ components:
     CashDrawerSessionListResponse: { type: object, additionalProperties: false, required: [items], properties: { items: { type: array, items: { $ref: '#/components/schemas/CashDrawerSession' } } } }
     CashDrawerMovement: { type: object, additionalProperties: false, required: [id, location_id, drawer_session_id, movement_type, amount, reason, recorded_by, created_at], properties: { id: { $ref: '#/components/schemas/Uuid' }, location_id: { $ref: '#/components/schemas/Uuid' }, drawer_session_id: { $ref: '#/components/schemas/Uuid' }, movement_type: { type: string, enum: [CASH_IN, CASH_OUT] }, amount: { type: integer }, reason: { type: string }, recorded_by: { $ref: '#/components/schemas/Uuid' }, created_at: { type: string, format: date-time } } }
     CashDrawerSessionDetail: { type: object, additionalProperties: true, required: [id, location_id, terminal_id, opened_by, opening_float, status, opened_at, version, movements], properties: { id: { $ref: '#/components/schemas/Uuid' }, location_id: { $ref: '#/components/schemas/Uuid' }, terminal_id: { $ref: '#/components/schemas/Uuid' }, opened_by: { $ref: '#/components/schemas/Uuid' }, opening_float: { type: integer }, status: { type: string, enum: [OPEN, CLOSED] }, opened_at: { type: string, format: date-time }, version: { type: integer }, movements: { type: array, items: { $ref: '#/components/schemas/CashDrawerMovement' } } } }
+    VisitListResponse:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Visit' }
+    VisitDetailResponse:
+      allOf:
+        - $ref: '#/components/schemas/Visit'
+        - type: object
+          properties:
+            orders:
+              type: array
+              items:
+                type: object
+                additionalProperties: true
+            accounts:
+              type: array
+              items:
+                type: object
+                additionalProperties: true
+    OrderDetailResponse:
+      allOf:
+        - $ref: '#/components/schemas/Order'
+        - type: object
+          properties:
+            order_lines:
+              type: array
+              items:
+                type: object
+                additionalProperties: true
+    AccountDetailResponse:
+      allOf:
+        - $ref: '#/components/schemas/Account'
+        - type: object
+          properties:
+            payments:
+              type: array
+              items:
+                type: object
+                additionalProperties: true
+            cancellations_and_voids:
+              type: array
+              items:
+                type: object
+                additionalProperties: true

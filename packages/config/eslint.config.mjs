@@ -89,6 +89,7 @@ export default [
           default: 'disallow',
           rules: [
             { target: 'api-module', allow: 'index.ts' },
+            { target: 'api-shared', allow: 'index.ts' },
             { target: 'api-composition', allow: ['app.ts', 'server.ts'] },
           ],
         },

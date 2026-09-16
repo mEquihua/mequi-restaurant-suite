@@ -2,3 +2,10 @@ packages:
   - apps/*
   - services/*
   - packages/*
+
+ignoredBuiltDependencies:
+  - esbuild
+  - unrs-resolver
+
+onlyBuiltDependencies:
+  - argon2

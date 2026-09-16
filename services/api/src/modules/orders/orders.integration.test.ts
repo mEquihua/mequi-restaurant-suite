@@ -71,7 +71,7 @@ describeIntegration('orders API against PostgreSQL', () => {
       'terminals',
       'staff',
       'roles',
-      'locations',
+      'customer_sessions', 'customers', 'locations',
       'organizations',
     ] as const)
       await db.deleteFrom(table).execute();

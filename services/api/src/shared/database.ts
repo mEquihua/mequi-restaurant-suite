@@ -47,6 +47,7 @@ export interface OrderFulfillmentTable {
   customer_phone: string;
   delivery_address: unknown | null;
   delivery_driver_name: string | null;
+  guest_token_hash: string | null;
   version: Generated<number>;
   created_at: Generated<Date>;
   updated_at: Generated<Date>;

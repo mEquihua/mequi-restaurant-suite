@@ -5,7 +5,12 @@ import type { DatabaseTransaction } from '../../shared/index.js';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export class CustomerSessionHttpError extends Error {
-  constructor(readonly statusCode: number, readonly code: string, message: string, readonly details?: unknown) {
+  constructor(
+    readonly statusCode: number,
+    readonly code: string,
+    message: string,
+    readonly details?: unknown,
+  ) {
     super(message);
   }
 }
@@ -22,10 +27,20 @@ export function createCustomerSessionToken(organizationId: string): string {
   return `customer.${organizationId}.${randomBytes(32).toString('base64url')}`;
 }
 
-export function parseCustomerSessionToken(value: string | undefined): { organizationId: string; token: string } | undefined {
+export function parseCustomerSessionToken(
+  value: string | undefined,
+): { organizationId: string; token: string } | undefined {
   if (!value) return undefined;
   const [kind, organizationId, secret, ...rest] = value.split('.');
-  if (kind !== 'customer' || !organizationId || !secret || rest.length > 0 || !UUID.test(organizationId) || secret.length < 32) return undefined;
+  if (
+    kind !== 'customer' ||
+    !organizationId ||
+    !secret ||
+    rest.length > 0 ||
+    !UUID.test(organizationId) ||
+    secret.length < 32
+  )
+    return undefined;
   return { organizationId, token: value };
 }
 
@@ -38,10 +53,20 @@ function bearerToken(request: FastifyRequest): string | undefined {
   return value?.startsWith('Bearer ') ? value.slice('Bearer '.length) : undefined;
 }
 
-export async function withCustomerSession<T>(app: FastifyInstance, request: FastifyRequest, now: Date, work: (session: CustomerSession) => Promise<T>): Promise<T> {
+export async function withCustomerSession<T>(
+  app: FastifyInstance,
+  request: FastifyRequest,
+  now: Date,
+  work: (session: CustomerSession) => Promise<T>,
+): Promise<T> {
   const parsed = parseCustomerSessionToken(bearerToken(request));
-  if (!parsed) throw new CustomerSessionHttpError(401, 'UNAUTHENTICATED', 'A valid customer session token is required.');
-  
+  if (!parsed)
+    throw new CustomerSessionHttpError(
+      401,
+      'UNAUTHENTICATED',
+      'A valid customer session token is required.',
+    );
+
   return app.withOrganizationTransaction(parsed.organizationId, async (trx) => {
     const row = await trx
       .selectFrom('customer_sessions as cs')
@@ -50,9 +75,20 @@ export async function withCustomerSession<T>(app: FastifyInstance, request: Fast
       .where('cs.revoked_at', 'is', null)
       .where('cs.expires_at', '>', now)
       .executeTakeFirst();
-      
-    if (!row) throw new CustomerSessionHttpError(401, 'UNAUTHENTICATED', 'The customer session is invalid, expired, or revoked.');
-    
-    return work({ trx, sessionId: row.id, organizationId: row.organization_id, customerId: row.customer_id, expiresAt: row.expires_at });
+
+    if (!row)
+      throw new CustomerSessionHttpError(
+        401,
+        'UNAUTHENTICATED',
+        'The customer session is invalid, expired, or revoked.',
+      );
+
+    return work({
+      trx,
+      sessionId: row.id,
+      organizationId: row.organization_id,
+      customerId: row.customer_id,
+      expiresAt: row.expires_at,
+    });
   });
 }

@@ -63,9 +63,12 @@ describeIntegration('customer accounts and online ordering against PostgreSQL', 
     await db.insertInto('terminals').values({ id: terminalId, location_id: location, name: 'POS', credential_hash: hash(terminal) }).execute();
     
     const unlock = await app.inject({ method: 'POST', url: '/api/v1/auth/pin-unlock', headers: { 'x-terminal-credential': terminal }, payload: { staff_id: staff.id, pin: '1234' } });
-    if (unlock.statusCode === 200) {
-      staffToken = unlock.json().token;
-    }
+    // pin-unlock returns 201 on success, not 200 — a prior version of this
+    // check compared against the wrong status code, which silently skipped
+    // the entire dispatch/deliver test below via the `if (staffToken)` guard
+    // it was gated on, with no failure ever surfacing. Fail loudly instead.
+    expect(unlock.statusCode).toBe(201);
+    staffToken = unlock.json().token;
   });
 
   afterAll(async () => {
@@ -186,33 +189,76 @@ describeIntegration('customer accounts and online ordering against PostgreSQL', 
     // Actually, sending is just order lines send command. We can test fulfillment transitions directly.
     
     // Fulfillments dispatch should reject because line is not READY
-    if (staffToken) {
-      const dispatchFail = await app.inject({
-        method: 'POST',
-        url: `/api/v1/locations/${location}/orders/${order_id}/fulfillment/dispatch`,
-        headers: { authorization: `Bearer ${staffToken}` },
-        payload: { version: 1 }
-      });
-      expect(dispatchFail.statusCode).toBe(409); // Not ready
-      
-      // Update line status manually in DB for test speed
-      await db.updateTable('order_lines').set({ status: 'READY' }).where('id', '=', lineId).execute();
+    const dispatchFail = await app.inject({
+      method: 'POST',
+      url: `/api/v1/locations/${location}/orders/${order_id}/fulfillment/dispatch`,
+      headers: { authorization: `Bearer ${staffToken}` },
+      payload: { version: 1 }
+    });
+    expect(dispatchFail.statusCode).toBe(409); // Not ready
 
-      const dispatch = await app.inject({
-        method: 'POST',
-        url: `/api/v1/locations/${location}/orders/${order_id}/fulfillment/dispatch`,
-        headers: { authorization: `Bearer ${staffToken}` },
-        payload: { version: 1 }
-      });
-      expect(dispatch.statusCode).toBe(200);
+    // Update line status manually in DB for test speed
+    await db.updateTable('order_lines').set({ status: 'READY' }).where('id', '=', lineId).execute();
 
-      const deliver = await app.inject({
-        method: 'POST',
-        url: `/api/v1/locations/${location}/orders/${order_id}/fulfillment/deliver`,
-        headers: { authorization: `Bearer ${staffToken}` },
-        payload: { version: 2 }
-      });
-      expect(deliver.statusCode).toBe(200);
-    }
+    const dispatch = await app.inject({
+      method: 'POST',
+      url: `/api/v1/locations/${location}/orders/${order_id}/fulfillment/dispatch`,
+      headers: { authorization: `Bearer ${staffToken}` },
+      payload: { version: 1 }
+    });
+    expect(dispatch.statusCode).toBe(200);
+    expect(dispatch.json().status).toBe('OUT_FOR_DELIVERY');
+    expect(dispatch.json().version).toBe(2);
+
+    const deliver = await app.inject({
+      method: 'POST',
+      url: `/api/v1/locations/${location}/orders/${order_id}/fulfillment/deliver`,
+      headers: { authorization: `Bearer ${staffToken}` },
+      payload: { version: 2 }
+    });
+    expect(deliver.statusCode).toBe(200);
+    expect(deliver.json().status).toBe('DELIVERED');
+
+    // Regression check for the missing version-bump bug found during review:
+    // the HELD transition after checkout must bump both the order's and each
+    // line's own version, not just leave them at their post-insert value.
+    const heldLine = await db.selectFrom('order_lines').selectAll().where('id', '=', lineId).executeTakeFirstOrThrow();
+    expect(heldLine.version).toBeGreaterThan(1);
+  });
+
+  it('rejects a guest order poll with a missing or wrong order_token', async () => {
+    const checkout = await app.inject({
+      method: 'POST',
+      url: `/api/v1/locations/${location}/online-orders/checkout`,
+      payload: {
+        fulfillment_type: 'PICKUP',
+        customer_name: 'Another Guest',
+        customer_email: 'another-guest@example.com',
+        customer_phone: '333-4444',
+        items: [{ product_id: product, quantity: 1 }],
+      },
+    });
+    expect(checkout.statusCode).toBe(201);
+    const { order_id } = checkout.json();
+
+    const noToken = await app.inject({
+      method: 'GET',
+      url: `/api/v1/locations/${location}/online-orders/${order_id}`,
+    });
+    expect(noToken.statusCode).toBe(403);
+
+    const wrongToken = await app.inject({
+      method: 'GET',
+      url: `/api/v1/locations/${location}/online-orders/${order_id}?order_token=not-the-real-token`,
+    });
+    expect(wrongToken.statusCode).toBe(403);
+
+    // Regression check for the order-id-as-its-own-token bug found during
+    // review: the order's own id must not work as a substitute order_token.
+    const idAsToken = await app.inject({
+      method: 'GET',
+      url: `/api/v1/locations/${location}/online-orders/${order_id}?order_token=${order_id}`,
+    });
+    expect(idAsToken.statusCode).toBe(403);
   });
 });

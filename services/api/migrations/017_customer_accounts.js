@@ -49,6 +49,7 @@ CREATE TABLE order_fulfillments (
   customer_phone VARCHAR NOT NULL,
   delivery_address JSONB,
   delivery_driver_name VARCHAR,
+  guest_token_hash VARCHAR,
   version INTEGER NOT NULL DEFAULT 1,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()

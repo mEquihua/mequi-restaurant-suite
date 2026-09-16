@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import { createHash } from 'node:crypto';
 import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 import { sql } from 'kysely';
@@ -733,13 +732,14 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
                 'PRODUCT_UNAVAILABLE',
                 'A selected product became unavailable before send.',
               );
-            const updated = await actor.trx
+            const sent = await actor.trx
               .updateTable('order_lines')
               .set({ status: 'SENT', version: sql<number>`version + 1` })
               .where('id', '=', line.id)
               .where('version', '=', line.version)
               .returningAll()
-              .executeTakeFirstOrThrow();
+              .executeTakeFirst();
+            if (!sent) throw conflict(line, line);
             await outbox(actor, line.id, 'order_line.sent', {
               line_id: line.id,
               order_id: orderId,

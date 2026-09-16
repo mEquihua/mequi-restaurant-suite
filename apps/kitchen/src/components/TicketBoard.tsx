@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiFetch } from '../api.js';
+import { apiFetch, ApiError } from '../api.js';
 import { useRealtime } from '../realtime.js';
 
 import { tokens } from '@restaurant-suite/ui-tokens';
@@ -15,6 +15,7 @@ interface OrderLine {
   status: 'DRAFT' | 'HELD' | 'SENT' | 'PREPARING' | 'READY' | 'FULFILLED' | 'CANCELLED' | 'VOIDED';
   version: number;
   order_created_at: string;
+  updated_at: string;
   modifiers: { modifier_id: string }[];
 }
 
@@ -24,6 +25,7 @@ interface Product {
   allergens: string[];
   tags: string[];
   availability: { status: string, available: boolean };
+  modifier_groups: { modifiers: { id: string; name: string }[] }[];
 }
 
 const STATION_OPTIONS = [
@@ -60,6 +62,14 @@ export function TicketBoard({ locationId }: { locationId: string }) {
 
   const products = productsData?.data || [];
   const productsById = new Map(products.map(p => [p.id, p]));
+  const modifierNamesById = new Map<string, string>();
+  for (const p of products) {
+    for (const group of p.modifier_groups) {
+      for (const modifier of group.modifiers) {
+        modifierNamesById.set(modifier.id, modifier.name);
+      }
+    }
+  }
 
   const currentStation = STATION_OPTIONS.find(s => s.id === stationId) || STATION_OPTIONS[0];
 
@@ -89,11 +99,28 @@ export function TicketBoard({ locationId }: { locationId: string }) {
 
   const markUnavailable = useMutation({
     mutationFn: async (productId: string) => {
-      return apiFetch(`/api/v1/locations/${locationId}/products/${productId}/mark-unavailable`, {
-        method: 'POST',
-        ifMatch: '0',
-        body: JSON.stringify({ status: 'EXHAUSTED' })
-      });
+      // A product's first-ever availability rule for this location must be
+      // created with If-Match: 0 (see menu module's changeAvailability); once
+      // it exists, mark-unavailable/mark-available cycles bump its version,
+      // so a repeat 86 on the same product must read the current version off
+      // the resulting 409 and retry, or it never succeeds a second time.
+      try {
+        return await apiFetch(`/api/v1/locations/${locationId}/products/${productId}/mark-unavailable`, {
+          method: 'POST',
+          ifMatch: '0',
+          body: JSON.stringify({ status: 'EXHAUSTED' })
+        });
+      } catch (e) {
+        if (e instanceof ApiError && e.status === 409 && typeof e.details === 'object' && e.details !== null && 'current_version' in e.details) {
+          const currentVersion = (e.details as { current_version: number }).current_version;
+          return apiFetch(`/api/v1/locations/${locationId}/products/${productId}/mark-unavailable`, {
+            method: 'POST',
+            ifMatch: String(currentVersion),
+            body: JSON.stringify({ status: 'EXHAUSTED' })
+          });
+        }
+        throw e;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
@@ -146,11 +173,12 @@ export function TicketBoard({ locationId }: { locationId: string }) {
         <main style={{ flex: 1, padding: '1rem', overflowX: 'auto', display: 'flex', gap: '1rem' }}>
           {Array.from(ticketsByOrder.entries()).map(([orderId, lines]) => {
             return (
-              <TicketCard 
-                key={orderId} 
-                
-                lines={lines} 
+              <TicketCard
+                key={orderId}
+
+                lines={lines}
                 productsById={productsById}
+                modifierNamesById={modifierNamesById}
                 onUpdateStatus={(lineId, status, version) => updateLineStatus.mutate({ lineId, status, version })}
                 onMarkUnavailable={(productId) => {
                   if (confirm('Mark this product as out of stock?')) {
@@ -190,23 +218,30 @@ function useCurrentTime() {
   return now;
 }
 
-function TicketCard({ 
- 
-  lines, 
+function TicketCard({
+
+  lines,
   productsById,
+  modifierNamesById,
   onUpdateStatus,
   onMarkUnavailable
-}: { 
-  
-  lines: OrderLine[], 
+}: {
+
+  lines: OrderLine[],
   productsById: Map<string, Product>,
+  modifierNamesById: Map<string, string>,
   onUpdateStatus: (lineId: string, status: string, version: number) => void,
   onMarkUnavailable: (productId: string) => void
 }) {
   const tableId = lines[0]?.table_id || 'Takeout/Other';
-  const createdAt = new Date(lines[0]?.order_created_at);
+  // updated_at reflects the last status transition; for a line still sitting
+  // in SENT it equals the actual send time (order_created_at is the same for
+  // every line in the order regardless of when each was individually fired,
+  // which would make every line on a multi-round ticket look equally fresh
+  // or equally late).
+  const sentAt = new Date(Math.min(...lines.map(l => new Date(l.updated_at).getTime())));
   const now = useCurrentTime();
-  const elapsedMinutes = Math.floor((now.getTime() - createdAt.getTime()) / 60000);
+  const elapsedMinutes = Math.floor((now.getTime() - sentAt.getTime()) / 60000);
   
   let timeColor = '#333';
   if (elapsedMinutes >= 15) timeColor = '#d32f2f'; // Late
@@ -256,11 +291,10 @@ function TicketCard({
                 </div>
               )}
               
-              {/* Modifiers placeholder */}
               {line.modifiers.length > 0 && (
                 <ul style={{ margin: '0.25rem 0 0 1.5rem', color: '#555' }}>
                   {line.modifiers.map(m => (
-                    <li key={m.modifier_id}>Mod {m.modifier_id.slice(0,4)}</li>
+                    <li key={m.modifier_id}>{modifierNamesById.get(m.modifier_id) || 'Modifier'}</li>
                   ))}
                 </ul>
               )}

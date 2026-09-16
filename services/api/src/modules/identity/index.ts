@@ -2,6 +2,9 @@ import type { FastifyPluginAsync } from 'fastify';
 
 import { identityRoute, type IdentityRouteOptions } from './route.js';
 
+export { IdentityHttpError, requirePermission, withAuthenticatedSession } from './authentication.js';
+export type { AuthenticatedSession } from './authentication.js';
+
 /** Public identity module entry point. Other modules may import only from this file. */
 export const identityModule: FastifyPluginAsync<IdentityRouteOptions> = async (app, options) => {
   await app.register(identityRoute, options);

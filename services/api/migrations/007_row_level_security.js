@@ -52,5 +52,17 @@ CREATE POLICY terminal_pin_attempts_permissive ON terminal_pin_attempts AS PERMI
 CREATE POLICY terminal_pin_attempts_restrictive ON terminal_pin_attempts AS RESTRICTIVE FOR ALL TO application_runtime_role
     USING (EXISTS (SELECT 1 FROM terminals WHERE terminals.id = terminal_pin_attempts.terminal_id))
     WITH CHECK (EXISTS (SELECT 1 FROM terminals WHERE terminals.id = terminal_pin_attempts.terminal_id));
+
+ALTER TABLE location_price_overrides ENABLE ROW LEVEL SECURITY;
+CREATE POLICY location_price_overrides_permissive ON location_price_overrides AS PERMISSIVE FOR ALL TO application_runtime_role USING (true) WITH CHECK (true);
+CREATE POLICY location_price_overrides_restrictive ON location_price_overrides AS RESTRICTIVE FOR ALL TO application_runtime_role
+    USING (location_id = NULLIF(current_setting('app.current_location_id', true), '')::uuid)
+    WITH CHECK (location_id = NULLIF(current_setting('app.current_location_id', true), '')::uuid);
+
+ALTER TABLE availability_rules ENABLE ROW LEVEL SECURITY;
+CREATE POLICY availability_rules_permissive ON availability_rules AS PERMISSIVE FOR ALL TO application_runtime_role USING (true) WITH CHECK (true);
+CREATE POLICY availability_rules_restrictive ON availability_rules AS RESTRICTIVE FOR ALL TO application_runtime_role
+    USING (location_id = NULLIF(current_setting('app.current_location_id', true), '')::uuid)
+    WITH CHECK (location_id = NULLIF(current_setting('app.current_location_id', true), '')::uuid);
 `);
 };

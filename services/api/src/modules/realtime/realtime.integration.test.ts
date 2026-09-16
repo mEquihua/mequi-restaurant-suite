@@ -116,12 +116,27 @@ describeIntegration('realtime WebSocket gateway', () => {
     const ws = new WebSocket(`ws://127.0.0.1:${address.port}/api/v1/realtime`, {
       headers: { authorization: `Bearer ${sessionA}` }
     });
-    
+
     return new Promise<void>((resolve, reject) => {
       ws.on('open', () => {
         ws.close();
         resolve();
       });
+      ws.on('error', reject);
+    });
+  });
+
+  it('connects successfully via the Sec-WebSocket-Protocol token, as a real browser must (it cannot set Authorization on the handshake)', async () => {
+    const address = app.server.address() as AddressInfo;
+    const ws = new WebSocket(`ws://127.0.0.1:${address.port}/api/v1/realtime`, ['Bearer', sessionA]);
+
+    return new Promise<void>((resolve, reject) => {
+      ws.on('open', () => {
+        expect(ws.protocol).toBe('Bearer');
+        ws.close();
+        resolve();
+      });
+      ws.on('unexpected-response', (_req, res) => reject(new Error(`Unexpected response: ${res.statusCode}`)));
       ws.on('error', reject);
     });
   });

@@ -12,8 +12,6 @@ import { ordersModule } from './index.js';
 const databaseUrl = process.env.DATABASE_URL;
 const describeIntegration = databaseUrl ? describe : describe.skip;
 const hash = (value: string) => createHash('sha256').update(value).digest('hex');
-const credential = (locationId: string, terminalId: string) =>
-  `${locationId}.${terminalId}.${randomBytes(32).toString('base64url')}`;
 
 describeIntegration('orders API reads and table side effects against PostgreSQL', () => {
   const db = createDatabase({ databaseUrl });
@@ -34,8 +32,6 @@ describeIntegration('orders API reads and table side effects against PostgreSQL'
   let tableA1 = '';
   let tableA2 = '';
   let areaB = '';
-  let tableB1 = '';
-  let product = '';
 
   const authA = () => ({ authorization: `Bearer ${tokenA}` });
   const authB = () => ({ authorization: `Bearer ${tokenB}` });
@@ -85,9 +81,9 @@ describeIntegration('orders API reads and table side effects against PostgreSQL'
     tableA2 = (await db.insertInto('tables').values({ location_id: locationA, area_id: areaA, name: 'T2', min_capacity: 1, max_capacity: 4, pos_x: 0, pos_y: 0 }).returning('id').executeTakeFirstOrThrow()).id;
     
     areaB = (await db.insertInto('areas').values({ location_id: locationB, name: 'Main' }).returning('id').executeTakeFirstOrThrow()).id;
-    tableB1 = (await db.insertInto('tables').values({ location_id: locationB, area_id: areaB, name: 'T1', min_capacity: 1, max_capacity: 4, pos_x: 0, pos_y: 0 }).returning('id').executeTakeFirstOrThrow()).id;
+    await db.insertInto('tables').values({ location_id: locationB, area_id: areaB, name: 'T1', min_capacity: 1, max_capacity: 4, pos_x: 0, pos_y: 0 }).execute();
 
-    product = (await db.insertInto('products').values({ organization_id: org, name: 'Burger', base_price: 1000 }).returning('id').executeTakeFirstOrThrow()).id;
+    await db.insertInto('products').values({ organization_id: org, name: 'Burger', base_price: 1000 }).execute();
   });
 
   afterAll(async () => {
@@ -140,7 +136,7 @@ describeIntegration('orders API reads and table side effects against PostgreSQL'
 
     const listB = await app.inject({ method: 'GET', url: `/api/v1/locations/${locationB}/visits`, headers: authB() });
     expect(listB.statusCode).toBe(200);
-    expect(listB.json().data.find((v: any) => v.id === visit.id)).toBeUndefined();
+    expect(listB.json().data.find((v: { id: string }) => v.id === visit.id)).toBeUndefined();
 
     // Cannot read locationA visits from locationB
     const deniedList = await app.inject({ method: 'GET', url: `/api/v1/locations/${locationA}/visits`, headers: authB() });

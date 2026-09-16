@@ -509,8 +509,8 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
         },
       },
     },
-    async (request, reply) =>
-      withSession(request, async (actor) => {
+    async (request, reply) => {
+      const visit = await withSession(request, async (actor) => {
         requirePermission(actor, 'orders.visits.create');
         const locationId = scoped(request, actor);
         const body = request.body as { table_id?: string; guest_count?: number };
@@ -541,7 +541,7 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
             .executeTakeFirst();
           if (!updatedTable) throw conflict(table, table);
         }
-        const visit = await actor.trx
+        return actor.trx
           .insertInto('visits')
           .values({
             location_id: locationId,
@@ -551,8 +551,14 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
           })
           .returningAll()
           .executeTakeFirstOrThrow();
-        return reply.status(201).send(visit);
-      }),
+      });
+      // Sent only after withSession's wrapped transaction has committed (see
+      // withLocationTransaction), so a client that immediately re-reads table
+      // state after this 201 always observes the OCCUPIED transition. Do not
+      // call reply.send() from inside the transaction callback for this
+      // handler, since that races the commit (confirmed by direct testing).
+      return reply.status(201).send(visit);
+    },
   );
   app.post(
     '/api/v1/locations/:locationId/visits/:visitId/orders',

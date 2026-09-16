@@ -64,5 +64,23 @@ CREATE POLICY availability_rules_permissive ON availability_rules AS PERMISSIVE 
 CREATE POLICY availability_rules_restrictive ON availability_rules AS RESTRICTIVE FOR ALL TO application_runtime_role
     USING (location_id = NULLIF(current_setting('app.current_location_id', true), '')::uuid)
     WITH CHECK (location_id = NULLIF(current_setting('app.current_location_id', true), '')::uuid);
+
+ALTER TABLE areas ENABLE ROW LEVEL SECURITY;
+CREATE POLICY areas_permissive ON areas AS PERMISSIVE FOR ALL TO application_runtime_role USING (true) WITH CHECK (true);
+CREATE POLICY areas_restrictive ON areas AS RESTRICTIVE FOR ALL TO application_runtime_role
+    USING (location_id = NULLIF(current_setting('app.current_location_id', true), '')::uuid)
+    WITH CHECK (location_id = NULLIF(current_setting('app.current_location_id', true), '')::uuid);
+
+ALTER TABLE tables ENABLE ROW LEVEL SECURITY;
+CREATE POLICY tables_permissive ON tables AS PERMISSIVE FOR ALL TO application_runtime_role USING (true) WITH CHECK (true);
+CREATE POLICY tables_restrictive ON tables AS RESTRICTIVE FOR ALL TO application_runtime_role
+    USING (location_id = NULLIF(current_setting('app.current_location_id', true), '')::uuid)
+    WITH CHECK (location_id = NULLIF(current_setting('app.current_location_id', true), '')::uuid);
+
+ALTER TABLE sections ENABLE ROW LEVEL SECURITY;
+CREATE POLICY sections_permissive ON sections AS PERMISSIVE FOR ALL TO application_runtime_role USING (true) WITH CHECK (true);
+CREATE POLICY sections_restrictive ON sections AS RESTRICTIVE FOR ALL TO application_runtime_role
+    USING (location_id = NULLIF(current_setting('app.current_location_id', true), '')::uuid)
+    WITH CHECK (location_id = NULLIF(current_setting('app.current_location_id', true), '')::uuid);
 `);
 };

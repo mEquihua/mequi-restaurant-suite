@@ -35,6 +35,10 @@ describeIntegration('menu API against PostgreSQL', () => {
   const auth = (token: string) => ({ authorization: `Bearer ${token}` });
 
   beforeAll(async () => {
+    await db.deleteFrom('table_sections').execute();
+    await db.deleteFrom('sections').execute();
+    await db.deleteFrom('tables').execute();
+    await db.deleteFrom('areas').execute();
     await db.deleteFrom('availability_rules').execute();
     await db.deleteFrom('location_price_overrides').execute();
     await db.deleteFrom('product_combo_items').execute();

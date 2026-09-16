@@ -248,6 +248,96 @@ paths:
         - { name: If-Match, in: header, required: true, description: Availability-rule version; use 0 to create a scoped rule, schema: { type: string, pattern: '^"?[0-9]+"?$' } }
       requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/MarkAvailableRequest' } } } }
       responses: { '200': { description: Explicit availability operation recorded, content: { application/json: { schema: { $ref: '#/components/schemas/AvailabilityRule' } } } }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' }, '409': { $ref: '#/components/responses/Error' } }
+  /api/v1/locations/{locationId}/areas:
+    get:
+      operationId: listAreas
+      x-required-permission: floor.layout.read
+      security: [{ staffSession: [] }]
+      parameters: [{ name: locationId, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }]
+      responses: { '200': { description: Areas in the authenticated session location, content: { application/json: { schema: { $ref: '#/components/schemas/AreaListResponse' } } } }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' } }
+    post:
+      operationId: createArea
+      x-required-permission: floor.layout.write
+      security: [{ staffSession: [] }]
+      parameters: [{ name: locationId, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreateAreaRequest' } } } }
+      responses: { '201': { description: Area created, content: { application/json: { schema: { $ref: '#/components/schemas/Area' } } } }, '400': { $ref: '#/components/responses/Error' }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' } }
+  /api/v1/locations/{locationId}/tables:
+    get:
+      operationId: listTables
+      x-required-permission: floor.layout.read
+      security: [{ staffSession: [] }]
+      parameters: [{ name: locationId, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }]
+      responses: { '200': { description: Tables in the authenticated session location, content: { application/json: { schema: { $ref: '#/components/schemas/TableListResponse' } } } }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' } }
+    post:
+      operationId: createTable
+      x-required-permission: floor.layout.write
+      security: [{ staffSession: [] }]
+      parameters: [{ name: locationId, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreateTableRequest' } } } }
+      responses: { '201': { description: Table created, content: { application/json: { schema: { $ref: '#/components/schemas/Table' } } } }, '400': { $ref: '#/components/responses/Error' }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' } }
+  /api/v1/tables/{id}:
+    put:
+      operationId: updateTable
+      x-required-permission: floor.layout.write
+      security: [{ staffSession: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }
+        - { name: If-Match, in: header, required: true, description: Current table version, schema: { type: string, pattern: '^"?[1-9][0-9]*"?$' } }
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/UpdateTableRequest' } } } }
+      responses: { '200': { description: Updated table, content: { application/json: { schema: { $ref: '#/components/schemas/Table' } } } }, '400': { $ref: '#/components/responses/Error' }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' }, '404': { $ref: '#/components/responses/Error' }, '409': { $ref: '#/components/responses/Error' }, '428': { $ref: '#/components/responses/Error' } }
+  /api/v1/tables/{id}/mark-needs-cleaning:
+    post:
+      operationId: markTableNeedsCleaning
+      x-required-permission: floor.tables.update_status
+      security: [{ staffSession: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }
+        - { name: If-Match, in: header, required: true, description: Current table version, schema: { type: string, pattern: '^"?[1-9][0-9]*"?$' } }
+      requestBody: { content: { application/json: { schema: { $ref: '#/components/schemas/EmptyObjectRequest' } } } }
+      responses: { '200': { description: Table marked as needing cleaning, content: { application/json: { schema: { $ref: '#/components/schemas/Table' } } } }, '400': { $ref: '#/components/responses/Error' }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' }, '404': { $ref: '#/components/responses/Error' }, '409': { $ref: '#/components/responses/Error' }, '428': { $ref: '#/components/responses/Error' } }
+  /api/v1/tables/{id}/mark-available:
+    post:
+      operationId: markTableAvailable
+      x-required-permission: floor.tables.update_status
+      security: [{ staffSession: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }
+        - { name: If-Match, in: header, required: true, description: Current table version, schema: { type: string, pattern: '^"?[1-9][0-9]*"?$' } }
+      requestBody: { content: { application/json: { schema: { $ref: '#/components/schemas/EmptyObjectRequest' } } } }
+      responses: { '200': { description: Table marked as available, content: { application/json: { schema: { $ref: '#/components/schemas/Table' } } } }, '400': { $ref: '#/components/responses/Error' }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' }, '404': { $ref: '#/components/responses/Error' }, '409': { $ref: '#/components/responses/Error' }, '428': { $ref: '#/components/responses/Error' } }
+  /api/v1/tables/{id}/mark-out-of-service:
+    post:
+      operationId: markTableOutOfService
+      x-required-permission: floor.tables.update_status
+      security: [{ staffSession: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }
+        - { name: If-Match, in: header, required: true, description: Current table version, schema: { type: string, pattern: '^"?[1-9][0-9]*"?$' } }
+      requestBody: { content: { application/json: { schema: { $ref: '#/components/schemas/EmptyObjectRequest' } } } }
+      responses: { '200': { description: Table marked as out of service, content: { application/json: { schema: { $ref: '#/components/schemas/Table' } } } }, '400': { $ref: '#/components/responses/Error' }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' }, '404': { $ref: '#/components/responses/Error' }, '409': { $ref: '#/components/responses/Error' }, '428': { $ref: '#/components/responses/Error' } }
+  /api/v1/locations/{locationId}/sections:
+    get:
+      operationId: listSections
+      x-required-permission: floor.layout.read
+      security: [{ staffSession: [] }]
+      parameters: [{ name: locationId, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }]
+      responses: { '200': { description: Sections in the authenticated session location, content: { application/json: { schema: { $ref: '#/components/schemas/SectionListResponse' } } } }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' } }
+    post:
+      operationId: createSection
+      x-required-permission: floor.layout.write
+      security: [{ staffSession: [] }]
+      parameters: [{ name: locationId, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreateSectionRequest' } } } }
+      responses: { '201': { description: Section created, content: { application/json: { schema: { $ref: '#/components/schemas/Section' } } } }, '400': { $ref: '#/components/responses/Error' }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' } }
+  /api/v1/sections/{id}/tables:
+    put:
+      operationId: replaceSectionTables
+      x-required-permission: floor.sections.assign
+      security: [{ staffSession: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ReplaceSectionTablesRequest' } } } }
+      responses: { '200': { description: Section table assignments replaced, content: { application/json: { schema: { $ref: '#/components/schemas/SectionTablesResponse' } } } }, '400': { $ref: '#/components/responses/Error' }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' }, '404': { $ref: '#/components/responses/Error' } }
 components:
   securitySchemes:
     staffSession: { type: http, scheme: bearer, bearerFormat: opaque }
@@ -297,5 +387,18 @@ components:
     AvailabilityRule: { type: object, additionalProperties: false, required: [id, location_id, product_id, status, channel_scope, service_type_scope, days_of_week, start_time, end_time, version], properties: { id: { $ref: '#/components/schemas/Uuid' }, location_id: { $ref: '#/components/schemas/Uuid' }, product_id: { $ref: '#/components/schemas/Uuid' }, status: { type: string, enum: [AVAILABLE, EXHAUSTED, HIDDEN, SCHEDULED] }, channel_scope: { type: [string, 'null'] }, service_type_scope: { type: [string, 'null'] }, days_of_week: { type: ['array', 'null'], items: { type: integer, minimum: 1, maximum: 7 } }, start_time: { type: [string, 'null'], format: date-time }, end_time: { type: [string, 'null'], format: date-time }, version: { type: integer, minimum: 1 } } }
     MarkUnavailableRequest: { type: object, additionalProperties: false, properties: { rule_id: { $ref: '#/components/schemas/Uuid' }, status: { type: string, enum: [EXHAUSTED, HIDDEN, SCHEDULED] }, channel_scope: { type: [string, 'null'] }, service_type_scope: { type: [string, 'null'] }, days_of_week: { type: ['array', 'null'], items: { type: integer, minimum: 1, maximum: 7 } }, start_time: { type: [string, 'null'], format: date-time }, end_time: { type: [string, 'null'], format: date-time } } }
     MarkAvailableRequest: { type: object, additionalProperties: false, properties: { rule_id: { $ref: '#/components/schemas/Uuid' }, channel_scope: { type: [string, 'null'] }, service_type_scope: { type: [string, 'null'] }, days_of_week: { type: ['array', 'null'], items: { type: integer, minimum: 1, maximum: 7 } }, start_time: { type: [string, 'null'], format: date-time }, end_time: { type: [string, 'null'], format: date-time } } }
+    Area: { type: object, additionalProperties: false, required: [id, location_id, name, created_at, updated_at], properties: { id: { $ref: '#/components/schemas/Uuid' }, location_id: { $ref: '#/components/schemas/Uuid' }, name: { type: string }, created_at: { type: string, format: date-time }, updated_at: { type: string, format: date-time } } }
+    AreaListResponse: { type: object, additionalProperties: false, required: [data], properties: { data: { type: array, items: { $ref: '#/components/schemas/Area' } } } }
+    CreateAreaRequest: { type: object, additionalProperties: false, required: [name], properties: { name: { type: string, minLength: 1, maxLength: 160 } } }
+    Table: { type: object, additionalProperties: false, required: [id, location_id, area_id, name, min_capacity, max_capacity, pos_x, pos_y, status, version, created_at, updated_at], properties: { id: { $ref: '#/components/schemas/Uuid' }, location_id: { $ref: '#/components/schemas/Uuid' }, area_id: { $ref: '#/components/schemas/Uuid' }, name: { type: string }, min_capacity: { type: integer }, max_capacity: { type: integer }, pos_x: { type: integer }, pos_y: { type: integer }, status: { type: string, enum: [AVAILABLE, OCCUPIED, NEEDS_CLEANING, OUT_OF_ORDER] }, version: { type: integer, minimum: 1 }, created_at: { type: string, format: date-time }, updated_at: { type: string, format: date-time } } }
+    TableListResponse: { type: object, additionalProperties: false, required: [data], properties: { data: { type: array, items: { $ref: '#/components/schemas/Table' } } } }
+    CreateTableRequest: { type: object, additionalProperties: false, required: [area_id, name, max_capacity], properties: { area_id: { $ref: '#/components/schemas/Uuid' }, name: { type: string, minLength: 1, maxLength: 160 }, min_capacity: { type: integer, minimum: 1 }, max_capacity: { type: integer, minimum: 1 }, pos_x: { type: integer }, pos_y: { type: integer } } }
+    UpdateTableRequest: { type: object, additionalProperties: false, minProperties: 1, properties: { area_id: { $ref: '#/components/schemas/Uuid' }, name: { type: string, minLength: 1, maxLength: 160 }, min_capacity: { type: integer, minimum: 1 }, max_capacity: { type: integer, minimum: 1 }, pos_x: { type: integer }, pos_y: { type: integer } } }
+    EmptyObjectRequest: { type: object, additionalProperties: false, maxProperties: 0 }
+    Section: { type: object, additionalProperties: false, required: [id, location_id, name, created_at, updated_at], properties: { id: { $ref: '#/components/schemas/Uuid' }, location_id: { $ref: '#/components/schemas/Uuid' }, name: { type: string }, created_at: { type: string, format: date-time }, updated_at: { type: string, format: date-time } } }
+    SectionListResponse: { type: object, additionalProperties: false, required: [data], properties: { data: { type: array, items: { $ref: '#/components/schemas/Section' } } } }
+    CreateSectionRequest: { type: object, additionalProperties: false, required: [name], properties: { name: { type: string, minLength: 1, maxLength: 160 } } }
+    ReplaceSectionTablesRequest: { type: object, additionalProperties: false, required: [table_ids], properties: { table_ids: { type: array, uniqueItems: true, items: { $ref: '#/components/schemas/Uuid' } } } }
+    SectionTablesResponse: { type: object, additionalProperties: false, required: [section_id, table_ids], properties: { section_id: { $ref: '#/components/schemas/Uuid' }, table_ids: { type: array, items: { $ref: '#/components/schemas/Uuid' } } } }
     ErrorResponse: { type: object, additionalProperties: false, required: [error], properties: { error: { type: object, additionalProperties: true, required: [status, code, message, request_id], properties: { status: { type: integer }, code: { type: string }, message: { type: string }, request_id: { type: string }, details: {} } } } }
     ConcurrencyConflict: { type: object, additionalProperties: false, required: [error], properties: { error: { type: object, additionalProperties: false, required: [status, code, message, request_id, details], properties: { status: { const: 409 }, code: { const: OPTIMISTIC_CONCURRENCY_CONFLICT }, message: { type: string }, request_id: { type: string }, details: { type: object, additionalProperties: false, required: [current_version, current_state], properties: { current_version: { type: integer }, current_state: { $ref: '#/components/schemas/Staff' } } } } } } }

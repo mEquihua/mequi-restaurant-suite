@@ -144,17 +144,15 @@ const expected = (value: string | undefined) => {
 };
 const fail = (reply: FastifyReply, request: FastifyRequest, error: IdentityHttpError) => {
   for (const [name, value] of Object.entries(error.headers ?? {})) reply.header(name, value);
-  return reply
-    .status(error.statusCode)
-    .send({
-      error: {
-        status: error.statusCode,
-        code: error.code,
-        message: error.message,
-        request_id: request.id,
-        ...(error.details === undefined ? {} : { details: error.details }),
-      },
-    });
+  return reply.status(error.statusCode).send({
+    error: {
+      status: error.statusCode,
+      code: error.code,
+      message: error.message,
+      request_id: request.id,
+      ...(error.details === undefined ? {} : { details: error.details }),
+    },
+  });
 };
 const conflict = (row: { version: number }, state: unknown) =>
   new IdentityHttpError(
@@ -197,27 +195,23 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
       'validation' in error &&
       (error as { validation?: unknown }).validation
     )
-      return reply
-        .status(400)
-        .send({
-          error: {
-            status: 400,
-            code: 'VALIDATION_ERROR',
-            message: 'The request does not match the required schema.',
-            request_id: request.id,
-          },
-        });
-    request.log.error({ err: error }, 'orders request failed');
-    return reply
-      .status(500)
-      .send({
+      return reply.status(400).send({
         error: {
-          status: 500,
-          code: 'INTERNAL_ERROR',
-          message: 'An unexpected error occurred.',
+          status: 400,
+          code: 'VALIDATION_ERROR',
+          message: 'The request does not match the required schema.',
           request_id: request.id,
         },
       });
+    request.log.error({ err: error }, 'orders request failed');
+    return reply.status(500).send({
+      error: {
+        status: 500,
+        code: 'INTERNAL_ERROR',
+        message: 'An unexpected error occurred.',
+        request_id: request.id,
+      },
+    });
   });
   const scoped = (request: FastifyRequest, actor: Actor) => {
     const locationId = (request.params as { locationId: string }).locationId;
@@ -225,7 +219,12 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
     return locationId;
   };
   const outbox = async (actor: Actor, aggregateId: string, eventType: string, payload: unknown) => {
-    const line = await actor.trx.selectFrom('order_lines as ol').innerJoin('orders as o', 'o.id', 'ol.order_id').select('o.visit_id').where('ol.id', '=', aggregateId).executeTakeFirst();
+    const line = await actor.trx
+      .selectFrom('order_lines as ol')
+      .innerJoin('orders as o', 'o.id', 'ol.order_id')
+      .select('o.visit_id')
+      .where('ol.id', '=', aggregateId)
+      .executeTakeFirst();
     return actor.trx
       .insertInto('outbox_events')
       .values({
@@ -233,7 +232,10 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
         aggregate_type: 'order_line',
         aggregate_id: aggregateId,
         event_type: eventType,
-        payload: { ...(payload as Record<string, unknown>), ...(line ? { visit_id: line.visit_id } : {}) } as never,
+        payload: {
+          ...(payload as Record<string, unknown>),
+          ...(line ? { visit_id: line.visit_id } : {}),
+        } as never,
         schema_version: 1,
       })
       .execute();
@@ -323,7 +325,11 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
     return response;
   }
 
-  async function enforceReauth(actor: Actor, authorizedBy: string | undefined, pin: string | undefined) {
+  async function enforceReauth(
+    actor: Actor,
+    authorizedBy: string | undefined,
+    pin: string | undefined,
+  ) {
     if (!authorizedBy)
       throw new IdentityHttpError(
         400,
@@ -343,24 +349,46 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
     const outcome = await app.withLocationTransaction(actor.locationId, async (authTrx) => {
       const attempt = await lockPinAttempt(authTrx, actor.terminalId, fingerprint);
       const timestamp = now();
-      const retryAfter = retryAfterSeconds({ failureCount: attempt.failure_count, nextAttemptAt: attempt.next_attempt_at }, timestamp);
-      
+      const retryAfter = retryAfterSeconds(
+        { failureCount: attempt.failure_count, nextAttemptAt: attempt.next_attempt_at },
+        timestamp,
+      );
+
       if (retryAfter !== undefined) {
         return { kind: 'backoff' as const, retryAfter };
       }
 
       const [staff, location] = await Promise.all([
         findStaff(authTrx, authorizedBy),
-        authTrx.selectFrom('locations').select(['organization_id']).where('id', '=', actor.locationId).executeTakeFirst(),
+        authTrx
+          .selectFrom('locations')
+          .select(['organization_id'])
+          .where('id', '=', actor.locationId)
+          .executeTakeFirst(),
       ]);
       const pinMatches = await verifyPin(staff?.pin_hash ?? DUMMY_PIN_HASH, pin);
-      if (!staff || !location || !staff.active || staff.organization_id !== location.organization_id || !pinMatches) {
-        const next = nextFailedPinAttempt({ failureCount: attempt.failure_count, nextAttemptAt: attempt.next_attempt_at }, timestamp);
-        await recordFailedPinAttempt(authTrx, actor.terminalId, fingerprint, next.failureCount, next.nextAttemptAt!);
+      if (
+        !staff ||
+        !location ||
+        !staff.active ||
+        staff.organization_id !== location.organization_id ||
+        !pinMatches
+      ) {
+        const next = nextFailedPinAttempt(
+          { failureCount: attempt.failure_count, nextAttemptAt: attempt.next_attempt_at },
+          timestamp,
+        );
+        await recordFailedPinAttempt(
+          authTrx,
+          actor.terminalId,
+          fingerprint,
+          next.failureCount,
+          next.nextAttemptAt!,
+        );
         const seconds = retryAfterSeconds(next, timestamp)!;
         return { kind: 'invalid-pin' as const, retryAfter: seconds };
       }
-      
+
       await resetPinAttempt(authTrx, actor.terminalId, fingerprint);
       return { kind: 'success' as const };
     });
@@ -380,7 +408,7 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
         'AUTHORIZER_PIN_INVALID',
         'The authorizer PIN is invalid.',
         undefined,
-        { 'Retry-After': String(outcome.retryAfter) }
+        { 'Retry-After': String(outcome.retryAfter) },
       );
     }
   }
@@ -450,11 +478,7 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
     return updated;
   }
 
-  async function applyDiscount(
-    request: FastifyRequest,
-    actor: Actor,
-    override: boolean,
-  ) {
+  async function applyDiscount(request: FastifyRequest, actor: Actor, override: boolean) {
     requirePermission(
       actor,
       override ? 'accounts.discounts.apply_override' : 'accounts.discounts.apply',
@@ -600,11 +624,7 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
               'Table does not belong to this location.',
             );
           if (table.status !== 'AVAILABLE')
-            throw new IdentityHttpError(
-              409,
-              'TABLE_NOT_AVAILABLE',
-              'Table is not available.',
-            );
+            throw new IdentityHttpError(409, 'TABLE_NOT_AVAILABLE', 'Table is not available.');
           const updatedTable = await actor.trx
             .updateTable('tables')
             .set({ status: 'OCCUPIED', version: sql<number>`version + 1` })
@@ -656,8 +676,8 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
         },
       },
     },
-    async (request, reply) =>
-      withSession(request, async (actor) => {
+    async (request, reply) => {
+      const order = await withSession(request, async (actor) => {
         requirePermission(actor, 'orders.orders.create');
         const locationId = scoped(request, actor);
         const visitId = (request.params as { visitId: string }).visitId;
@@ -686,8 +706,10 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
           .where('id', '=', visitId)
           .where('version', '=', v)
           .executeTakeFirst();
-        return reply.status(201).send(order);
-      }),
+        return order;
+      });
+      return reply.status(201).send(order);
+    },
   );
   app.post(
     '/api/v1/locations/:locationId/visits/:visitId/accounts',
@@ -706,32 +728,32 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
         },
       },
     },
-    async (request, reply) =>
-      withSession(request, async (actor) => {
+    async (request, reply) => {
+      const account = await withSession(request, async (actor) => {
         requirePermission(actor, 'accounts.accounts.create');
         const locationId = scoped(request, actor);
         const visitId = (request.params as { visitId: string }).visitId;
         const visit = await findVisit(actor.trx, locationId, visitId);
         if (!visit || visit.status !== 'OPEN')
           throw new IdentityHttpError(404, 'NOT_FOUND', 'Open visit was not found.');
-        return reply.status(201).send(
-          await actor.trx
-            .insertInto('accounts')
-            .values({
-              location_id: locationId,
-              visit_id: visitId,
-              name: (request.body as { name?: string }).name?.trim() ?? null,
-            })
-            .returningAll()
-            .executeTakeFirstOrThrow(),
-        );
-      }),
+        return actor.trx
+          .insertInto('accounts')
+          .values({
+            location_id: locationId,
+            visit_id: visitId,
+            name: (request.body as { name?: string }).name?.trim() ?? null,
+          })
+          .returningAll()
+          .executeTakeFirstOrThrow();
+      });
+      return reply.status(201).send(account);
+    },
   );
   app.post(
     '/api/v1/locations/:locationId/orders/:orderId/lines',
     { schema: addLinesSchema },
-    async (request, reply) =>
-      withSession(request, async (actor) => {
+    async (request, reply) => {
+      const result = await withSession(request, async (actor) => {
         requirePermission(actor, 'orders.lines.add');
         scoped(request, actor);
         const orderId = (request.params as { orderId: string }).orderId;
@@ -744,8 +766,10 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
           expectedVersion: v,
           lines,
         });
-        return reply.status(201).send(result);
-      }),
+        return result;
+      });
+      return reply.status(201).send(result);
+    },
   );
   app.post(
     '/api/v1/locations/:locationId/order-lines/:lineId/hold',
@@ -974,12 +998,15 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
     async (request) =>
       withSession(request, async (actor) => {
         scoped(request, actor);
-        const body = request.body as { reason: string; authorized_by: string; authorized_by_pin?: string };
+        const body = request.body as {
+          reason: string;
+          authorized_by: string;
+          authorized_by_pin?: string;
+        };
         const before = await findLine(
           actor.trx,
           actor.locationId,
           (request.params as { lineId: string }).lineId,
-
         );
         if (!before || !['PREPARING', 'READY', 'FULFILLED'].includes(before.status))
           throw new IdentityHttpError(
@@ -1008,7 +1035,11 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
     if (!order) throw new IdentityHttpError(404, 'NOT_FOUND', 'Order was not found.');
     const v = expected(request.headers['if-match']);
     if (v !== order.version) throw conflict(order, order);
-    const body = request.body as { reason: string; authorized_by?: string; authorized_by_pin?: string };
+    const body = request.body as {
+      reason: string;
+      authorized_by?: string;
+      authorized_by_pin?: string;
+    };
     const lines = await actor.trx
       .selectFrom('order_lines')
       .selectAll()
@@ -1236,18 +1267,18 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
   app.post(
     '/api/v1/locations/:locationId/accounts/:accountId/discounts',
     { schema: discountSchema(false) },
-    async (request, reply) =>
-      withSession(request, async (actor) =>
-        reply.status(201).send(await applyDiscount(request, actor, false)),
-      ),
+    async (request, reply) => {
+      const discount = await withSession(request, (actor) => applyDiscount(request, actor, false));
+      return reply.status(201).send(discount);
+    },
   );
   app.post(
     '/api/v1/locations/:locationId/accounts/:accountId/discounts/override',
     { schema: discountSchema(true) },
-    async (request, reply) =>
-      withSession(request, async (actor) =>
-        reply.status(201).send(await applyDiscount(request, actor, true)),
-      ),
+    async (request, reply) => {
+      const discount = await withSession(request, (actor) => applyDiscount(request, actor, true));
+      return reply.status(201).send(discount);
+    },
   );
   app.post(
     '/api/v1/locations/:locationId/accounts/:accountId/split',
@@ -1272,8 +1303,8 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
         },
       },
     },
-    async (request, reply) =>
-      withSession(request, async (actor) => {
+    async (request, reply) => {
+      const split = await withSession(request, async (actor) => {
         requirePermission(actor, 'accounts.accounts.split');
         scoped(request, actor);
         const accountId = (request.params as { accountId: string }).accountId;
@@ -1398,8 +1429,10 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
             .where('version', '=', v)
             .executeTakeFirstOrThrow();
         }
-        return reply.status(201).send({ source_account_id: accountId, accounts: siblings });
-      }),
+        return { source_account_id: accountId, accounts: siblings };
+      });
+      return reply.status(201).send(split);
+    },
   );
   app.post(
     '/api/v1/locations/:locationId/accounts/:accountId/reopen',
@@ -1468,8 +1501,8 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
         },
       },
     },
-    async (request, reply) =>
-      withSession(request, async (actor) => {
+    async (request, reply) => {
+      const response = await withSession(request, async (actor) => {
         requirePermission(actor, 'payments.payments.create');
         scoped(request, actor);
         const accountId = (request.params as { accountId: string }).accountId;
@@ -1523,8 +1556,10 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
             return { payment, account: updated };
           },
         );
-        return reply.status(201).send(response);
-      }),
+        return response;
+      });
+      return reply.status(201).send(response);
+    },
   );
   app.post(
     '/api/v1/locations/:locationId/payments/:paymentId/refund',
@@ -1547,8 +1582,8 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
         },
       },
     },
-    async (request, reply) =>
-      withSession(request, async (actor) => {
+    async (request, reply) => {
+      const refund = await withSession(request, async (actor) => {
         requirePermission(actor, 'payments.refunds.create');
         scoped(request, actor);
         const payment = await findPayment(
@@ -1604,8 +1639,10 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
           payment.version,
           body.reason,
         );
-        return reply.status(201).send(refund);
-      }),
+        return refund;
+      });
+      return reply.status(201).send(refund);
+    },
   );
   app.post(
     '/api/v1/locations/:locationId/visits/:visitId/close',
@@ -1674,7 +1711,12 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
           .executeTakeFirst();
         if (!updated) throw conflict(visit, visit);
 
-        await actor.trx.updateTable('guest_sessions').set({ revoked_at: now() }).where('visit_id', '=', visitId).where('revoked_at', 'is', null).execute();
+        await actor.trx
+          .updateTable('guest_sessions')
+          .set({ revoked_at: now() })
+          .where('visit_id', '=', visitId)
+          .where('revoked_at', 'is', null)
+          .execute();
 
         if (updated.table_id) {
           const table = await actor.trx
@@ -1745,22 +1787,22 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
         requirePermission(actor, 'orders.visits.read_all');
         const locationId = scoped(request, actor);
         const visitId = (request.params as { visitId: string }).visitId;
-        
+
         const visit = await findVisit(actor.trx, locationId, visitId);
         if (!visit) throw new IdentityHttpError(404, 'NOT_FOUND', 'Visit was not found.');
-        
+
         const orders = await actor.trx
           .selectFrom('orders')
           .select(['id', 'status', 'version'])
           .where('visit_id', '=', visitId)
           .execute();
-          
+
         const accounts = await actor.trx
           .selectFrom('accounts')
           .select(['id', 'status', 'total', 'version'])
           .where('visit_id', '=', visitId)
           .execute();
-          
+
         return { ...visit, orders, accounts };
       }),
   );
@@ -1782,27 +1824,33 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
         requirePermission(actor, 'orders.visits.read_all');
         const locationId = scoped(request, actor);
         const orderId = (request.params as { orderId: string }).orderId;
-        
+
         const order = await findOrder(actor.trx, locationId, orderId);
         if (!order) throw new IdentityHttpError(404, 'NOT_FOUND', 'Order was not found.');
-        
+
         const lines = await actor.trx
           .selectFrom('order_lines')
           .selectAll()
           .where('order_id', '=', orderId)
           .execute();
-          
-        const modifierRows = lines.length ? await actor.trx
-          .selectFrom('order_line_modifiers')
-          .selectAll()
-          .where('order_line_id', 'in', lines.map(l => l.id))
-          .execute() : [];
-          
-        const linesWithModifiers = lines.map(line => ({
+
+        const modifierRows = lines.length
+          ? await actor.trx
+              .selectFrom('order_line_modifiers')
+              .selectAll()
+              .where(
+                'order_line_id',
+                'in',
+                lines.map((l) => l.id),
+              )
+              .execute()
+          : [];
+
+        const linesWithModifiers = lines.map((line) => ({
           ...line,
-          modifiers: modifierRows.filter(m => m.order_line_id === line.id)
+          modifiers: modifierRows.filter((m) => m.order_line_id === line.id),
         }));
-        
+
         return { ...order, order_lines: linesWithModifiers };
       }),
   );
@@ -1824,28 +1872,34 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
         requirePermission(actor, 'orders.visits.read_all');
         const locationId = scoped(request, actor);
         const accountId = (request.params as { accountId: string }).accountId;
-        
+
         const account = await findAccount(actor.trx, locationId, accountId);
         if (!account) throw new IdentityHttpError(404, 'NOT_FOUND', 'Account was not found.');
-        
+
         const payments = await actor.trx
           .selectFrom('payments')
           .selectAll()
           .where('account_id', '=', accountId)
           .execute();
-          
+
         const lines = await actor.trx
           .selectFrom('order_lines')
           .select('id')
           .where('account_id', '=', accountId)
           .execute();
-          
-        const voids = lines.length ? await actor.trx
-          .selectFrom('cancellations_and_voids')
-          .selectAll()
-          .where('order_line_id', 'in', lines.map(l => l.id))
-          .execute() : [];
-          
+
+        const voids = lines.length
+          ? await actor.trx
+              .selectFrom('cancellations_and_voids')
+              .selectAll()
+              .where(
+                'order_line_id',
+                'in',
+                lines.map((l) => l.id),
+              )
+              .execute()
+          : [];
+
         return { ...account, payments, cancellations_and_voids: voids };
       }),
   );
@@ -1869,7 +1923,7 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
         requirePermission(actor, 'kitchen.tickets.read');
         const locationId = scoped(request, actor);
         const { status } = request.query as { status?: string };
-        
+
         let query = actor.trx
           .selectFrom('order_lines as ol')
           .innerJoin('orders as o', 'o.id', 'ol.order_id')
@@ -1877,27 +1931,45 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
           .selectAll('ol')
           .select(['o.visit_id', 'v.table_id', 'o.created_at as order_created_at'])
           .where('v.location_id', '=', locationId);
-          
+
         if (status) {
           const statuses = status.split(',');
-          query = query.where('ol.status', 'in', statuses as ("DRAFT" | "HELD" | "SENT" | "PREPARING" | "READY" | "FULFILLED" | "CANCELLED" | "VOIDED")[]);
+          query = query.where(
+            'ol.status',
+            'in',
+            statuses as (
+              | 'DRAFT'
+              | 'HELD'
+              | 'SENT'
+              | 'PREPARING'
+              | 'READY'
+              | 'FULFILLED'
+              | 'CANCELLED'
+              | 'VOIDED'
+            )[],
+          );
         }
-        
+
         const lines = await query.execute();
-        
-        const modifierRows = lines.length ? await actor.trx
-          .selectFrom('order_line_modifiers')
-          .selectAll()
-          .where('order_line_id', 'in', lines.map(l => l.id))
-          .execute() : [];
-          
-        const linesWithModifiers = lines.map(line => ({
+
+        const modifierRows = lines.length
+          ? await actor.trx
+              .selectFrom('order_line_modifiers')
+              .selectAll()
+              .where(
+                'order_line_id',
+                'in',
+                lines.map((l) => l.id),
+              )
+              .execute()
+          : [];
+
+        const linesWithModifiers = lines.map((line) => ({
           ...line,
-          modifiers: modifierRows.filter(m => m.order_line_id === line.id)
+          modifiers: modifierRows.filter((m) => m.order_line_id === line.id),
         }));
-        
+
         return { data: linesWithModifiers };
       }),
   );
-
 };

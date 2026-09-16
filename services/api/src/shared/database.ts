@@ -135,6 +135,7 @@ export interface CategoryTable {
   description: string | null;
   display_order: Generated<number>;
   is_active: Generated<boolean>;
+  version: Generated<number>;
   created_at: Generated<Date>;
   updated_at: Generated<Date>;
 }

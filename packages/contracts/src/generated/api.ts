@@ -1403,6 +1403,7 @@ export interface components {
             description: string | null;
             display_order: number;
             is_active: boolean;
+            version: number;
         };
         CategoryListResponse: {
             data: components["schemas"]["Category"][];

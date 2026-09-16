@@ -50,8 +50,8 @@ function dates(body: AvailabilityBody): { start_time: Date | null; end_time: Dat
   return { start_time, end_time };
 }
 
-function publicCategory(row: { id: string; name: string; description: string | null; display_order: number; is_active: boolean }) {
-  return { id: row.id, name: row.name, description: row.description, display_order: row.display_order, is_active: row.is_active };
+function publicCategory(row: { id: string; name: string; description: string | null; display_order: number; is_active: boolean; version: number }) {
+  return { id: row.id, name: row.name, description: row.description, display_order: row.display_order, is_active: row.is_active, version: row.version };
 }
 
 function publicAvailability(row: { id: string; location_id: string; product_id: string; status: string; channel_scope: string | null; service_type_scope: string | null; days_of_week: number[] | null; start_time: Date | null; end_time: Date | null; version: number }) {

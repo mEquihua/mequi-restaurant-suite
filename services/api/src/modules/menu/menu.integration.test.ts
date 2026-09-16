@@ -314,6 +314,7 @@ describeIntegration('menu API against PostgreSQL', () => {
     const noAuth = await app.inject({
       method: 'PUT',
       url: `/api/v1/categories/${categoryId}`,
+      headers: { 'if-match': '1' },
       payload: { name: 'Sweets' },
     });
     expect(noAuth.statusCode).toBe(401);

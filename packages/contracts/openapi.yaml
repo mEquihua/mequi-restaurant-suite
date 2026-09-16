@@ -2614,6 +2614,41 @@ paths:
                 $ref: "#/components/schemas/Customer"
         "401":
           description: Unauthorized
+  /api/v1/locations/{loc_id}/online-orders:
+    get:
+      summary: List customer online orders
+      tags:
+        - OnlineOrdering
+      security:
+        - CustomerBearerAuth: []
+      parameters:
+        - name: loc_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+        - name: before
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: List of online orders
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OnlineOrderListResponse"
   /api/v1/locations/{loc_id}/online-orders/checkout:
     post:
       summary: Checkout online order
@@ -5125,6 +5160,29 @@ components:
             $ref: "#/components/schemas/OnlineOrderLineSummary"
         fulfillment:
           $ref: "#/components/schemas/OrderFulfillment"
+    OnlineOrderListItem:
+      type: object
+      required:
+        - order
+        - fulfillment
+      properties:
+        order:
+          $ref: "#/components/schemas/OnlineOrderSummary"
+        fulfillment:
+          $ref: "#/components/schemas/OrderFulfillment"
+    OnlineOrderListResponse:
+      type: object
+      required:
+        - data
+        - next_before
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/OnlineOrderListItem"
+        next_before:
+          type: string
+          nullable: true
     FulfillmentActionRequest:
       type: object
       required:

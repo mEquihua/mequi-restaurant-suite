@@ -15,6 +15,8 @@ import {
   type OnlineCheckoutRequest,
   type OnlineCheckoutResponse,
   type OnlineOrderDetail,
+  type OnlineOrderListItem,
+  type OnlineOrderListResponse,
   type Product,
 } from './api.js';
 import { cartItemPrice, cartTotal, requiresDeliveryAddress, type CartItem } from './logic.js';
@@ -642,7 +644,65 @@ function OrderStatus({ location, customer }: { location: Location; customer?: Cu
   );
 }
 
-function History({ customer }: { customer?: Customer | null }) {
+function CustomerOrderHistory({ location }: { location: Location }) {
+  const [cursor, setCursor] = useState<string | undefined>(undefined);
+  const [accumulated, setAccumulated] = useState<OnlineOrderListItem[]>([]);
+
+  const query = useQuery({
+    queryKey: ['customer-orders', location.id, cursor],
+    queryFn: async () => {
+      const path = `/api/v1/locations/${location.id}/online-orders${cursor ? `?before=${encodeURIComponent(cursor)}` : ''}`;
+      return apiFetch<OnlineOrderListResponse>(path);
+    },
+  });
+
+  useEffect(() => {
+    if (query.data?.data) {
+      setAccumulated((prev) => {
+        const existingIds = new Set(prev.map((item) => item.order.id));
+        const newItems = query.data.data.filter((item) => !existingIds.has(item.order.id));
+        return [...prev, ...newItems];
+      });
+    }
+  }, [query.data]);
+
+  const items = accumulated;
+  const hasMore = Boolean(query.data?.next_before);
+
+  return (
+    <main>
+      <h1>Recent orders</h1>
+      <p className="muted">Orders linked to your account.</p>
+      {query.isPending && !items.length && <p>Loading orders…</p>}
+      {query.isError && <ErrorMessage error={query.error} />}
+      {!query.isPending && !items.length && !query.isError && <p>No recent orders here yet.</p>}
+      <div className="history-list">
+        {items.map((item) => (
+          <Link key={item.order.id} className="history-card" to={`/orders/${item.order.id}`}>
+            <strong>{item.fulfillment.fulfillment_type}</strong>
+            <span>{item.order.status}</span>
+            <small>{new Date(item.order.created_at).toLocaleString()}</small>
+          </Link>
+        ))}
+      </div>
+      {hasMore && (
+        <button
+          className="button secondary"
+          style={{ marginTop: '1rem' }}
+          disabled={query.isFetching}
+          onClick={() => setCursor(query.data?.next_before ?? undefined)}
+        >
+          {query.isFetching ? 'Loading…' : 'Load more'}
+        </button>
+      )}
+    </main>
+  );
+}
+
+function History({ location, customer }: { location: Location; customer?: Customer | null }) {
+  if (customer) {
+    return <CustomerOrderHistory key={location.id} location={location} />;
+  }
   const orders = readOrders(customer);
   return (
     <main>
@@ -734,7 +794,7 @@ function CustomerRoutes({ location }: { location: Location }) {
           path="/orders/:orderId"
           element={<OrderStatus location={location} customer={customer} />}
         />
-        <Route path="/history" element={<History customer={customer} />} />
+        <Route path="/history" element={<History location={location} customer={customer} />} />
       </Routes>
     </>
   );

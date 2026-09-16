@@ -10,7 +10,7 @@
     "migrate": "node-pg-migrate up --migrations-dir migrations --migration-file-language js",
     "seed:identity": "tsx src/modules/identity/seed.ts",
     "test": "vitest run && node ../../packages/config/scripts/verify-api-boundaries.mjs",
-    "test:integration": "pnpm migrate && vitest run --no-file-parallelism src/modules/identity/identity.integration.test.ts src/modules/menu/menu.integration.test.ts",
+    "test:integration": "pnpm migrate && DATABASE_URL=\"${DATABASE_URL:?DATABASE_URL is required}\" pnpm test",
     "typecheck": "tsc -b --pretty false"
   },
   "dependencies": {

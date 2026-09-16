@@ -9,6 +9,22 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: restaurant_suite
+          POSTGRES_USER: restaurant_suite
+          POSTGRES_PASSWORD: ci-only-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U restaurant_suite -d restaurant_suite"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://restaurant_suite:ci-only-password@localhost:5432/restaurant_suite
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -21,6 +37,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm typecheck
+      - run: pnpm --filter @restaurant-suite/api migrate
       - run: pnpm test
       - run: pnpm contracts:check
       - run: docker compose -f infra/compose/docker-compose.yml config

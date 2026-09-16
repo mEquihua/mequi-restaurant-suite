@@ -24,10 +24,12 @@ describeIntegration('realtime WebSocket gateway', () => {
   let locationB = '';
   let sessionA = '';
   let sessionB = '';
+  let guestSession = '';
+  let guestVisit = '';
   let redis: Redis;
   beforeAll(async () => {
     // Standard suite global cleanup at the start
-    for (const table of ['cash_drawer_movements', 'cash_drawer_sessions', 'module_activations', 'command_idempotency', 'audit_events', 'account_discounts', 'outbox_events', 'refunds', 'cancellations_and_voids', 'payments', 'order_line_modifiers', 'order_lines', 'orders', 'accounts', 'visits', 'table_sections', 'sections', 'tables', 'areas', 'availability_rules', 'location_price_overrides', 'product_combo_items', 'product_combo_groups', 'product_modifier_groups', 'modifiers', 'modifier_groups', 'product_variants', 'products', 'categories', 'terminal_pin_attempts', 'staff_sessions', 'staff_roles', 'role_permissions', 'terminals', 'staff', 'roles', 'locations', 'organizations'] as const) {
+    for (const table of ['table_service_requests', 'guest_sessions', 'cash_drawer_movements', 'cash_drawer_sessions', 'module_activations', 'command_idempotency', 'audit_events', 'account_discounts', 'outbox_events', 'refunds', 'cancellations_and_voids', 'payments', 'order_line_modifiers', 'order_lines', 'orders', 'accounts', 'visits', 'table_sections', 'sections', 'tables', 'areas', 'availability_rules', 'location_price_overrides', 'product_combo_items', 'product_combo_groups', 'product_modifier_groups', 'modifiers', 'modifier_groups', 'product_variants', 'products', 'categories', 'terminal_pin_attempts', 'staff_sessions', 'staff_roles', 'role_permissions', 'terminals', 'staff', 'roles', 'locations', 'organizations'] as const) {
       await db.deleteFrom(table).execute();
     }
 
@@ -44,6 +46,13 @@ describeIntegration('realtime WebSocket gateway', () => {
       .values({ organization_id: org.id, name: 'Location B' })
       .returning('id').executeTakeFirstOrThrow();
     locationB = locB.id;
+
+    const area = await db.insertInto('areas').values({ location_id: locationA, name: 'Dining' }).returning('id').executeTakeFirstOrThrow();
+    const table = await db.insertInto('tables').values({ location_id: locationA, area_id: area.id, name: 'A1', max_capacity: 4, status: 'OCCUPIED' }).returning('id').executeTakeFirstOrThrow();
+    const visit = await db.insertInto('visits').values({ location_id: locationA, table_id: table.id }).returning('id').executeTakeFirstOrThrow();
+    guestVisit = visit.id;
+    guestSession = `guest.${locationA}.${'g'.repeat(32)}`;
+    await db.insertInto('guest_sessions').values({ location_id: locationA, visit_id: visit.id, table_id: table.id, token_hash: hashSecret(guestSession), expires_at: new Date(Date.now() + 60 * 60 * 1000) }).execute();
 
     // Create staff
     const staffId = await db.insertInto('staff')
@@ -94,6 +103,8 @@ describeIntegration('realtime WebSocket gateway', () => {
 
   afterAll(async () => {
     if (redis) await redis.quit();
+    await db.deleteFrom('table_service_requests').execute();
+    await db.deleteFrom('guest_sessions').execute();
     await app.close();
     await db.destroy();
   });
@@ -139,6 +150,20 @@ describeIntegration('realtime WebSocket gateway', () => {
       ws.on('unexpected-response', (_req, res) => reject(new Error(`Unexpected response: ${res.statusCode}`)));
       ws.on('error', reject);
     });
+  });
+
+  it('accepts a guest subprotocol token and forwards only events for that guest visit', async () => {
+    const address = app.server.address() as AddressInfo;
+    const ws = new WebSocket(`ws://127.0.0.1:${address.port}/api/v1/realtime`, ['Bearer', guestSession]);
+    await new Promise<void>((resolve, reject) => { ws.on('open', resolve); ws.on('error', reject); });
+    const messages: Array<{ id: string }> = [];
+    ws.on('message', (data: RawData) => messages.push(JSON.parse(data.toString())));
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    await redis.publish(`location:${locationA}:events`, JSON.stringify({ id: 'guest-own', payload: { visit_id: guestVisit } }));
+    await redis.publish(`location:${locationA}:events`, JSON.stringify({ id: 'guest-other', payload: { visit_id: crypto.randomUUID() } }));
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(messages.map((message) => message.id)).toEqual(['guest-own']);
+    ws.close();
   });
 
   it('receives messages for its location and isolates cross-location events', async () => {

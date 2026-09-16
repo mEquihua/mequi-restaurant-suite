@@ -7,6 +7,7 @@ import {
   requirePermission,
   withAuthenticatedSession,
 } from '../identity/index.js';
+import { addOrderLines } from './commands.js';
 import {
   resolveAvailability as rawResolveAvailability,
   type AvailabilityRuleInput,
@@ -22,7 +23,6 @@ import {
   canTransitionLineStatus,
   computeDiscountAmount,
   lineAmount,
-  resolveLinePrice,
   splitEqually,
   type LineStatus,
 } from './state.js';
@@ -212,18 +212,20 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
     requireLocation(actor, locationId);
     return locationId;
   };
-  const outbox = (actor: Actor, aggregateId: string, eventType: string, payload: unknown) =>
-    actor.trx
+  const outbox = async (actor: Actor, aggregateId: string, eventType: string, payload: unknown) => {
+    const line = await actor.trx.selectFrom('order_lines as ol').innerJoin('orders as o', 'o.id', 'ol.order_id').select('o.visit_id').where('ol.id', '=', aggregateId).executeTakeFirst();
+    return actor.trx
       .insertInto('outbox_events')
       .values({
         location_id: actor.locationId,
         aggregate_type: 'order_line',
         aggregate_id: aggregateId,
         event_type: eventType,
-        payload: payload as never,
+        payload: { ...(payload as Record<string, unknown>), ...(line ? { visit_id: line.visit_id } : {}) } as never,
         schema_version: 1,
       })
       .execute();
+  };
   const audit = (
     actor: Actor,
     request: FastifyRequest,
@@ -663,125 +665,16 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
         requirePermission(actor, 'orders.lines.add');
         scoped(request, actor);
         const orderId = (request.params as { orderId: string }).orderId;
-        const order = await findOrder(actor.trx, actor.locationId, orderId);
-        if (!order) throw new IdentityHttpError(404, 'NOT_FOUND', 'Order was not found.');
         const v = expected(request.headers['if-match']);
-        if (v !== order.version) throw conflict(order, order);
-        if (!['DRAFT', 'HELD', 'SENT'].includes(order.status))
-          throw new IdentityHttpError(
-            409,
-            'ORDER_NOT_MUTABLE',
-            'Lines cannot be added to this order.',
-          );
         const lines = (request.body as { lines: LineBody[] }).lines;
-        const created = [];
-        for (const input of lines) {
-          const account = await findAccount(actor.trx, actor.locationId, input.account_id);
-          if (!account || account.visit_id !== order.visit_id)
-            throw new IdentityHttpError(
-              400,
-              'INVALID_ACCOUNT_FOR_VISIT',
-              'account_id must belong to the same visit as the order.',
-            );
-          if (account.status !== 'OPEN' && account.status !== 'PARTIALLY_PAID')
-            throw new IdentityHttpError(409, 'ACCOUNT_NOT_OPEN', 'Lines require an open account.');
-          const product = await actor.trx
-            .selectFrom('products')
-            .selectAll()
-            .where('id', '=', input.product_id)
-            .where('organization_id', '=', actor.organizationId)
-            .where('is_active', '=', true)
-            .executeTakeFirst();
-          if (!product)
-            throw new IdentityHttpError(400, 'INVALID_PRODUCT', 'Product is unavailable.');
-          const override = await actor.trx
-            .selectFrom('location_price_overrides')
-            .select('override_price')
-            .where('location_id', '=', actor.locationId)
-            .where('product_id', '=', product.id)
-            .executeTakeFirst();
-          let variantAdjustment = 0;
-          if (input.variant_id) {
-            const variant = await actor.trx
-              .selectFrom('product_variants')
-              .selectAll()
-              .where('id', '=', input.variant_id)
-              .where('product_id', '=', product.id)
-              .executeTakeFirst();
-            if (!variant)
-              throw new IdentityHttpError(
-                400,
-                'INVALID_VARIANT',
-                'Variant does not belong to product.',
-              );
-            variantAdjustment = variant.price_adjustment;
-          }
-          const modifierIds = input.modifier_ids ?? [];
-          const modifiers = modifierIds.length
-            ? await actor.trx
-                .selectFrom('modifiers as m')
-                .innerJoin(
-                  'product_modifier_groups as pmg',
-                  'pmg.modifier_group_id',
-                  'm.modifier_group_id',
-                )
-                .select(['m.id', 'm.price_adjustment', 'm.is_active'])
-                .where('pmg.product_id', '=', product.id)
-                .where('m.id', 'in', modifierIds)
-                .execute()
-            : [];
-          if (modifiers.length !== modifierIds.length || modifiers.some((m) => !m.is_active))
-            throw new IdentityHttpError(
-              400,
-              'INVALID_MODIFIER',
-              'Modifier is not available for this product.',
-            );
-          const unit = resolveLinePrice({
-            basePrice: product.base_price,
-            overridePrice: override?.override_price,
-            variantAdjustment,
-            modifierAdjustments: modifiers.map((m) => m.price_adjustment),
-            quantity: input.quantity,
-          });
-          const line = await actor.trx
-            .insertInto('order_lines')
-            .values({
-              location_id: actor.locationId,
-              order_id: orderId,
-              account_id: account.id,
-              product_id: product.id,
-              variant_id: input.variant_id ?? null,
-              seat_number: input.seat_number ?? null,
-              course_name: input.course_name?.trim() ?? null,
-              quantity: input.quantity,
-              unit_price: unit,
-            })
-            .returningAll()
-            .executeTakeFirstOrThrow();
-          if (modifiers.length)
-            await actor.trx
-              .insertInto('order_line_modifiers')
-              .values(
-                modifiers.map((m) => ({
-                  location_id: actor.locationId,
-                  order_line_id: line.id,
-                  modifier_id: m.id,
-                  unit_price: m.price_adjustment,
-                })),
-              )
-              .execute();
-          await updateAccountTotal(actor, account.id, lineAmount(line));
-          created.push(line);
-        }
-        const updated = await actor.trx
-          .updateTable('orders')
-          .set({ version: sql<number>`version + 1` })
-          .where('id', '=', orderId)
-          .where('version', '=', v)
-          .returningAll()
-          .executeTakeFirst();
-        if (!updated) throw conflict(order, order);
-        return reply.status(201).send({ order: updated, lines: created });
+        const result = await addOrderLines(actor.trx, {
+          locationId: actor.locationId,
+          organizationId: actor.organizationId,
+          orderId,
+          expectedVersion: v,
+          lines,
+        });
+        return reply.status(201).send(result);
       }),
   );
   app.post(
@@ -1705,6 +1598,8 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
           .returningAll()
           .executeTakeFirst();
         if (!updated) throw conflict(visit, visit);
+
+        await actor.trx.updateTable('guest_sessions').set({ revoked_at: now() }).where('visit_id', '=', visitId).where('revoked_at', 'is', null).execute();
 
         if (updated.table_id) {
           const table = await actor.trx

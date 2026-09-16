@@ -4,6 +4,7 @@ export const ordersModule: FastifyPluginAsync<OrdersRouteOptions> = async (app, 
   await app.register(ordersRoute, options);
 };
 export type { OrdersRouteOptions } from './route.js';
+export { addOrderLines, type GuestLineInput } from './commands.js';
 export {
   canTransitionLineStatus,
   lineStatuses,

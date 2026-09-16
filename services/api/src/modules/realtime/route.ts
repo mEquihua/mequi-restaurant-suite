@@ -1,12 +1,14 @@
 import type { FastifyPluginAsync } from 'fastify';
 import fastifyWebsocket from '@fastify/websocket';
 import { withAuthenticatedSession } from '../identity/index.js';
+import { withGuestSession } from '../guest-sessions/index.js';
 import { Redis } from 'ioredis';
 import type { WebSocket } from 'ws';
 
 // We use a shared redis subscriber per API instance to avoid one connection per websocket client.
 let redisSubscriber: Redis | null = null;
-const clientMap = new Map<string, Set<WebSocket>>(); // locationId -> Set of websocket connections
+type RealtimeClient = { socket: WebSocket; visitId?: string };
+const clientMap = new Map<string, Set<RealtimeClient>>(); // locationId -> scoped connections
 
 // Browsers cannot set custom headers (e.g. Authorization) on a WebSocket
 // handshake request, so browser clients pass the session token as a
@@ -44,8 +46,16 @@ export const realtimeRoute: FastifyPluginAsync = async (app) => {
 
     const clients = clientMap.get(locationId);
     if (clients) {
-      for (const socket of clients) {
-        socket.send(message);
+      let visitId: string | undefined;
+      try {
+        const payload = JSON.parse(message) as { payload?: { visit_id?: string } };
+        visitId = payload.payload?.visit_id;
+      } catch { return; }
+      for (const client of clients) {
+        // A guest receives only events explicitly bound to its visit. Events with no visit
+        // identifier intentionally fail closed instead of leaking a location-wide update.
+        if (client.visitId && visitId !== client.visitId) continue;
+        client.socket.send(message);
       }
     }
   });
@@ -69,21 +79,26 @@ export const realtimeRoute: FastifyPluginAsync = async (app) => {
     // Authenticate the session
     // We execute withAuthenticatedSession just to get the session info and then return immediately
     // so we don't hold open the database transaction for the duration of the websocket connection.
-    withAuthenticatedSession(app, req, new Date(), 24 * 60 * 60 * 1000, async (session) => {
-      return session.locationId;
-    }).then(locationId => {
+    const token = req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.slice(7) : undefined;
+    const auth = token?.startsWith('guest.')
+      ? withGuestSession(app, req, new Date(), async (session) => ({ locationId: session.locationId, visitId: session.visitId }))
+      : withAuthenticatedSession(app, req, new Date(), 24 * 60 * 60 * 1000, async (session) => ({ locationId: session.locationId }));
+    auth.then((authenticated) => {
+      const { locationId } = authenticated;
+      const visitId = 'visitId' in authenticated && typeof authenticated.visitId === 'string' ? authenticated.visitId : undefined;
       // Add client to the map for this location
       let clients = clientMap.get(locationId);
       if (!clients) {
         clients = new Set();
         clientMap.set(locationId, clients);
       }
-      clients.add(connection);
+      const client = { socket: connection, visitId };
+      clients.add(client);
 
       connection.on('close', () => {
         const set = clientMap.get(locationId);
         if (set) {
-          set.delete(connection);
+          set.delete(client);
           if (set.size === 0) {
             clientMap.delete(locationId);
           }

@@ -17,41 +17,41 @@ services:
         condition: service_started
 
   web:
-    image: nginx:1.27-alpine
-    volumes:
-      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
-      - ../../apps/admin/dist:/usr/share/nginx/html/admin:ro
-      - ../../apps/staff/dist:/usr/share/nginx/html/staff:ro
-      - ../../apps/kitchen/dist:/usr/share/nginx/html/kitchen:ro
-      - ../../apps/self-service/dist:/usr/share/nginx/html/self-service:ro
-      - ../../apps/customer/dist:/usr/share/nginx/html/customer:ro
+    # Single-host installs build these immutable local images; CI can tag and publish the same Dockerfiles.
+    build:
+      context: ../..
+      dockerfile: apps/Dockerfile
+    image: restaurant-suite-web:local
     networks: [restaurant-internal]
 
   api:
-    image: node:22-alpine
-    working_dir: /workspace
-    command: node services/api/dist/server.js
+    build:
+      context: ../..
+      dockerfile: services/api/Dockerfile
+    image: restaurant-suite-api:local
     environment:
       NODE_ENV: production
       PORT: '3000'
       LOG_LEVEL: ${API_LOG_LEVEL:-info}
-    volumes:
-      - ../..:/workspace:ro
     networks: [restaurant-internal]
     depends_on:
       postgres:
         condition: service_started
       valkey:
         condition: service_started
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -q -O /dev/null http://127.0.0.1:3000/healthz']
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   worker:
-    image: node:22-alpine
-    working_dir: /workspace
-    command: node services/worker/dist/index.js
+    build:
+      context: ../..
+      dockerfile: services/worker/Dockerfile
+    image: restaurant-suite-worker:local
     environment:
       NODE_ENV: production
-    volumes:
-      - ../..:/workspace:ro
     networks: [restaurant-internal]
     depends_on:
       postgres:

@@ -46,12 +46,11 @@ export function POSMode({ locationId }: { locationId: string }) {
       visitVersion++;
       let orderVersion = order.version;
 
-      // 3. Create Account
-      const accountRes = await apiFetch<{ account: Account }>(`/api/v1/locations/${locationId}/visits/${visit.id}/accounts`, {
+      // 3. Create Account (does not touch the visit's own version, unlike
+      // order creation above, so visitVersion is not incremented again here)
+      const account = await apiFetch<Account>(`/api/v1/locations/${locationId}/visits/${visit.id}/accounts`, {
         method: 'POST', headers: { 'If-Match': `"${visitVersion}"` }, body: JSON.stringify({})
       });
-      const account = accountRes.account; // The API returns { account, discount }
-      visitVersion++;
       const accountVersion = account.version;
 
       // 4. Add lines
@@ -74,7 +73,7 @@ export function POSMode({ locationId }: { locationId: string }) {
       const currentAccount = await apiFetch<Account>(`/api/v1/locations/${locationId}/accounts/${account.id}`);
       await apiFetch<unknown>(`/api/v1/locations/${locationId}/accounts/${account.id}/payments`, {
         method: 'POST', headers: { 'If-Match': `"${accountVersion}"`, 'Idempotency-Key': crypto.randomUUID() },
-        body: JSON.stringify({ amount: currentAccount.total, tender_type: 'CASH' })
+        body: JSON.stringify({ amount: currentAccount.total, method: 'CASH' })
       });
 
       // 7. Close Visit

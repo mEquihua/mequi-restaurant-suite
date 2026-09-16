@@ -270,4 +270,50 @@ describeIntegration('identity API against PostgreSQL', () => {
       false,
     );
   });
+
+  it('creates a custom role', async () => {
+    const noAuth = await app.inject({
+      method: 'POST',
+      url: '/api/v1/roles',
+      payload: { name: 'Manager' },
+    });
+    expect(noAuth.statusCode).toBe(401);
+
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/v1/roles',
+      headers: { authorization: `Bearer ${ownerSession}` },
+      payload: { name: 'Manager', description: 'Store manager' },
+    });
+    expect(created.statusCode).toBe(201);
+    expect(created.json().name).toBe('Manager');
+    expect(created.json().is_system_template).toBe(false);
+    expect(created.json().permissions).toEqual([]);
+  });
+
+  it('reassigns staff roles', async () => {
+    const role = await app.inject({
+      method: 'POST',
+      url: '/api/v1/roles',
+      headers: { authorization: `Bearer ${ownerSession}` },
+      payload: { name: 'Cashier' },
+    });
+    const roleId = role.json().id;
+
+    const invalidRole = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/staff/${ownerId}`,
+      headers: { authorization: `Bearer ${ownerSession}`, 'if-match': '1' },
+      payload: { role_ids: [crypto.randomUUID()] },
+    });
+    expect(invalidRole.statusCode).toBe(400);
+
+    const reassigned = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/staff/${ownerId}`,
+      headers: { authorization: `Bearer ${ownerSession}`, 'if-match': '1' },
+      payload: { role_ids: [roleId] },
+    });
+    expect(reassigned.statusCode).toBe(200);
+  });
 });

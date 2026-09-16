@@ -232,8 +232,8 @@ export const identityRoute: FastifyPluginAsync<IdentityRouteOptions> = async (ap
     });
   });
 
-  app.put('/api/v1/staff/:id', { schema: { params: { type: 'object', additionalProperties: false, required: ['id'], properties: { id: uuidSchema } }, headers: { type: 'object', additionalProperties: true, required: ['if-match'], properties: { 'if-match': { type: 'string', pattern: '^"?[1-9][0-9]*"?$' } } }, body: { type: 'object', additionalProperties: false, minProperties: 1, properties: { first_name: { type: 'string', minLength: 1 }, last_name: { type: 'string', minLength: 1 }, active: { type: 'boolean' }, pin: { type: 'string', pattern: '^\\d{4,12}$' } } } } }, async (request, reply) => {
-    const body = request.body as UpdateStaffBody;
+  app.put('/api/v1/staff/:id', { schema: { params: { type: 'object', additionalProperties: false, required: ['id'], properties: { id: uuidSchema } }, headers: { type: 'object', additionalProperties: true, required: ['if-match'], properties: { 'if-match': { type: 'string', pattern: '^"?[1-9][0-9]*"?$' } } }, body: { type: 'object', additionalProperties: false, minProperties: 1, properties: { first_name: { type: 'string', minLength: 1 }, last_name: { type: 'string', minLength: 1 }, active: { type: 'boolean' }, pin: { type: 'string', pattern: '^\\d{4,12}$' }, role_ids: { type: 'array', minItems: 1, items: uuidSchema } } } } }, async (request, reply) => {
+    const body = request.body as UpdateStaffBody & { role_ids?: string[] };
     const params = request.params as { id: string };
     const expectedVersion = parseIfMatch(request.headers['if-match']);
     return withSession(request, async (actor) => {
@@ -248,7 +248,12 @@ export const identityRoute: FastifyPluginAsync<IdentityRouteOptions> = async (ap
         if (!/^\d{4,12}$/.test(body.pin)) throw new IdentityHttpError(400, 'VALIDATION_ERROR', 'PIN must contain 4-12 digits.');
         patch.pin_hash = await hashPin(body.pin);
       }
-      if (Object.keys(patch).length === 1) throw new IdentityHttpError(400, 'VALIDATION_ERROR', 'At least one mutable staff field is required.');
+      if (body.role_ids !== undefined) {
+        if (!Array.isArray(body.role_ids) || body.role_ids.length === 0) throw new IdentityHttpError(400, 'VALIDATION_ERROR', 'role_ids must be a non-empty array.');
+        const roles = await actor.trx.selectFrom('roles').select('id').where('organization_id', '=', actor.organizationId).where('id', 'in', body.role_ids).execute();
+        if (roles.length !== new Set(body.role_ids).size) throw new IdentityHttpError(400, 'INVALID_ROLE', 'One or more roles do not belong to this organization.');
+      }
+      if (Object.keys(patch).length === 1 && body.role_ids === undefined) throw new IdentityHttpError(400, 'VALIDATION_ERROR', 'At least one mutable staff field or role_ids is required.');
       const updated = await actor.trx
         .updateTable('staff')
         .set(patch)
@@ -268,6 +273,10 @@ export const identityRoute: FastifyPluginAsync<IdentityRouteOptions> = async (ap
           .executeTakeFirst();
         if (!current) throw new IdentityHttpError(404, 'NOT_FOUND', 'Staff member was not found in this location scope.');
         throw new IdentityHttpError(409, 'OPTIMISTIC_CONCURRENCY_CONFLICT', 'The resource has been modified since it was last read. Please refresh and try again.', { current_version: current.version, current_state: publicStaff(current) });
+      }
+      if (body.role_ids !== undefined) {
+        await actor.trx.deleteFrom('staff_roles').where('staff_id', '=', params.id).where('location_id', '=', actor.locationId).execute();
+        await actor.trx.insertInto('staff_roles').values(body.role_ids.map((roleId) => ({ staff_id: params.id, role_id: roleId, location_id: actor.locationId }))).execute();
       }
       return reply.send(publicStaff(updated));
     });
@@ -292,6 +301,15 @@ export const identityRoute: FastifyPluginAsync<IdentityRouteOptions> = async (ap
       return { data: [...roles.values()] };
     }),
   );
+
+  app.post('/api/v1/roles', { schema: { body: { type: 'object', additionalProperties: false, required: ['name'], properties: { name: { type: 'string', minLength: 1 }, description: { type: ['string', 'null'] } } } } }, async (request, reply) => {
+    const body = request.body as { name: string; description?: string | null };
+    return withSession(request, async (actor) => {
+      requirePermission(actor, 'iam.roles.update');
+      const role = await actor.trx.insertInto('roles').values({ organization_id: actor.organizationId, name: body.name.trim(), description: body.description?.trim() || null, is_system_template: false }).returningAll().executeTakeFirstOrThrow();
+      return reply.status(201).send({ id: role.id, name: role.name, description: role.description, is_system_template: role.is_system_template, permissions: [] });
+    });
+  });
 
   app.put('/api/v1/roles/:id/permissions', { schema: { params: { type: 'object', additionalProperties: false, required: ['id'], properties: { id: uuidSchema } }, body: { type: 'object', additionalProperties: false, required: ['permissions'], properties: { permissions: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['permission_name', 'scope'], properties: { permission_name: { type: 'string', pattern: '^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$' }, scope: { type: 'string', enum: ['organization', 'location'] } } } } } } } }, async (request) => {
     const body = request.body as UpdatePermissionsBody;

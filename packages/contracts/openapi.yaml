@@ -195,6 +195,25 @@ paths:
           }
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
+    post:
+      operationId: createRole
+      x-required-permission: iam.roles.update
+      security: [{ staffSession: [] }]
+      requestBody:
+        {
+          required: true,
+          content:
+            { application/json: { schema: { $ref: '#/components/schemas/CreateRoleRequest' } } },
+        }
+      responses:
+        '201':
+          {
+            description: Role created,
+            content: { application/json: { schema: { $ref: '#/components/schemas/Role' } } },
+          }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
   /api/v1/roles/{id}/permissions:
     put:
       operationId: replaceRolePermissions
@@ -261,6 +280,38 @@ paths:
         '400': { $ref: '#/components/responses/Error' }
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
+  /api/v1/categories/{id}:
+    put:
+      operationId: updateCategory
+      x-required-permission: menu.products.write
+      security: [{ staffSession: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }
+        - {
+            name: If-Match,
+            in: header,
+            required: true,
+            description: Current category version,
+            schema: { type: string, pattern: '^"?[1-9][0-9]*"?$' },
+          }
+      requestBody:
+        {
+          required: true,
+          content:
+            { application/json: { schema: { $ref: '#/components/schemas/UpdateCategoryRequest' } } },
+        }
+      responses:
+        '200':
+          {
+            description: Updated category,
+            content: { application/json: { schema: { $ref: '#/components/schemas/Category' } } },
+          }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '428': { $ref: '#/components/responses/Error' }
   /api/v1/products:
     get:
       operationId: listProducts
@@ -602,6 +653,23 @@ paths:
         - { name: If-Match, in: header, required: true, description: Availability-rule version; use 0 to create a scoped rule, schema: { type: string, pattern: '^"?[0-9]+"?$' } }
       requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/MarkAvailableRequest' } } } }
       responses: { '200': { description: Explicit availability operation recorded, content: { application/json: { schema: { $ref: '#/components/schemas/AvailabilityRule' } } } }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' }, '409': { $ref: '#/components/responses/Error' } }
+  /api/v1/locations/{locationId}/products/{productId}/availability-rules:
+    get:
+      operationId: listAvailabilityRules
+      x-required-permission: menu.catalog.read
+      security: [{ staffSession: [] }]
+      parameters:
+        - { name: locationId, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }
+        - { name: productId, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }
+      responses:
+        '200':
+          {
+            description: Availability rules for the product at the location,
+            content: { application/json: { schema: { $ref: '#/components/schemas/AvailabilityRuleListResponse' } } },
+          }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
   /api/v1/module-definitions:
     get:
       operationId: listModuleDefinitions
@@ -1832,16 +1900,18 @@ components:
     Staff: { type: object, additionalProperties: false, required: [id, first_name, last_name, active, version], properties: { id: { $ref: '#/components/schemas/Uuid' }, first_name: { type: string }, last_name: { type: string }, active: { type: boolean }, version: { type: integer, minimum: 1 } } }
     StaffListResponse: { type: object, additionalProperties: false, required: [data], properties: { data: { type: array, items: { $ref: '#/components/schemas/Staff' } } } }
     CreateStaffRequest: { type: object, additionalProperties: false, required: [first_name, last_name, pin, role_ids], properties: { first_name: { type: string, minLength: 1 }, last_name: { type: string, minLength: 1 }, pin: { type: string, pattern: '^\\d{4,12}$', writeOnly: true }, role_ids: { type: array, minItems: 1, items: { $ref: '#/components/schemas/Uuid' } } } }
-    UpdateStaffRequest: { type: object, additionalProperties: false, minProperties: 1, properties: { first_name: { type: string, minLength: 1 }, last_name: { type: string, minLength: 1 }, active: { type: boolean }, pin: { type: string, pattern: '^\\d{4,12}$', writeOnly: true } } }
+    UpdateStaffRequest: { type: object, additionalProperties: false, minProperties: 1, properties: { first_name: { type: string, minLength: 1 }, last_name: { type: string, minLength: 1 }, active: { type: boolean }, pin: { type: string, pattern: '^\\d{4,12}$', writeOnly: true }, role_ids: { type: array, minItems: 1, items: { $ref: '#/components/schemas/Uuid' } } } }
     PermissionGrant: { type: object, additionalProperties: false, required: [permission_name, scope], properties: { permission_name: { type: string, pattern: '^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$' }, scope: { type: string, enum: [organization, location] } } }
     Role: { type: object, additionalProperties: false, required: [id, name, description, is_system_template, permissions], properties: { id: { $ref: '#/components/schemas/Uuid' }, name: { type: string }, description: { type: [string, 'null'] }, is_system_template: { type: boolean }, permissions: { type: array, items: { $ref: '#/components/schemas/PermissionGrant' } } } }
     RoleListResponse: { type: object, additionalProperties: false, required: [data], properties: { data: { type: array, items: { $ref: '#/components/schemas/Role' } } } }
+    CreateRoleRequest: { type: object, additionalProperties: false, required: [name], properties: { name: { type: string, minLength: 1 }, description: { type: [string, 'null'] } } }
     ReplaceRolePermissionsRequest: { type: object, additionalProperties: false, required: [permissions], properties: { permissions: { type: array, items: { $ref: '#/components/schemas/PermissionGrant' } } } }
     RolePermissionsResponse: { type: object, additionalProperties: false, required: [id, permissions], properties: { id: { $ref: '#/components/schemas/Uuid' }, permissions: { type: array, items: { $ref: '#/components/schemas/PermissionGrant' } } } }
     MeResponse: { type: object, additionalProperties: false, required: [staff, location_id, terminal_id, roles, permissions], properties: { staff: { $ref: '#/components/schemas/Staff' }, location_id: { $ref: '#/components/schemas/Uuid' }, terminal_id: { $ref: '#/components/schemas/Uuid' }, roles: { type: array, items: { type: object, additionalProperties: false, required: [id, name, description], properties: { id: { $ref: '#/components/schemas/Uuid' }, name: { type: string }, description: { type: [string, 'null'] } } } }, permissions: { type: array, items: { type: string } } } }
     Category: { type: object, additionalProperties: false, required: [id, name, description, display_order, is_active], properties: { id: { $ref: '#/components/schemas/Uuid' }, name: { type: string }, description: { type: [string, 'null'] }, display_order: { type: integer }, is_active: { type: boolean } } }
     CategoryListResponse: { type: object, additionalProperties: false, required: [data], properties: { data: { type: array, items: { $ref: '#/components/schemas/Category' } } } }
     CreateCategoryRequest: { type: object, additionalProperties: false, required: [name], properties: { name: { type: string, minLength: 1, maxLength: 160 }, description: { type: [string, 'null'] }, display_order: { type: integer }, is_active: { type: boolean } } }
+    UpdateCategoryRequest: { type: object, additionalProperties: false, minProperties: 1, properties: { name: { type: string, minLength: 1, maxLength: 160 }, description: { type: [string, 'null'] }, display_order: { type: integer }, is_active: { type: boolean } } }
     Variant: { type: object, additionalProperties: false, required: [id, name, price, price_adjustment, display_order], properties: { id: { $ref: '#/components/schemas/Uuid' }, name: { type: string }, price: { type: integer, description: Server-computed effective price in cents. }, price_adjustment: { type: integer }, display_order: { type: integer } } }
     Modifier: { type: object, additionalProperties: false, required: [id, name, price_adjustment, display_order, is_active], properties: { id: { $ref: '#/components/schemas/Uuid' }, name: { type: string }, price_adjustment: { type: integer }, display_order: { type: integer }, is_active: { type: boolean } } }
     ModifierGroup: { type: object, additionalProperties: false, required: [id, name, min_selections, max_selections, is_active], properties: { id: { $ref: '#/components/schemas/Uuid' }, name: { type: string }, min_selections: { type: integer }, max_selections: { type: [integer, 'null'] }, is_active: { type: boolean } } }
@@ -1860,6 +1930,7 @@ components:
     LocationPriceOverride: { type: object, additionalProperties: false, required: [location_id, product_id, override_price, version], properties: { location_id: { $ref: '#/components/schemas/Uuid' }, product_id: { $ref: '#/components/schemas/Uuid' }, override_price: { type: integer }, version: { type: integer, minimum: 1 } } }
     PutPriceOverrideRequest: { type: object, additionalProperties: false, required: [override_price], properties: { override_price: { type: integer, minimum: 0 } } }
     AvailabilityRule: { type: object, additionalProperties: false, required: [id, location_id, product_id, status, channel_scope, service_type_scope, days_of_week, start_time, end_time, version], properties: { id: { $ref: '#/components/schemas/Uuid' }, location_id: { $ref: '#/components/schemas/Uuid' }, product_id: { $ref: '#/components/schemas/Uuid' }, status: { type: string, enum: [AVAILABLE, EXHAUSTED, HIDDEN, SCHEDULED] }, channel_scope: { type: [string, 'null'] }, service_type_scope: { type: [string, 'null'] }, days_of_week: { type: ['array', 'null'], items: { type: integer, minimum: 1, maximum: 7 } }, start_time: { type: [string, 'null'], format: date-time }, end_time: { type: [string, 'null'], format: date-time }, version: { type: integer, minimum: 1 } } }
+    AvailabilityRuleListResponse: { type: object, additionalProperties: false, required: [data], properties: { data: { type: array, items: { $ref: '#/components/schemas/AvailabilityRule' } } } }
     MarkUnavailableRequest: { type: object, additionalProperties: false, properties: { rule_id: { $ref: '#/components/schemas/Uuid' }, status: { type: string, enum: [EXHAUSTED, HIDDEN, SCHEDULED] }, channel_scope: { type: [string, 'null'] }, service_type_scope: { type: [string, 'null'] }, days_of_week: { type: ['array', 'null'], items: { type: integer, minimum: 1, maximum: 7 } }, start_time: { type: [string, 'null'], format: date-time }, end_time: { type: [string, 'null'], format: date-time } } }
     MarkAvailableRequest: { type: object, additionalProperties: false, properties: { rule_id: { $ref: '#/components/schemas/Uuid' }, channel_scope: { type: [string, 'null'] }, service_type_scope: { type: [string, 'null'] }, days_of_week: { type: ['array', 'null'], items: { type: integer, minimum: 1, maximum: 7 } }, start_time: { type: [string, 'null'], format: date-time }, end_time: { type: [string, 'null'], format: date-time } } }
     ModuleDefinition: { type: object, additionalProperties: false, required: [key, display_name, description, created_at, updated_at], properties: { key: { type: string }, display_name: { type: string }, description: { type: string }, created_at: { type: string, format: date-time }, updated_at: { type: string, format: date-time } } }

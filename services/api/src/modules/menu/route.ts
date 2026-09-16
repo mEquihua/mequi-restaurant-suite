@@ -117,6 +117,24 @@ export const menuRoute: FastifyPluginAsync<MenuRouteOptions> = async (app, optio
     return reply.status(201).send(publicCategory(category));
   }));
 
+  app.put('/api/v1/categories/:id', { schema: { params: { type: 'object', additionalProperties: false, required: ['id'], properties: { id: uuidSchema } }, headers: ifMatchHeader, body: { type: 'object', additionalProperties: false, minProperties: 1, properties: { name: { type: 'string', minLength: 1, maxLength: 160 }, description: nullableString, display_order: { type: 'integer' }, is_active: { type: 'boolean' } } } } }, async (request, reply) => withSession(request, async (actor) => {
+    requirePermission(actor, 'menu.products.write');
+    const body = request.body as { name?: string; description?: string | null; display_order?: number; is_active?: boolean };
+    const categoryId = (request.params as { id: string }).id;
+    const expectedVersion = parseIfMatch(request.headers['if-match']);
+    const patch: Record<string, unknown> & { version: RawBuilder<number> } = { version: sql<number>`version + 1` };
+    for (const field of ['name', 'description', 'display_order', 'is_active'] as const) {
+      if (body[field] !== undefined) patch[field] = field === 'name' ? String(body[field]).trim() : field === 'description' ? optionalText(body[field] as string | null) : body[field];
+    }
+    const updated = await actor.trx.updateTable('categories').set(patch as never).where('id', '=', categoryId).where('organization_id', '=', actor.organizationId).where('version', '=', expectedVersion).returningAll().executeTakeFirst();
+    if (!updated) {
+      const current = await actor.trx.selectFrom('categories').selectAll().where('id', '=', categoryId).where('organization_id', '=', actor.organizationId).executeTakeFirst();
+      if (!current) throw new IdentityHttpError(404, 'NOT_FOUND', 'Category was not found.');
+      throw new IdentityHttpError(409, 'OPTIMISTIC_CONCURRENCY_CONFLICT', 'The resource has been modified since it was last read. Please refresh and try again.', { current_version: current.version, current_state: publicCategory(current) });
+    }
+    return reply.send(publicCategory(updated));
+  }));
+
   app.get('/api/v1/products', { schema: { querystring: { type: 'object', additionalProperties: false, properties: { channel: { type: 'string' }, service_type: { type: 'string' }, at: { type: 'string', format: 'date-time' } } } } }, async (request) => withSession(request, async (actor) => {
     requirePermission(actor, 'menu.catalog.read');
     const query = request.query as { channel?: string; service_type?: string; at?: string };
@@ -248,4 +266,13 @@ export const menuRoute: FastifyPluginAsync<MenuRouteOptions> = async (app, optio
 
   app.post('/api/v1/locations/:locationId/products/:productId/mark-unavailable', { schema: { params: { type: 'object', additionalProperties: false, required: ['locationId', 'productId'], properties: { locationId: uuidSchema, productId: uuidSchema } }, headers: ifMatchHeader, body: { type: 'object', additionalProperties: false, properties: { rule_id: uuidSchema, status: { type: 'string', enum: availabilityStatus }, channel_scope: nullableString, service_type_scope: nullableString, days_of_week: { anyOf: [{ type: 'array', minItems: 1, items: { type: 'integer', minimum: 1, maximum: 7 } }, { type: 'null' }] }, start_time: { type: ['string', 'null'], format: 'date-time' }, end_time: { type: ['string', 'null'], format: 'date-time' } } } } }, async (request, reply) => changeAvailability(request, reply, 'EXHAUSTED'));
   app.post('/api/v1/locations/:locationId/products/:productId/mark-available', { schema: { params: { type: 'object', additionalProperties: false, required: ['locationId', 'productId'], properties: { locationId: uuidSchema, productId: uuidSchema } }, headers: ifMatchHeader, body: { type: 'object', additionalProperties: false, properties: { rule_id: uuidSchema, channel_scope: nullableString, service_type_scope: nullableString, days_of_week: { anyOf: [{ type: 'array', minItems: 1, items: { type: 'integer', minimum: 1, maximum: 7 } }, { type: 'null' }] }, start_time: { type: ['string', 'null'], format: 'date-time' }, end_time: { type: ['string', 'null'], format: 'date-time' } } } } }, async (request, reply) => changeAvailability(request, reply, 'AVAILABLE'));
+
+  app.get('/api/v1/locations/:locationId/products/:productId/availability-rules', { schema: { params: { type: 'object', additionalProperties: false, required: ['locationId', 'productId'], properties: { locationId: uuidSchema, productId: uuidSchema } } } }, async (request) => withSession(request, async (actor) => {
+    requirePermission(actor, 'menu.catalog.read');
+    const params = request.params as { locationId: string; productId: string };
+    await requireActorLocation(actor, params.locationId);
+    if (!await findOrganizationProduct(actor.trx, actor.organizationId, params.productId)) throw new IdentityHttpError(404, 'NOT_FOUND', 'Product was not found.');
+    const rules = await actor.trx.selectFrom('availability_rules').selectAll().where('location_id', '=', params.locationId).where('product_id', '=', params.productId).execute();
+    return { data: rules.map(publicAvailability) };
+  }));
 };

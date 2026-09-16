@@ -103,7 +103,7 @@ export const floorRoute: FastifyPluginAsync<FloorRouteOptions> = async (app, opt
     return { data: await actor.trx.selectFrom('sections').selectAll().where('location_id', '=', locationId).orderBy('name').execute() };
   }));
   app.post('/api/v1/locations/:locationId/sections', { schema: { params: { type: 'object', additionalProperties: false, required: ['locationId'], properties: { locationId: uuidSchema } }, body: { type: 'object', additionalProperties: false, required: ['name'], properties: { name: { type: 'string', minLength: 1, maxLength: 160 } } } } }, async (request, reply) => withSession(request, async (actor) => {
-    requirePermission(actor, 'floor.sections.assign'); const { locationId } = request.params as { locationId: string }; const body = request.body as { name: string }; await requireActorLocation(actor, locationId);
+    requirePermission(actor, 'floor.layout.write'); const { locationId } = request.params as { locationId: string }; const body = request.body as { name: string }; await requireActorLocation(actor, locationId);
     return reply.status(201).send(await actor.trx.insertInto('sections').values({ location_id: locationId, name: body.name.trim() }).returningAll().executeTakeFirstOrThrow());
   }));
   app.put('/api/v1/sections/:id/tables', { schema: { params: { type: 'object', additionalProperties: false, required: ['id'], properties: { id: uuidSchema } }, body: { type: 'object', additionalProperties: false, required: ['table_ids'], properties: { table_ids: { type: 'array', uniqueItems: true, items: uuidSchema } } } } }, async (request, reply) => withSession(request, async (actor) => {

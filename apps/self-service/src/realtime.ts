@@ -14,9 +14,20 @@ export function useGuestRealtime(locationId: string) {
     const connect = () => {
       if (!active) return;
       const token = getGuestToken();
-      socket.current = new WebSocket(`${BASE_URL.replace(/^http/, 'ws')}/api/v1/realtime`, token ? ['Bearer', token] : undefined);
-      socket.current.onopen = () => { if (active) { setConnected(true); backoff.current = 1000; client.invalidateQueries({ queryKey: ['guest-order', locationId] }); } };
-      socket.current.onmessage = () => { client.invalidateQueries({ queryKey: ['guest-order', locationId] }); };
+      socket.current = new WebSocket(
+        `${BASE_URL.replace(/^http/, 'ws')}/api/v1/realtime`,
+        token ? ['Bearer', token] : undefined,
+      );
+      socket.current.onopen = () => {
+        if (active) {
+          setConnected(true);
+          backoff.current = 1000;
+          client.invalidateQueries({ queryKey: ['guest-order', locationId] });
+        }
+      };
+      socket.current.onmessage = () => {
+        client.invalidateQueries({ queryKey: ['guest-order', locationId] });
+      };
       socket.current.onclose = () => {
         if (!active) return;
         setConnected(false);
@@ -26,7 +37,11 @@ export function useGuestRealtime(locationId: string) {
       };
     };
     connect();
-    return () => { active = false; if (timeout.current) clearTimeout(timeout.current); socket.current?.close(); };
+    return () => {
+      active = false;
+      if (timeout.current) clearTimeout(timeout.current);
+      socket.current?.close();
+    };
   }, [client, locationId]);
   return connected;
 }

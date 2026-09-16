@@ -1,75 +1,602 @@
-import { QueryClient, QueryClientProvider, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { BrowserRouter, Route, Routes, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import {
+  QueryClient,
+  QueryClientProvider,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
+import {
+  BrowserRouter,
+  Route,
+  Routes,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from 'react-router-dom';
 import { useMemo, useState } from 'react';
-import { ApiError, apiFetch, clearGuestToken, setGuestToken, type Category, type GuestAddLinesRequest, type GuestSessionMintResponse, type Product, type ServiceRequestType } from './api.js';
-import { bucketBoardOrders, canOfferOnlinePayment, requestBillIsPrimary, type PaymentMode } from './logic.js';
+import {
+  ApiError,
+  apiFetch,
+  clearGuestToken,
+  setGuestToken,
+  type Category,
+  type GuestAddLinesRequest,
+  type GuestSessionMintResponse,
+  type Product,
+  type ServiceRequestType,
+} from './api.js';
+import {
+  bucketBoardOrders,
+  canOfferOnlinePayment,
+  requestBillIsPrimary,
+  type PaymentMode,
+} from './logic.js';
 import { useGuestRealtime } from './realtime.js';
 
 const queryClient = new QueryClient();
-type GuestInfo = { visit_id: string; table: { id: string; name: string; status: string }; self_service: { enabled: boolean; guest_payment_mode: PaymentMode } };
+type GuestInfo = {
+  visit_id: string;
+  table: { id: string; name: string; status: string };
+  self_service: { enabled: boolean; guest_payment_mode: PaymentMode };
+};
 type OrderLine = { id: string; product_id: string; quantity: number; status: string };
-type GuestOrder = { order: { id: string; status: string; version: number; lines: OrderLine[] }; account: { subtotal: number; tax: number; discount: number; total: number; paid_amount: number; status: string } | null };
+type GuestOrder = {
+  order: { id: string; status: string; version: number; lines: OrderLine[] };
+  account: {
+    subtotal: number;
+    tax: number;
+    discount: number;
+    total: number;
+    paid_amount: number;
+    status: string;
+  } | null;
+};
 type BoardOrder = { order_id: string; status: string };
-const cents = (value: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value / 100);
+const cents = (value: number) =>
+  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value / 100);
 
 function ConnectionNotice({ stale, connected }: { stale: boolean; connected?: boolean }) {
   if (!stale && connected !== false) return null;
-  return <div className="connection-notice" role="status">{stale ? 'OFFLINE / STALE DATA — unable to refresh. Please try again.' : 'LIVE UPDATES DISCONNECTED — showing the last refreshed data.'}</div>;
+  return (
+    <div className="connection-notice" role="status">
+      {stale
+        ? 'OFFLINE / STALE DATA — unable to refresh. Please try again.'
+        : 'LIVE UPDATES DISCONNECTED — showing the last refreshed data.'}
+    </div>
+  );
 }
 
-function MintingScreen({ locationId, tableId, children }: { locationId: string; tableId: string; children: () => React.ReactNode }) {
-  const mint = useQuery({ queryKey: ['guest-session', locationId, tableId], queryFn: async () => { clearGuestToken(); const session = await apiFetch<GuestSessionMintResponse>(`/api/v1/locations/${locationId}/tables/${tableId}/guest-session`, { method: 'POST', body: '{}' }); setGuestToken(session.token); return session; }, retry: false });
-  if (mint.isPending) return <main className="centered"><h1>Connecting to your table…</h1></main>;
-  if (mint.isError) { const error = mint.error as ApiError; return <main className="centered"><h1>{error.code === 'TABLE_NOT_READY' ? 'Table not ready' : 'We could not start your table session'}</h1><p>{error.code === 'TABLE_NOT_READY' ? 'This table is being prepared or is unavailable. Please ask a team member for help.' : error.message}</p><button onClick={() => mint.refetch()}>Try again</button></main>; }
+function MintingScreen({
+  locationId,
+  tableId,
+  children,
+}: {
+  locationId: string;
+  tableId: string;
+  children: () => React.ReactNode;
+}) {
+  const mint = useQuery({
+    queryKey: ['guest-session', locationId, tableId],
+    queryFn: async () => {
+      clearGuestToken();
+      const session = await apiFetch<GuestSessionMintResponse>(
+        `/api/v1/locations/${locationId}/tables/${tableId}/guest-session`,
+        { method: 'POST', body: '{}' },
+      );
+      setGuestToken(session.token);
+      return session;
+    },
+    retry: false,
+  });
+  if (mint.isPending)
+    return (
+      <main className="centered">
+        <h1>Connecting to your table…</h1>
+      </main>
+    );
+  if (mint.isError) {
+    const error = mint.error as ApiError;
+    return (
+      <main className="centered">
+        <h1>
+          {error.code === 'TABLE_NOT_READY'
+            ? 'Table not ready'
+            : 'We could not start your table session'}
+        </h1>
+        <p>
+          {error.code === 'TABLE_NOT_READY'
+            ? 'This table is being prepared or is unavailable. Please ask a team member for help.'
+            : error.message}
+        </p>
+        <button onClick={() => mint.refetch()}>Try again</button>
+      </main>
+    );
+  }
   return <>{children()}</>;
 }
 
-function ProductPicker({ products, categories, onAdd }: { products: Product[]; categories: Category[]; onAdd: (line: GuestAddLinesRequest['lines'][number]) => void }) {
-  const [category, setCategory] = useState('all'); const [selected, setSelected] = useState<Product | null>(null);
-  const available = products.filter((product) => product.is_active && product.availability.available && (category === 'all' || product.category_id === category));
-  return <section><div className="category-tabs"><button className={category === 'all' ? 'active' : ''} onClick={() => setCategory('all')}>All</button>{categories.filter((item) => item.is_active).sort((a, b) => a.display_order - b.display_order).map((item) => <button className={category === item.id ? 'active' : ''} key={item.id} onClick={() => setCategory(item.id)}>{item.name}</button>)}</div><div className="product-grid">{available.map((product) => <button className="product-card" key={product.id} onClick={() => setSelected(product)}>{product.photo_url && <img src={product.photo_url} alt="" />}<strong>{product.name}</strong><span>{product.description}</span><b>{cents(product.price)}</b></button>)}</div>{selected && <ProductDialog product={selected} onClose={() => setSelected(null)} onAdd={(line) => { onAdd(line); setSelected(null); }} />}</section>;
+function ProductPicker({
+  products,
+  categories,
+  onAdd,
+}: {
+  products: Product[];
+  categories: Category[];
+  onAdd: (line: GuestAddLinesRequest['lines'][number]) => void;
+}) {
+  const [category, setCategory] = useState('all');
+  const [selected, setSelected] = useState<Product | null>(null);
+  const available = products.filter(
+    (product) =>
+      product.is_active &&
+      product.availability.available &&
+      (category === 'all' || product.category_id === category),
+  );
+  return (
+    <section>
+      <div className="category-tabs">
+        <button className={category === 'all' ? 'active' : ''} onClick={() => setCategory('all')}>
+          All
+        </button>
+        {categories
+          .filter((item) => item.is_active)
+          .sort((a, b) => a.display_order - b.display_order)
+          .map((item) => (
+            <button
+              className={category === item.id ? 'active' : ''}
+              key={item.id}
+              onClick={() => setCategory(item.id)}
+            >
+              {item.name}
+            </button>
+          ))}
+      </div>
+      <div className="product-grid">
+        {available.map((product) => (
+          <button className="product-card" key={product.id} onClick={() => setSelected(product)}>
+            {product.photo_url && <img src={product.photo_url} alt="" />}
+            <strong>{product.name}</strong>
+            <span>{product.description}</span>
+            <b>{cents(product.price)}</b>
+          </button>
+        ))}
+      </div>
+      {selected && (
+        <ProductDialog
+          product={selected}
+          onClose={() => setSelected(null)}
+          onAdd={(line) => {
+            onAdd(line);
+            setSelected(null);
+          }}
+        />
+      )}
+    </section>
+  );
 }
 
-function ProductDialog({ product, onClose, onAdd }: { product: Product; onClose: () => void; onAdd: (line: GuestAddLinesRequest['lines'][number]) => void }) {
-  const [variantId, setVariantId] = useState<string | undefined>(product.variants[0]?.id); const [modifierIds, setModifierIds] = useState<string[]>([]);
-  const toggle = (id: string) => setModifierIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
-  return <div className="dialog-backdrop"><section className="dialog" role="dialog" aria-modal="true" aria-labelledby="product-name"><button className="close" onClick={onClose} aria-label="Close">×</button><h2 id="product-name">{product.name}</h2><p>{product.description}</p>{product.variants.length > 0 && <fieldset><legend>Choose a size</legend>{product.variants.map((variant) => <label key={variant.id}><input type="radio" checked={variantId === variant.id} onChange={() => setVariantId(variant.id)} /> {variant.name} ({cents(variant.price)})</label>)}</fieldset>}{product.modifier_groups.filter((group) => group.is_active).map((group) => <fieldset key={group.id}><legend>{group.name}</legend>{group.modifiers.filter((modifier) => modifier.is_active).map((modifier) => <label key={modifier.id}><input type="checkbox" checked={modifierIds.includes(modifier.id)} onChange={() => toggle(modifier.id)} /> {modifier.name}{modifier.price_adjustment ? ` (+${cents(modifier.price_adjustment)})` : ''}</label>)}</fieldset>)}<button className="primary" onClick={() => onAdd({ product_id: product.id, variant_id: variantId, modifier_ids: modifierIds, quantity: 1 })}>Add to shared order</button></section></div>;
+function ProductDialog({
+  product,
+  onClose,
+  onAdd,
+}: {
+  product: Product;
+  onClose: () => void;
+  onAdd: (line: GuestAddLinesRequest['lines'][number]) => void;
+}) {
+  const [variantId, setVariantId] = useState<string | undefined>(product.variants[0]?.id);
+  const [modifierIds, setModifierIds] = useState<string[]>([]);
+  const toggle = (id: string) =>
+    setModifierIds((current) =>
+      current.includes(id) ? current.filter((item) => item !== id) : [...current, id],
+    );
+  return (
+    <div className="dialog-backdrop">
+      <section className="dialog" role="dialog" aria-modal="true" aria-labelledby="product-name">
+        <button className="close" onClick={onClose} aria-label="Close">
+          ×
+        </button>
+        <h2 id="product-name">{product.name}</h2>
+        <p>{product.description}</p>
+        {product.variants.length > 0 && (
+          <fieldset>
+            <legend>Choose a size</legend>
+            {product.variants.map((variant) => (
+              <label key={variant.id}>
+                <input
+                  type="radio"
+                  checked={variantId === variant.id}
+                  onChange={() => setVariantId(variant.id)}
+                />{' '}
+                {variant.name} ({cents(variant.price)})
+              </label>
+            ))}
+          </fieldset>
+        )}
+        {product.modifier_groups
+          .filter((group) => group.is_active)
+          .map((group) => (
+            <fieldset key={group.id}>
+              <legend>{group.name}</legend>
+              {group.modifiers
+                .filter((modifier) => modifier.is_active)
+                .map((modifier) => (
+                  <label key={modifier.id}>
+                    <input
+                      type="checkbox"
+                      checked={modifierIds.includes(modifier.id)}
+                      onChange={() => toggle(modifier.id)}
+                    />{' '}
+                    {modifier.name}
+                    {modifier.price_adjustment ? ` (+${cents(modifier.price_adjustment)})` : ''}
+                  </label>
+                ))}
+            </fieldset>
+          ))}
+        <button
+          className="primary"
+          onClick={() =>
+            onAdd({
+              product_id: product.id,
+              variant_id: variantId,
+              modifier_ids: modifierIds,
+              quantity: 1,
+            })
+          }
+        >
+          Add to shared order
+        </button>
+      </section>
+    </div>
+  );
 }
 
 function ServiceButtons({ locationId, billPrimary }: { locationId: string; billPrimary: boolean }) {
-  const [message, setMessage] = useState(''); const request = useMutation({ mutationFn: (request_type: ServiceRequestType) => apiFetch(`/api/v1/locations/${locationId}/guest-sessions/current/service-requests`, { method: 'POST', body: JSON.stringify({ request_type }) }), onSuccess: () => setMessage('Your request has been sent to the restaurant team.') });
-  const buttons: Array<[ServiceRequestType, string]> = [['CALL_WAITER', 'Call waiter'], ['REQUEST_BILL', 'Request bill'], ['NEED_WATER', 'Need water'], ['NEED_UTENSILS', 'Need utensils']];
-  return <section className="service-actions"><h2>Need something?</h2>{message && <p className="success">{message}</p>}{request.isError && <p className="error">{(request.error as Error).message}</p>}<div>{buttons.map(([type, label]) => <button key={type} className={billPrimary && type === 'REQUEST_BILL' ? 'primary' : ''} disabled={request.isPending} onClick={() => request.mutate(type)}>{label}</button>)}</div></section>;
+  const [message, setMessage] = useState('');
+  const request = useMutation({
+    mutationFn: (request_type: ServiceRequestType) =>
+      apiFetch(`/api/v1/locations/${locationId}/guest-sessions/current/service-requests`, {
+        method: 'POST',
+        body: JSON.stringify({ request_type }),
+      }),
+    onSuccess: () => setMessage('Your request has been sent to the restaurant team.'),
+  });
+  const buttons: Array<[ServiceRequestType, string]> = [
+    ['CALL_WAITER', 'Call waiter'],
+    ['REQUEST_BILL', 'Request bill'],
+    ['NEED_WATER', 'Need water'],
+    ['NEED_UTENSILS', 'Need utensils'],
+  ];
+  return (
+    <section className="service-actions">
+      <h2>Need something?</h2>
+      {message && <p className="success">{message}</p>}
+      {request.isError && <p className="error">{(request.error as Error).message}</p>}
+      <div>
+        {buttons.map(([type, label]) => (
+          <button
+            key={type}
+            className={billPrimary && type === 'REQUEST_BILL' ? 'primary' : ''}
+            disabled={request.isPending}
+            onClick={() => request.mutate(type)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+    </section>
+  );
 }
 
-function SharedOrder({ order, products, locationId, paymentMode, onConfirm }: { order: GuestOrder; products: Product[]; locationId: string; paymentMode: PaymentMode; onConfirm?: () => void }) {
-  const [paymentMessage, setPaymentMessage] = useState(''); const payment = useMutation({ mutationFn: () => apiFetch(`/api/v1/locations/${locationId}/guest-sessions/current/payments`, { method: 'POST', body: JSON.stringify({ provider_token: 'guest-payment-entry' }) }), onError: (error) => setPaymentMessage(error instanceof ApiError && error.code === 'PAYMENT_PROVIDER_NOT_CONFIGURED' ? "Online payment isn't available yet — please pay at the counter or ask your server." : (error as Error).message) });
+function SharedOrder({
+  order,
+  products,
+  locationId,
+  paymentMode,
+  onConfirm,
+}: {
+  order: GuestOrder;
+  products: Product[];
+  locationId: string;
+  paymentMode: PaymentMode;
+  onConfirm?: () => void;
+}) {
+  const [paymentMessage, setPaymentMessage] = useState('');
+  const payment = useMutation({
+    mutationFn: () =>
+      apiFetch(`/api/v1/locations/${locationId}/guest-sessions/current/payments`, {
+        method: 'POST',
+        body: JSON.stringify({ provider_token: 'guest-payment-entry' }),
+      }),
+    onError: (error) =>
+      setPaymentMessage(
+        error instanceof ApiError && error.code === 'PAYMENT_PROVIDER_NOT_CONFIGURED'
+          ? "Online payment isn't available yet — please pay at the counter or ask your server."
+          : (error as Error).message,
+      ),
+  });
   const names = new Map(products.map((product) => [product.id, product.name]));
-  return <aside className="cart"><h2>Shared table order</h2><p className="muted">Everyone at this table sees the same order.</p>{order.order.lines.length === 0 ? <p>No items have been added yet.</p> : <ul>{order.order.lines.map((line) => <li key={line.id}><span>{line.quantity} × {names.get(line.product_id) ?? 'Menu item'}</span><small>{line.status}</small></li>)}</ul>}{order.account && <div className="total"><span>Total</span><strong>{cents(order.account.total)}</strong></div>}{onConfirm && order.order.lines.length > 0 && <button className="primary confirm-order" onClick={onConfirm}>Review order</button>}{canOfferOnlinePayment(paymentMode) && <div className="payment"><button className="primary" disabled={payment.isPending} onClick={() => payment.mutate()}>Pay online</button>{paymentMessage && <p className="payment-note">{paymentMessage}</p>}</div>}</aside>;
+  return (
+    <aside className="cart">
+      <h2>Shared table order</h2>
+      <p className="muted">Everyone at this table sees the same order.</p>
+      {order.order.lines.length === 0 ? (
+        <p>No items have been added yet.</p>
+      ) : (
+        <ul>
+          {order.order.lines.map((line) => (
+            <li key={line.id}>
+              <span>
+                {line.quantity} × {names.get(line.product_id) ?? 'Menu item'}
+              </span>
+              <small>{line.status}</small>
+            </li>
+          ))}
+        </ul>
+      )}
+      {order.account && (
+        <div className="total">
+          <span>Total</span>
+          <strong>{cents(order.account.total)}</strong>
+        </div>
+      )}
+      {onConfirm && order.order.lines.length > 0 && (
+        <button className="primary confirm-order" onClick={onConfirm}>
+          Review order
+        </button>
+      )}
+      {canOfferOnlinePayment(paymentMode) && (
+        <div className="payment">
+          <button className="primary" disabled={payment.isPending} onClick={() => payment.mutate()}>
+            Pay online
+          </button>
+          {paymentMessage && <p className="payment-note">{paymentMessage}</p>}
+        </div>
+      )}
+    </aside>
+  );
 }
 
 function GuestExperience({ locationId, kiosk }: { locationId: string; kiosk: boolean }) {
-  const client = useQueryClient(); const connected = useGuestRealtime(locationId);
+  const client = useQueryClient();
+  const connected = useGuestRealtime(locationId);
   const [confirmed, setConfirmed] = useState(false);
-  const info = useQuery<GuestInfo>({ queryKey: ['guest-info', locationId], queryFn: () => apiFetch(`/api/v1/locations/${locationId}/guest-sessions/current`), retry: false });
-  const order = useQuery<GuestOrder>({ queryKey: ['guest-order', locationId], queryFn: () => apiFetch(`/api/v1/locations/${locationId}/guest-sessions/current/order`), refetchInterval: 15000, retry: false });
-  const products = useQuery<{ data: Product[] }>({ queryKey: ['guest-products', locationId], queryFn: () => apiFetch('/api/v1/products?channel=TABLE_SELF_ORDER'), retry: false });
-  const categories = useQuery<{ data: Category[] }>({ queryKey: ['guest-categories', locationId], queryFn: () => apiFetch('/api/v1/categories'), retry: false });
-  const add = useMutation({ mutationFn: (line: GuestAddLinesRequest['lines'][number]) => apiFetch(`/api/v1/locations/${locationId}/guest-sessions/current/lines`, { method: 'POST', body: JSON.stringify({ lines: [line] }) }), onSuccess: () => client.invalidateQueries({ queryKey: ['guest-order', locationId] }) });
+  const info = useQuery<GuestInfo>({
+    queryKey: ['guest-info', locationId],
+    queryFn: () => apiFetch(`/api/v1/locations/${locationId}/guest-sessions/current`),
+    retry: false,
+  });
+  const order = useQuery<GuestOrder>({
+    queryKey: ['guest-order', locationId],
+    queryFn: () => apiFetch(`/api/v1/locations/${locationId}/guest-sessions/current/order`),
+    refetchInterval: 15000,
+    retry: false,
+  });
+  const products = useQuery<{ data: Product[] }>({
+    queryKey: ['guest-products', locationId],
+    queryFn: () => apiFetch('/api/v1/products?channel=TABLE_SELF_ORDER'),
+    retry: false,
+  });
+  const categories = useQuery<{ data: Category[] }>({
+    queryKey: ['guest-categories', locationId],
+    queryFn: () => apiFetch('/api/v1/categories'),
+    retry: false,
+  });
+  const add = useMutation({
+    mutationFn: (line: GuestAddLinesRequest['lines'][number]) =>
+      apiFetch(`/api/v1/locations/${locationId}/guest-sessions/current/lines`, {
+        method: 'POST',
+        body: JSON.stringify({ lines: [line] }),
+      }),
+    onSuccess: () => client.invalidateQueries({ queryKey: ['guest-order', locationId] }),
+  });
   const stale = info.isError || order.isError || products.isError || categories.isError;
-  if (info.isPending || order.isPending || products.isPending || categories.isPending) return <main className="centered"><h1>Loading menu…</h1></main>;
-  if (!info.data || !order.data || !products.data || !categories.data) return <main className="centered"><ConnectionNotice stale connected={false} /><button onClick={() => client.invalidateQueries()}>Retry</button></main>;
+  if (info.isPending || order.isPending || products.isPending || categories.isPending)
+    return (
+      <main className="centered">
+        <h1>Loading menu…</h1>
+      </main>
+    );
+  if (!info.data || !order.data || !products.data || !categories.data)
+    return (
+      <main className="centered">
+        <ConnectionNotice stale connected={false} />
+        <button onClick={() => client.invalidateQueries()}>Retry</button>
+      </main>
+    );
   const mode = info.data.self_service.guest_payment_mode;
-  if (kiosk && confirmed) return <main className="centered"><h1>Order received</h1><p>Your order reference is <strong>{order.data.order.id.slice(0, 8).toUpperCase()}</strong>.</p><p>{canOfferOnlinePayment(mode) ? 'If online payment is unavailable, please pay at the counter.' : 'Please pay at the counter.'}</p><p className="muted">The current API provides only an order UUID, so this safe short reference is shown instead of a restaurant order number.</p><button onClick={() => setConfirmed(false)}>Back to order</button></main>;
-  return <main className="app-shell"><header><div><p className="eyebrow">{kiosk ? 'Counter kiosk' : info.data.table.name}</p><h1>{kiosk ? 'Place your order' : 'Order from your table'}</h1></div><ConnectionNotice stale={stale} connected={connected} /></header>{add.isError && <p className="error">Could not add item: {(add.error as Error).message}</p>}<div className="ordering-layout"><ProductPicker products={products.data.data} categories={categories.data.data} onAdd={(line) => add.mutate(line)} /><SharedOrder order={order.data} products={products.data.data} locationId={locationId} paymentMode={mode} onConfirm={kiosk ? () => setConfirmed(true) : undefined} /></div>{!kiosk && <ServiceButtons locationId={locationId} billPrimary={requestBillIsPrimary(mode)} />}{kiosk && <p className="kiosk-note">Kiosk orders currently use the configured counter pseudo-table. The backend records both dine-in and takeout as TABLE_SELF_ORDER.</p>}</main>;
+  if (kiosk && confirmed)
+    return (
+      <main className="centered">
+        <h1>Order received</h1>
+        <p>
+          Your order reference is <strong>{order.data.order.id.slice(0, 8).toUpperCase()}</strong>.
+        </p>
+        <p>
+          {canOfferOnlinePayment(mode)
+            ? 'If online payment is unavailable, please pay at the counter.'
+            : 'Please pay at the counter.'}
+        </p>
+        <p className="muted">
+          The current API provides only an order UUID, so this safe short reference is shown instead
+          of a restaurant order number.
+        </p>
+        <button onClick={() => setConfirmed(false)}>Back to order</button>
+      </main>
+    );
+  return (
+    <main className="app-shell">
+      <header>
+        <div>
+          <p className="eyebrow">{kiosk ? 'Counter kiosk' : info.data.table.name}</p>
+          <h1>{kiosk ? 'Place your order' : 'Order from your table'}</h1>
+        </div>
+        <ConnectionNotice stale={stale} connected={connected} />
+      </header>
+      {add.isError && <p className="error">Could not add item: {(add.error as Error).message}</p>}
+      <div className="ordering-layout">
+        <ProductPicker
+          products={products.data.data}
+          categories={categories.data.data}
+          onAdd={(line) => add.mutate(line)}
+        />
+        <SharedOrder
+          order={order.data}
+          products={products.data.data}
+          locationId={locationId}
+          paymentMode={mode}
+          onConfirm={kiosk ? () => setConfirmed(true) : undefined}
+        />
+      </div>
+      {!kiosk && (
+        <ServiceButtons locationId={locationId} billPrimary={requestBillIsPrimary(mode)} />
+      )}
+      {kiosk && (
+        <p className="kiosk-note">
+          Kiosk orders currently use the configured counter pseudo-table. The backend records both
+          dine-in and takeout as TABLE_SELF_ORDER.
+        </p>
+      )}
+    </main>
+  );
 }
 
-function TableScreen({ locationId, tableId, kiosk = false }: { locationId: string; tableId: string; kiosk?: boolean }) { return <MintingScreen locationId={locationId} tableId={tableId}>{() => <GuestExperience locationId={locationId} kiosk={kiosk} />}</MintingScreen>; }
-function KioskEntry() { const { locationId = '' } = useParams(); const [params] = useSearchParams(); const navigate = useNavigate(); const [tableId, setTableId] = useState(() => params.get('tableId') || localStorage.getItem(`self-service:kiosk-table:${locationId}`) || ''); const [service, setService] = useState<'DINE_IN' | 'TAKEOUT' | null>(null); const start = () => { localStorage.setItem(`self-service:kiosk-table:${locationId}`, tableId); navigate(`/${locationId}/kiosk/order/${tableId}`); }; if (service) return <main className="centered"><h1>{service === 'DINE_IN' ? 'Dine-in order' : 'Takeout order'}</h1><p>Choose your items next.</p><button className="primary" onClick={start} disabled={!tableId}>Browse menu</button><button onClick={() => setService(null)}>Back</button></main>; return <main className="centered"><h1>Welcome</h1><p>Start your order at the counter.</p><label className="setup-label">Kiosk counter table ID<input value={tableId} onChange={(event) => setTableId(event.target.value)} placeholder="Configured pseudo-table UUID" /></label><p className="muted">This one-time device setting is required because the current API only mints guest sessions against a table.</p><button className="primary" disabled={!tableId} onClick={() => setService('DINE_IN')}>Start dine-in order</button><button disabled={!tableId} onClick={() => setService('TAKEOUT')}>Start takeout order</button></main>; }
-function StatusBoard() { const { locationId = '' } = useParams(); const board = useQuery<{ data: BoardOrder[] }>({ queryKey: ['status-board', locationId], queryFn: () => apiFetch(`/api/v1/locations/${locationId}/order-status-board`), refetchInterval: 10000, retry: false }); const buckets = useMemo(() => bucketBoardOrders(board.data?.data ?? []), [board.data]); return <main className="status-board"><header><h1>Order status</h1><ConnectionNotice stale={board.isError} /></header>{board.isPending ? <p>Loading orders…</p> : <div className="board-columns"><StatusColumn title="Preparing" orders={buckets.preparing} /><StatusColumn title="Ready" orders={buckets.ready} /></div>}<p className="board-foot">Order numbers only — please listen for restaurant announcements.</p></main>; }
-function StatusColumn({ title, orders }: { title: string; orders: BoardOrder[] }) { return <section className={`status-column ${title.toLowerCase()}`}><h2>{title}</h2>{orders.length ? orders.map((order) => <strong key={`${order.order_id}-${order.status}`}>{order.order_id.slice(0, 8).toUpperCase()}</strong>) : <p>—</p>}</section>; }
-function NotFound() { return <main className="centered"><h1>Self-service link not found</h1><p>Please scan the QR code at your table or ask a team member for help.</p></main>; }
-function TableRoute() { const { locationId = '', tableId = '' } = useParams(); return <TableScreen locationId={locationId} tableId={tableId} />; }
-function KioskOrderRoute() { const { locationId = '', tableId = '' } = useParams(); return <TableScreen locationId={locationId} tableId={tableId} kiosk />; }
-export function App() { return <QueryClientProvider client={queryClient}><BrowserRouter><Routes><Route path="/:locationId/table/:tableId" element={<TableRoute />} /><Route path="/:locationId/kiosk" element={<KioskEntry />} /><Route path="/:locationId/kiosk/order/:tableId" element={<KioskOrderRoute />} /><Route path="/:locationId/status-board" element={<StatusBoard />} /><Route path="*" element={<NotFound />} /></Routes></BrowserRouter></QueryClientProvider>; }
+function TableScreen({
+  locationId,
+  tableId,
+  kiosk = false,
+}: {
+  locationId: string;
+  tableId: string;
+  kiosk?: boolean;
+}) {
+  return (
+    <MintingScreen locationId={locationId} tableId={tableId}>
+      {() => <GuestExperience locationId={locationId} kiosk={kiosk} />}
+    </MintingScreen>
+  );
+}
+function KioskEntry() {
+  const { locationId = '' } = useParams();
+  const [params] = useSearchParams();
+  const navigate = useNavigate();
+  const [tableId, setTableId] = useState(
+    () =>
+      params.get('tableId') || localStorage.getItem(`self-service:kiosk-table:${locationId}`) || '',
+  );
+  const [service, setService] = useState<'DINE_IN' | 'TAKEOUT' | null>(null);
+  const start = () => {
+    localStorage.setItem(`self-service:kiosk-table:${locationId}`, tableId);
+    navigate(`/${locationId}/kiosk/order/${tableId}`);
+  };
+  if (service)
+    return (
+      <main className="centered">
+        <h1>{service === 'DINE_IN' ? 'Dine-in order' : 'Takeout order'}</h1>
+        <p>Choose your items next.</p>
+        <button className="primary" onClick={start} disabled={!tableId}>
+          Browse menu
+        </button>
+        <button onClick={() => setService(null)}>Back</button>
+      </main>
+    );
+  return (
+    <main className="centered">
+      <h1>Welcome</h1>
+      <p>Start your order at the counter.</p>
+      <label className="setup-label">
+        Kiosk counter table ID
+        <input
+          value={tableId}
+          onChange={(event) => setTableId(event.target.value)}
+          placeholder="Configured pseudo-table UUID"
+        />
+      </label>
+      <p className="muted">
+        This one-time device setting is required because the current API only mints guest sessions
+        against a table.
+      </p>
+      <button className="primary" disabled={!tableId} onClick={() => setService('DINE_IN')}>
+        Start dine-in order
+      </button>
+      <button disabled={!tableId} onClick={() => setService('TAKEOUT')}>
+        Start takeout order
+      </button>
+    </main>
+  );
+}
+function StatusBoard() {
+  const { locationId = '' } = useParams();
+  const board = useQuery<{ data: BoardOrder[] }>({
+    queryKey: ['status-board', locationId],
+    queryFn: () => apiFetch(`/api/v1/locations/${locationId}/order-status-board`),
+    refetchInterval: 10000,
+    retry: false,
+  });
+  const buckets = useMemo(() => bucketBoardOrders(board.data?.data ?? []), [board.data]);
+  return (
+    <main className="status-board">
+      <header>
+        <h1>Order status</h1>
+        <ConnectionNotice stale={board.isError} />
+      </header>
+      {board.isPending ? (
+        <p>Loading orders…</p>
+      ) : (
+        <div className="board-columns">
+          <StatusColumn title="Preparing" orders={buckets.preparing} />
+          <StatusColumn title="Ready" orders={buckets.ready} />
+        </div>
+      )}
+      <p className="board-foot">Order numbers only — please listen for restaurant announcements.</p>
+    </main>
+  );
+}
+function StatusColumn({ title, orders }: { title: string; orders: BoardOrder[] }) {
+  return (
+    <section className={`status-column ${title.toLowerCase()}`}>
+      <h2>{title}</h2>
+      {orders.length ? (
+        orders.map((order) => (
+          <strong key={`${order.order_id}-${order.status}`}>
+            {order.order_id.slice(0, 8).toUpperCase()}
+          </strong>
+        ))
+      ) : (
+        <p>—</p>
+      )}
+    </section>
+  );
+}
+function NotFound() {
+  return (
+    <main className="centered">
+      <h1>Self-service link not found</h1>
+      <p>Please scan the QR code at your table or ask a team member for help.</p>
+    </main>
+  );
+}
+function TableRoute() {
+  const { locationId = '', tableId = '' } = useParams();
+  return <TableScreen locationId={locationId} tableId={tableId} />;
+}
+function KioskOrderRoute() {
+  const { locationId = '', tableId = '' } = useParams();
+  return <TableScreen locationId={locationId} tableId={tableId} kiosk />;
+}
+export function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/:locationId/table/:tableId" element={<TableRoute />} />
+          <Route path="/:locationId/kiosk" element={<KioskEntry />} />
+          <Route path="/:locationId/kiosk/order/:tableId" element={<KioskOrderRoute />} />
+          <Route path="/:locationId/status-board" element={<StatusBoard />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </BrowserRouter>
+    </QueryClientProvider>
+  );
+}
 export default App;

@@ -21,9 +21,15 @@ export type Category = components['schemas']['Category'];
 export type GuestAddLinesRequest = components['schemas']['GuestAddLinesRequest'];
 export type ServiceRequestType = components['schemas']['GuestServiceRequest']['request_type'];
 
-export function getGuestToken() { return sessionStorage.getItem(GUEST_TOKEN_KEY); }
-export function setGuestToken(token: string) { sessionStorage.setItem(GUEST_TOKEN_KEY, token); }
-export function clearGuestToken() { sessionStorage.removeItem(GUEST_TOKEN_KEY); }
+export function getGuestToken() {
+  return sessionStorage.getItem(GUEST_TOKEN_KEY);
+}
+export function setGuestToken(token: string) {
+  sessionStorage.setItem(GUEST_TOKEN_KEY, token);
+}
+export function clearGuestToken() {
+  sessionStorage.removeItem(GUEST_TOKEN_KEY);
+}
 
 export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers = new Headers(options.headers);
@@ -37,11 +43,23 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
     throw new ApiError(0, 'NETWORK_ERROR', 'Unable to reach the restaurant.');
   }
   if (!response.ok) {
-    let error = { code: 'UNKNOWN_ERROR', message: response.statusText, details: undefined as unknown };
+    let error = {
+      code: 'UNKNOWN_ERROR',
+      message: response.statusText,
+      details: undefined as unknown,
+    };
     try {
-      const body = await response.json() as { error?: { code?: string; message?: string; details?: unknown } };
-      error = { code: body.error?.code ?? error.code, message: body.error?.message ?? error.message, details: body.error?.details };
-    } catch { /* retain HTTP fallback */ }
+      const body = (await response.json()) as {
+        error?: { code?: string; message?: string; details?: unknown };
+      };
+      error = {
+        code: body.error?.code ?? error.code,
+        message: body.error?.message ?? error.message,
+        details: body.error?.details,
+      };
+    } catch {
+      /* retain HTTP fallback */
+    }
     if (response.status === 401) clearGuestToken();
     throw new ApiError(response.status, error.code, error.message, error.details);
   }

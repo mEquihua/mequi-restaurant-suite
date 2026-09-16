@@ -15,7 +15,11 @@ describe('payment mode UI rules', () => {
 
 describe('status-board bucketing', () => {
   it('keeps only preparing and ready orders in their own columns', () => {
-    const buckets = bucketBoardOrders([{ status: 'PREPARING', id: '104' }, { status: 'READY', id: '101' }, { status: 'SENT', id: 'ignore' }]);
+    const buckets = bucketBoardOrders([
+      { status: 'PREPARING', id: '104' },
+      { status: 'READY', id: '101' },
+      { status: 'SENT', id: 'ignore' },
+    ]);
     expect(buckets.preparing.map((item) => item.id)).toEqual(['104']);
     expect(buckets.ready.map((item) => item.id)).toEqual(['101']);
   });

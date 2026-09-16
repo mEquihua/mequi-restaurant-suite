@@ -111,10 +111,16 @@ The system is rooted in a single `organizations` row. The organization contains 
 - `name` VARCHAR NOT NULL
 - `internal_name` VARCHAR
 - `description` TEXT
+- `photo_url` TEXT *(nullable; idea.md section 12 — customer-facing photo)*
+- `notes` TEXT *(nullable; kitchen/prep notes, distinct from the customer-facing description)*
+- `allergens` TEXT[] NOT NULL DEFAULT '{}' *(idea.md section 12 — declared allergens)*
+- `tags` TEXT[] NOT NULL DEFAULT '{}' *(idea.md section 12 — free-form labels)*
 - `base_price` INTEGER NOT NULL *(cents)*
 - `is_active` BOOLEAN NOT NULL DEFAULT TRUE
 - `version` INTEGER NOT NULL DEFAULT 1
 - *Constraints*: `FOREIGN KEY (organization_id) REFERENCES organizations(id)`, `FOREIGN KEY (category_id) REFERENCES categories(id)`.
+
+*Deferred (idea.md section 12, not Foundation): related products / upsell suggestions — idea.md itself treats these as a later, optional recommendation feature ("no necesitamos inicialmente un motor de recomendación inteligente"), so they are out of scope until a later module.*
 
 **`product_variants`**
 - `id` UUID PK
@@ -177,10 +183,13 @@ The system is rooted in a single `organizations` row. The organization contains 
 - `status` VARCHAR NOT NULL
 - `channel_scope` VARCHAR
 - `service_type_scope` VARCHAR
+- `days_of_week` SMALLINT[] *(nullable; ISO 8601 weekday numbers 1=Monday..7=Sunday; NULL means every day — idea.md section 13 "disponible durante determinados días")*
 - `start_time` TIMESTAMPTZ
 - `end_time` TIMESTAMPTZ
 - `version` INTEGER NOT NULL DEFAULT 1
-- *Constraints*: `FOREIGN KEY (location_id) REFERENCES locations(id)`, `FOREIGN KEY (product_id) REFERENCES products(id)`, `CHECK (status IN ('AVAILABLE', 'EXHAUSTED', 'HIDDEN', 'SCHEDULED'))`.
+- *Constraints*: `FOREIGN KEY (location_id) REFERENCES locations(id)`, `FOREIGN KEY (product_id) REFERENCES products(id)`, `CHECK (status IN ('AVAILABLE', 'EXHAUSTED', 'HIDDEN', 'SCHEDULED'))`, `CHECK (days_of_week IS NULL OR days_of_week <@ ARRAY[1,2,3,4,5,6,7]::smallint[])`.
+
+*Note on "available until stock runs out" (idea.md section 13): Foundation has no inventory-quantity tracking yet, so this dimension is handled operationally — staff/kitchen set `status = 'EXHAUSTED'` when stock depletes (see the Kitchen module's out-of-stock reporting). A dedicated stock-quantity-driven auto-transition is deferred to the Inventory module.*
 
 ### 2.4 Floor & Tables
 

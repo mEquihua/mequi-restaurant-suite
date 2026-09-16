@@ -25,6 +25,10 @@ CREATE TABLE products (
     name VARCHAR NOT NULL,
     internal_name VARCHAR,
     description TEXT,
+    photo_url TEXT,
+    notes TEXT,
+    allergens TEXT[] NOT NULL DEFAULT '{}',
+    tags TEXT[] NOT NULL DEFAULT '{}',
     base_price INTEGER NOT NULL,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     version INTEGER NOT NULL DEFAULT 1,
@@ -160,12 +164,14 @@ CREATE TABLE availability_rules (
     status VARCHAR NOT NULL,
     channel_scope VARCHAR,
     service_type_scope VARCHAR,
+    days_of_week SMALLINT[],
     start_time TIMESTAMPTZ,
     end_time TIMESTAMPTZ,
     version INTEGER NOT NULL DEFAULT 1,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT chk_availability_status CHECK (status IN ('AVAILABLE', 'EXHAUSTED', 'HIDDEN', 'SCHEDULED'))
+    CONSTRAINT chk_availability_status CHECK (status IN ('AVAILABLE', 'EXHAUSTED', 'HIDDEN', 'SCHEDULED')),
+    CONSTRAINT chk_availability_days_of_week CHECK (days_of_week IS NULL OR days_of_week <@ ARRAY[1,2,3,4,5,6,7]::smallint[])
 );
 
 CREATE INDEX idx_availability_rules_location_id ON availability_rules(location_id);

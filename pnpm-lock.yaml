@@ -59,6 +59,9 @@ importers:
 
   apps/admin:
     dependencies:
+      '@restaurant-suite/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
       '@restaurant-suite/ui-admin':
         specifier: workspace:*
         version: link:../../packages/ui-admin
@@ -68,12 +71,18 @@ importers:
       '@restaurant-suite/ui-tokens':
         specifier: workspace:*
         version: link:../../packages/ui-tokens
+      '@tanstack/react-query':
+        specifier: ^5.102.8
+        version: 5.102.8(react@19.3.0)
       react:
         specifier: ^19.1.1
         version: 19.3.0
       react-dom:
         specifier: ^19.1.1
         version: 19.3.0(react@19.3.0)
+      react-router-dom:
+        specifier: ^7.18.4
+        version: 7.18.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
 
   apps/customer:
     dependencies:

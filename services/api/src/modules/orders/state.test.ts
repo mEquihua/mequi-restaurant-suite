@@ -13,6 +13,11 @@ describe('orders pure rules', () => {
     expect(canTransitionLineStatus('SENT', 'READY')).toBe(false);
     expect(canTransitionLineStatus('FULFILLED', 'VOIDED')).toBe(true);
   });
+  it('allows a kitchen recall from READY back to PREPARING, but not further back', () => {
+    expect(canTransitionLineStatus('READY', 'PREPARING')).toBe(true);
+    expect(canTransitionLineStatus('PREPARING', 'SENT')).toBe(false);
+    expect(canTransitionLineStatus('FULFILLED', 'PREPARING')).toBe(false);
+  });
   it('keeps every cent in the first equal-split sibling', () => {
     expect(splitEqually(1001, 3)).toEqual([335, 333, 333]);
     expect(splitEqually(1, 3)).toEqual([1, 0, 0]);

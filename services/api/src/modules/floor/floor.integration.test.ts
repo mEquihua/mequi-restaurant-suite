@@ -32,6 +32,7 @@ describeIntegration('floor API against PostgreSQL', () => {
   beforeAll(async () => {
     await db.deleteFrom('command_idempotency').execute();
     await db.deleteFrom('audit_events').execute();
+    await db.deleteFrom('account_discounts').execute();
     await db.deleteFrom('outbox_events').execute();
     await db.deleteFrom('refunds').execute();
     await db.deleteFrom('cancellations_and_voids').execute();

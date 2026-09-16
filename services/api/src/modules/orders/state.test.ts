@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { canTransitionLineStatus, resolveLinePrice, splitEqually } from './state.js';
+import {
+  canTransitionLineStatus,
+  computeDiscountAmount,
+  resolveLinePrice,
+  splitEqually,
+} from './state.js';
 
 describe('orders pure rules', () => {
   it('allows only the independent line lifecycle transitions', () => {
@@ -22,5 +27,16 @@ describe('orders pure rules', () => {
         quantity: 2,
       }),
     ).toBe(1215);
+  });
+  it('computes percentage and amount discounts in cents and rejects amount over target', () => {
+    expect(
+      computeDiscountAmount({ targetSubtotal: 1001, discountType: 'PERCENTAGE', value: 15 }),
+    ).toBe(150);
+    expect(
+      computeDiscountAmount({ targetSubtotal: 1001, discountType: 'AMOUNT', value: 250 }),
+    ).toBe(250);
+    expect(() =>
+      computeDiscountAmount({ targetSubtotal: 1001, discountType: 'AMOUNT', value: 1002 }),
+    ).toThrow('cannot exceed');
   });
 });

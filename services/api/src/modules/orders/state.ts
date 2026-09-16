@@ -50,3 +50,23 @@ export function resolveLinePrice(input: {
 export function lineAmount(line: { quantity: number; unit_price: number }): number {
   return line.quantity * line.unit_price;
 }
+
+/** Computes a discount from authoritative stored cents; never accepts a final client amount. */
+export function computeDiscountAmount(input: {
+  targetSubtotal: number;
+  discountType: 'PERCENTAGE' | 'AMOUNT';
+  value: number;
+}): number {
+  if (!Number.isSafeInteger(input.targetSubtotal) || input.targetSubtotal < 0)
+    throw new Error('Invalid discount target subtotal.');
+  if (!Number.isInteger(input.value) || input.value < 1)
+    throw new Error('Discount value must be a positive integer.');
+  if (input.discountType === 'PERCENTAGE') {
+    if (input.value > 100) throw new Error('Percentage discount cannot exceed 100.');
+    return Math.round((input.targetSubtotal * input.value) / 100);
+  }
+  if (input.discountType !== 'AMOUNT') throw new Error('Invalid discount type.');
+  if (input.value > input.targetSubtotal)
+    throw new Error('Discount amount cannot exceed the target subtotal.');
+  return input.value;
+}

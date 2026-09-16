@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import fastifyWebsocket from '@fastify/websocket';
 import { withAuthenticatedSession } from '../identity/index.js';
-import Redis from 'ioredis';
+import { Redis } from 'ioredis';
 
 // We use a shared redis subscriber per API instance to avoid one connection per websocket client.
 let redisSubscriber: Redis | null = null;
@@ -18,7 +18,7 @@ export const realtimeRoute: FastifyPluginAsync = async (app) => {
   // This keeps the implementation simpler than dynamic subscriptions per client connection.
   await redisSubscriber.psubscribe('location:*:events');
 
-  redisSubscriber.on('pmessage', (pattern, channel, message) => {
+  redisSubscriber.on('pmessage', (pattern: string, channel: string, message: string) => {
     // Channel is like "location:{location_id}:events"
     const match = /^location:([^:]+):events$/.exec(channel);
     if (!match) return;

@@ -1,6 +1,6 @@
 import { Kysely, PostgresDialect, sql } from 'kysely';
 import pg from 'pg';
-import Redis from 'ioredis';
+import { Redis } from 'ioredis';
 
 export interface OutboxEventTable {
   id: string;

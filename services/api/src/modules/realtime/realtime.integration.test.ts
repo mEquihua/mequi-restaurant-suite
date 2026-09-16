@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import Fastify from 'fastify';
 import WebSocket from 'ws';
-import Redis from 'ioredis';
+import { Redis } from 'ioredis';
 import { createDatabase, installDatabase } from '../../shared/index.js';
 import { hashSecret, hashPin } from '../identity/security.js';
 import { realtimeModule } from './index.js';

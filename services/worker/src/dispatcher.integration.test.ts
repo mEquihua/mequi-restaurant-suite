@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import Redis from 'ioredis';
+import { Redis } from 'ioredis';
 import { Kysely, PostgresDialect } from 'kysely';
 import pg from 'pg';
 import { OutboxDispatcher } from './dispatcher.js';
@@ -43,7 +43,7 @@ describeIntegration('Worker OutboxDispatcher', () => {
     const messages: any[] = [];
     
     await subscriber.psubscribe('location:*:events');
-    subscriber.on('pmessage', (pattern, channel, message) => {
+    subscriber.on('pmessage', (pattern: string, channel: string, message: string) => {
       messages.push({ channel, payload: JSON.parse(message) });
     });
     

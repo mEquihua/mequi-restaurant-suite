@@ -36,11 +36,15 @@ export interface Database {
   payments: PaymentTable;
   account_discounts: AccountDiscountTable;
   cancellations_and_voids: CancellationAndVoidTable;
+  cash_drawer_sessions: CashDrawerSessionTable;
+  cash_drawer_movements: CashDrawerMovementTable;
   refunds: RefundTable;
   outbox_events: OutboxEventTable;
   audit_events: AuditEventTable;
   command_idempotency: CommandIdempotencyTable;
 }
+
+export type TableName = keyof Database;
 
 export interface OrganizationTable {
   id: Generated<string>;
@@ -441,6 +445,32 @@ declare module 'fastify' {
 
 export interface DatabaseOptions {
   databaseUrl?: string;
+}
+
+export interface CashDrawerSessionTable {
+  id: Generated<string>;
+  location_id: string;
+  terminal_id: string;
+  opened_by: string;
+  opening_float: number;
+  status: string;
+  opened_at: Generated<Date>;
+  closed_by: string | null;
+  closed_at: Date | null;
+  counted_amount: number | null;
+  expected_amount: number | null;
+  variance: number | null;
+  version: Generated<number>;
+}
+export interface CashDrawerMovementTable {
+  id: Generated<string>;
+  location_id: string;
+  drawer_session_id: string;
+  movement_type: string;
+  amount: number;
+  reason: string;
+  recorded_by: string;
+  created_at: Generated<Date>;
 }
 
 export function createDatabase(options: DatabaseOptions = {}): Kysely<Database> {

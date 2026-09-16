@@ -36,6 +36,8 @@ describeIntegration('orders API against PostgreSQL', () => {
   const auth = () => ({ authorization: `Bearer ${token}` });
   beforeAll(async () => {
     for (const table of [
+      'cash_drawer_movements',
+      'cash_drawer_sessions',
       'command_idempotency',
       'audit_events',
       'account_discounts',

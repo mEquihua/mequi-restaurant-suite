@@ -7,6 +7,7 @@ import { floorModule, type FloorRouteOptions } from './modules/floor/index.js';
 import { moduleCenterModule, type ModuleCenterRouteOptions } from './modules/module-center/index.js';
 import { ordersModule, type OrdersRouteOptions } from './modules/orders/index.js';
 import { reportsModule, type ReportsRouteOptions } from './modules/reports/index.js';
+import { cashDrawerModule, type CashDrawerRouteOptions } from './modules/cash-drawer/index.js';
 import { pingModule } from './modules/ping/index.js';
 
 export interface AppOptions {
@@ -18,6 +19,7 @@ export interface AppOptions {
   moduleCenter?: ModuleCenterRouteOptions;
   orders?: OrdersRouteOptions;
   reports?: ReportsRouteOptions;
+  cashDrawer?: CashDrawerRouteOptions;
 }
 
 /** Creates the HTTP application without binding a network port. */
@@ -54,6 +56,7 @@ export function createApp(options: AppOptions = {}): FastifyInstance {
   app.register(moduleCenterModule, options.moduleCenter ?? {});
   app.register(ordersModule, options.orders ?? {});
   app.register(reportsModule, options.reports ?? {});
+  app.register(cashDrawerModule, options.cashDrawer ?? {});
 
   return app;
 }

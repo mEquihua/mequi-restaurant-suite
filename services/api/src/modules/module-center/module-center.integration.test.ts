@@ -22,6 +22,8 @@ describeIntegration('Module Center API against PostgreSQL', () => {
 
   beforeAll(async () => {
     await db.deleteFrom('module_activations').execute();
+    await db.deleteFrom('cash_drawer_movements').execute();
+    await db.deleteFrom('cash_drawer_sessions').execute();
     await db.deleteFrom('terminal_pin_attempts').execute(); await db.deleteFrom('staff_sessions').execute(); await db.deleteFrom('staff_roles').execute(); await db.deleteFrom('role_permissions').execute(); await db.deleteFrom('terminals').execute(); await db.deleteFrom('staff').execute(); await db.deleteFrom('roles').execute(); await db.deleteFrom('locations').execute(); await db.deleteFrom('organizations').execute();
     const organization = await db.insertInto('organizations').values({ name: 'Module Center Integration Restaurant' }).returning('id').executeTakeFirstOrThrow(); organizationId = organization.id;
     const locations = await db.insertInto('locations').values([{ organization_id: organizationId, name: 'Downtown' }, { organization_id: organizationId, name: 'Airport' }]).returning('id').execute(); [locationA, locationB] = locations.map((location) => location.id);

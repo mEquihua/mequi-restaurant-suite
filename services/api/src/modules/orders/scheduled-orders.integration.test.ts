@@ -139,7 +139,9 @@ describeIntegration('scheduled orders API integration tests', () => {
       location_id: locationId,
       terminal_id: terminalId,
       staff_id: staffId,
-      token_hash: hash(rawToken),
+      // The real session lookup hashes the WHOLE bearer token
+      // (`${locationId}.${secret}`), not just the secret portion.
+      token_hash: hash(staffSessionToken),
       expires_at: new Date(Date.now() + 1000 * 60 * 60 * 24),
     }).execute();
 
@@ -178,7 +180,9 @@ describeIntegration('scheduled orders API integration tests', () => {
       },
     });
     expect(putRes.statusCode).toBe(200);
-    expect(putRes.json().version).toBe(2);
+    // First PUT ever for this location has no existing row, so it takes the
+    // insert path (default version 1), not the update-and-increment path.
+    expect(putRes.json().version).toBe(1);
 
     const conflictRes = await app.inject({
       method: 'PUT',
@@ -189,7 +193,7 @@ describeIntegration('scheduled orders API integration tests', () => {
         minimum_lead_time_minutes: 120,
         maximum_lead_time_days: 14,
         operating_hours: [],
-        version: 1, // Conflict
+        version: 2, // stale relative to the real current version of 1 -> conflict
       },
     });
     expect(conflictRes.statusCode).toBe(409);
@@ -363,7 +367,7 @@ describeIntegration('scheduled orders API integration tests', () => {
     expect(asapRes.statusCode).toBe(201);
     const asapOrderId = asapRes.json().order_id;
 
-    // 2. Scheduled order within threshold (1.5 hrs is not within 60 mins... wait, let's just make one far-future)
+    // 2. A far-future scheduled order, outside the KDS's 60-minute visibility threshold
     const farFutureDate = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000); // 5 days
     const farRes = await app.inject({
       method: 'POST',

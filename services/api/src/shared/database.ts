@@ -77,7 +77,7 @@ export interface ScheduledOrderSettingsTable {
   accepts_scheduled_orders: Generated<boolean>;
   minimum_lead_time_minutes: Generated<number>;
   maximum_lead_time_days: Generated<number>;
-  operating_hours: string; // JSONB stored as string stringified
+  operating_hours: Generated<unknown>;
   version: Generated<number>;
   created_at: Generated<Date>;
   updated_at: Generated<Date>;

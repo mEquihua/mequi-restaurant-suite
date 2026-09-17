@@ -83,4 +83,67 @@ export const reportsRoute: FastifyPluginAsync<ReportsRouteOptions> = async (app,
   app.get('/api/v1/locations/:locationId/reports/voids-and-cancellations', schema, report('reports.audit.read', (actor, range) => voidsAndCancellations(actor.trx, range)));
   app.get('/api/v1/locations/:locationId/reports/refunds', schema, report('reports.audit.read', (actor, range) => refunds(actor.trx, range)));
   app.get('/api/v1/locations/:locationId/reports/tips', schema, report('reports.sales.read', (actor, range) => tips(actor.trx, range)));
+  const orgRangeQuery = {
+    type: 'object', additionalProperties: false, required: ['from', 'to'],
+    properties: {
+      from: { type: 'string', format: 'date-time' }, to: { type: 'string', format: 'date-time' },
+      format: { type: 'string', enum: ['json'] }, limit: { type: 'integer', minimum: 1, maximum: 500 }, offset: { type: 'integer', minimum: 0 },
+      location_ids: { type: 'string' }, all: { type: 'boolean' }
+    },
+    oneOf: [
+      { required: ['location_ids'] },
+      { required: ['all'] }
+    ]
+  } as const;
+  const orgParams = { type: 'object', additionalProperties: false, required: ['orgId'], properties: { orgId: uuid } } as const;
+  type OrgQuery = { from: string; to: string; format?: 'json'; limit?: number; offset?: number; location_ids?: string; all?: boolean };
+
+  const orgReport = (permission: string, execute: (trx: Parameters<typeof salesByDay>[0], range: ReportRange, query: OrgQuery) => Promise<Array<Record<string, unknown>>>) =>
+    async (request: FastifyRequest, _reply: FastifyReply) => withSession(request, async (actor) => {
+      requirePermission(actor, permission);
+      const query = request.query as OrgQuery;
+      const orgId = (request.params as { orgId: string }).orgId;
+      if (orgId !== actor.organizationId) throw new IdentityHttpError(403, 'FORBIDDEN', 'Cannot access reports for a different organization.');
+      if (query.all && query.location_ids) throw new IdentityHttpError(400, 'VALIDATION_ERROR', 'Cannot specify both all and location_ids');
+      if (!query.all && !query.location_ids) throw new IdentityHttpError(400, 'VALIDATION_ERROR', 'Must specify either all or location_ids');
+
+      const orgLocations = await actor.trx
+        .selectFrom('locations')
+        .select(['id', 'name'])
+        .where('organization_id', '=', actor.organizationId)
+        .execute();
+
+      let validLocations = orgLocations;
+      if (!query.all && query.location_ids) {
+        const requested = new Set(query.location_ids.split(','));
+        validLocations = orgLocations.filter(loc => requested.has(loc.id));
+      }
+
+      if (validLocations.length === 0) return { data: [] };
+
+      const results = [];
+      for (const loc of validLocations) {
+        const range = parseRange(query, loc.id);
+        const rows = await app.withLocationTransaction(loc.id, (trx) => execute(trx, range, query));
+        results.push({ location_id: loc.id, location_name: loc.name, data: rows });
+      }
+
+      return { data: results };
+    });
+
+  const orgSchema = { schema: { params: orgParams, querystring: orgRangeQuery } };
+  app.get('/api/v1/organizations/:orgId/reports/sales/by-day', orgSchema, orgReport('reports.sales.read', (trx, range) => salesByDay(trx, range)));
+  app.get('/api/v1/organizations/:orgId/reports/sales/by-hour', orgSchema, orgReport('reports.sales.read', (trx, range) => salesByHour(trx, range)));
+  app.get('/api/v1/organizations/:orgId/reports/sales/by-product', orgSchema, orgReport('reports.sales.read', (trx, range, query) => salesByProduct(trx, range, query.limit ?? 100, query.offset ?? 0)));
+  app.get('/api/v1/organizations/:orgId/reports/sales/by-category', orgSchema, orgReport('reports.sales.read', (trx, range) => salesByCategory(trx, range)));
+  app.get('/api/v1/organizations/:orgId/reports/sales/by-employee', orgSchema, orgReport('reports.sales.read', (trx, range) => salesByEmployee(trx, range)));
+  app.get('/api/v1/organizations/:orgId/reports/orders/summary', orgSchema, orgReport('reports.sales.read', async (trx, range) => {
+    const [summary] = await ordersSummary(trx, range) as Array<{ order_count: number; total_sales: number }>;
+    return [{ order_count: summary?.order_count ?? 0, average_ticket: averageTicket(summary?.total_sales ?? 0, summary?.order_count ?? 0) }];
+  }));
+  app.get('/api/v1/organizations/:orgId/reports/payments/by-method', orgSchema, orgReport('reports.sales.read', (trx, range) => paymentsByMethod(trx, range)));
+  app.get('/api/v1/organizations/:orgId/reports/discounts', orgSchema, orgReport('reports.sales.read', (trx, range) => discounts(trx, range)));
+  app.get('/api/v1/organizations/:orgId/reports/voids-and-cancellations', orgSchema, orgReport('reports.audit.read', (trx, range) => voidsAndCancellations(trx, range)));
+  app.get('/api/v1/organizations/:orgId/reports/refunds', orgSchema, orgReport('reports.audit.read', (trx, range) => refunds(trx, range)));
+  app.get('/api/v1/organizations/:orgId/reports/tips', orgSchema, orgReport('reports.sales.read', (trx, range) => tips(trx, range)));
 };

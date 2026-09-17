@@ -3164,6 +3164,121 @@ paths:
                   adjustment:
                     $ref: "#/components/schemas/StockAdjustment"
 
+ 
+
+  /api/v1/organizations/{orgId}/reports/sales/by-day:
+    get: &orgSales
+      operationId: reportOrgSalesByDay
+      x-required-permission: reports.sales.read
+      security:
+        - staffSession: []
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: "#/components/parameters/ReportFrom"
+        - $ref: "#/components/parameters/ReportTo"
+        - name: all
+          in: query
+          schema:
+            type: boolean
+        - name: location_ids
+          in: query
+          schema:
+            type: string
+      responses: &orgResponse
+        "200":
+          description: Report
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+  /api/v1/organizations/{orgId}/reports/sales/by-hour:
+    get:
+      <<: *orgSales
+      operationId: reportOrgSalesByHour
+  /api/v1/organizations/{orgId}/reports/sales/by-product:
+    get:
+      <<: *orgSales
+      operationId: reportOrgSalesByProduct
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: "#/components/parameters/ReportFrom"
+        - $ref: "#/components/parameters/ReportTo"
+        - $ref: "#/components/parameters/ReportLimit"
+        - $ref: "#/components/parameters/ReportOffset"
+        - name: all
+          in: query
+          schema:
+            type: boolean
+        - name: location_ids
+          in: query
+          schema:
+            type: string
+  /api/v1/organizations/{orgId}/reports/sales/by-category:
+    get:
+      <<: *orgSales
+      operationId: reportOrgSalesByCategory
+  /api/v1/organizations/{orgId}/reports/sales/by-employee:
+    get:
+      <<: *orgSales
+      operationId: reportOrgSalesByEmployee
+  /api/v1/organizations/{orgId}/reports/orders/summary:
+    get:
+      <<: *orgSales
+      operationId: reportOrgOrdersSummary
+  /api/v1/organizations/{orgId}/reports/payments/by-method:
+    get:
+      <<: *orgSales
+      operationId: reportOrgPaymentsByMethod
+  /api/v1/organizations/{orgId}/reports/discounts:
+    get:
+      <<: *orgSales
+      operationId: reportOrgDiscounts
+  /api/v1/organizations/{orgId}/reports/voids-and-cancellations:
+    get: &orgAudit
+      operationId: reportOrgVoidsAndCancellations
+      x-required-permission: reports.audit.read
+      security:
+        - staffSession: []
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: "#/components/parameters/ReportFrom"
+        - $ref: "#/components/parameters/ReportTo"
+        - name: all
+          in: query
+          schema:
+            type: boolean
+        - name: location_ids
+          in: query
+          schema:
+            type: string
+      responses: *orgResponse
+  /api/v1/organizations/{orgId}/reports/refunds:
+    get:
+      <<: *orgAudit
+      operationId: reportOrgRefunds
+  /api/v1/organizations/{orgId}/reports/tips:
+    get:
+      <<: *orgSales
+      operationId: reportOrgTips
 components:
   securitySchemes:
     staffSession:

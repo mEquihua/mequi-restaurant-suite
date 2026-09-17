@@ -6,7 +6,7 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
-import { BrowserRouter, NavLink, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { FormEvent, useEffect, useState } from 'react';
 import {
   apiFetch,
@@ -22,6 +22,7 @@ import { useRealtime } from './realtime.js';
 type Me = {
   staff: { first_name: string; last_name: string };
   location_id: string;
+  organization_id: string;
   permissions: string[];
 };
 type Category = { id: string; name: string; is_active: boolean };
@@ -124,7 +125,7 @@ function Enrollment() {
           body: JSON.stringify({ location_id: locationId, name, device_profile: 'admin-pwa' }),
         },
       );
-      setTerminalCredential({ terminal_id: res.terminal.id, secret: res.terminal_credential });
+      setTerminalCredential(locationId, { terminal_id: res.terminal.id, secret: res.terminal_credential });
       window.location.reload();
     } catch (err) {
       clearSessionToken();
@@ -161,7 +162,14 @@ function Unlock() {
   async function submit(e: FormEvent) {
     e.preventDefault();
     try {
-      const credential = getTerminalCredential();
+      // A pending location switch (see handleSwitchLocation) stores its target
+      // here; without this, unlock would fall back to whichever location's
+      // credential happens to occupy the single legacy slot, which is only
+      // ever updated on a fresh enrollment — not on every switch to an
+      // already-enrolled location — and would silently unlock the WRONG
+      // location's session.
+      const targetLocationId = sessionStorage.getItem('target_location_id') ?? undefined;
+      const credential = getTerminalCredential(targetLocationId);
       if (!credential) throw new Error('Terminal enrollment is required.');
       const res = await apiFetch<{ token: string }>('/api/v1/auth/pin-unlock', {
         method: 'POST',
@@ -169,6 +177,7 @@ function Unlock() {
         body: JSON.stringify({ staff_id: staff, pin }),
       });
       setSessionToken(res.token);
+      sessionStorage.removeItem('target_location_id');
       window.location.reload();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unlock failed');
@@ -203,9 +212,84 @@ function Shell() {
     );
   return <Workspace me={me.data} />;
 }
+async function handleSwitchLocation(newLocationId: string, currentLoc: string) {
+  if (newLocationId === currentLoc) return;
+  let cred = getTerminalCredential(newLocationId);
+  if (!cred) {
+    try {
+      const res = await apiFetch<{ terminal: { id: string }; terminal_credential: string }>(
+        '/api/v1/terminals/enroll',
+        {
+          method: 'POST',
+          body: JSON.stringify({ location_id: newLocationId, name: 'Virtual Admin Terminal', device_profile: 'admin-pwa' }),
+        },
+      );
+      cred = { terminal_id: res.terminal.id, secret: res.terminal_credential };
+      setTerminalCredential(newLocationId, cred);
+    } catch (err) {
+      alert('Failed to enroll virtual terminal: ' + (err instanceof Error ? err.message : String(err)));
+      return;
+    }
+  }
+  clearSessionToken();
+  sessionStorage.setItem('target_location_id', newLocationId);
+  window.location.reload();
+}
+
+function LocationSwitcher({ me, orgLocations, reportLocations, setReportLocations }: { me: Me; orgLocations: {id: string, name: string}[]; reportLocations: string[]; setReportLocations: React.Dispatch<React.SetStateAction<string[]>> }) {
+  const { pathname } = useLocation();
+  const isReports = pathname.startsWith('/reports');
+
+  if (!isReports) {
+    return (
+      <div className="location-switcher" style={{ marginTop: '1rem', padding: '0.5rem', background: 'rgba(0,0,0,0.1)', borderRadius: '4px' }}>
+        <label>
+          <strong>Active Location</strong>
+          <select value={me.location_id} onChange={(e) => handleSwitchLocation(e.target.value, me.location_id)} style={{ width: '100%', marginTop: '0.5rem' }}>
+            {orgLocations.map(loc => <option key={loc.id} value={loc.id}>{loc.name}</option>)}
+          </select>
+        </label>
+      </div>
+    );
+  }
+
+  return (
+    <div className="location-switcher reports-mode" style={{ marginTop: '1rem', padding: '0.5rem', background: 'rgba(0,0,0,0.1)', borderRadius: '4px' }}>
+      <strong>Report Locations</strong>
+      <label style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+        <input type="checkbox" checked={reportLocations[0] === 'all'} onChange={() => setReportLocations(['all'])} />
+        All locations
+      </label>
+      {orgLocations.map(loc => (
+        <label key={loc.id} style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
+          <input type="checkbox" checked={reportLocations[0] !== 'all' && reportLocations.includes(loc.id)} onChange={(e) => {
+            if (e.target.checked) {
+              setReportLocations(prev => prev[0] === 'all' ? [loc.id] : [...prev, loc.id]);
+            } else {
+              setReportLocations(prev => {
+                const next = prev.filter(id => id !== loc.id);
+                return next.length === 0 ? ['all'] : next;
+              });
+            }
+          }} />
+          {loc.name}
+        </label>
+      ))}
+    </div>
+  );
+}
+
 function Workspace({ me }: { me: Me }) {
   useRealtime(me.location_id);
   const nav = navForPermissions(me.permissions);
+  const [reportLocations, setReportLocations] = useState<string[]>(['all']);
+
+  const orgLocationsQuery = useQuery({
+    queryKey: ['org-locations', me.organization_id],
+    queryFn: () => apiFetch<{ data: Array<{ id: string; name: string }> }>(`/api/v1/organizations/${me.organization_id}/locations`),
+  });
+  const orgLocations = orgLocationsQuery.data?.data ?? [];
+
   return (
     <div className="shell">
       <aside>
@@ -217,7 +301,8 @@ function Workspace({ me }: { me: Me }) {
         <p>
           {me.staff.first_name} {me.staff.last_name}
         </p>
-        <nav>
+        <LocationSwitcher me={me} orgLocations={orgLocations} reportLocations={reportLocations} setReportLocations={setReportLocations} />
+        <nav style={{ marginTop: '1rem' }}>
           {nav.map(([label, path]) => (
             <NavLink key={path} to={path}>
               {label}
@@ -236,39 +321,13 @@ function Workspace({ me }: { me: Me }) {
       </aside>
       <main className="content">
         <Routes>
-          <Route
-            path="/menu"
-            element={<Menu permissions={me.permissions} locationId={me.location_id} />}
-          />
-
-          <Route
-            path="/inventory"
-            element={<Inventory permissions={me.permissions} locationId={me.location_id} />}
-          />
-          <Route
-            path="/modules"
-            element={<Modules permissions={me.permissions} locationId={me.location_id} />}
-          />
-          <Route
-            path="/delivery-zones"
-            element={<DeliveryZones permissions={me.permissions} locationId={me.location_id} />}
-          />
-          <Route
-            path="/staff"
-            element={<People permissions={me.permissions} locationId={me.location_id} />}
-          />
-          <Route
-            path="/reports"
-            element={<Reports permissions={me.permissions} locationId={me.location_id} />}
-          />
-          <Route
-            path="/no-access"
-            element={
-              <section>
-                <h2>No Admin access</h2>
-              </section>
-            }
-          />
+          <Route path="/menu" element={<Menu permissions={me.permissions} locationId={me.location_id} />} />
+          <Route path="/inventory" element={<Inventory permissions={me.permissions} locationId={me.location_id} />} />
+          <Route path="/modules" element={<Modules permissions={me.permissions} locationId={me.location_id} />} />
+          <Route path="/delivery-zones" element={<DeliveryZones permissions={me.permissions} locationId={me.location_id} />} />
+          <Route path="/staff" element={<People permissions={me.permissions} locationId={me.location_id} />} />
+          <Route path="/reports" element={<Reports permissions={me.permissions} organizationId={me.organization_id} reportLocations={reportLocations} />} />
+          <Route path="/no-access" element={<section><h2>No Admin access</h2></section>} />
           <Route path="*" element={<Navigate to={nav[0]?.[1] ?? '/no-access'} replace />} />
         </Routes>
       </main>
@@ -691,6 +750,7 @@ function Availability({
 type DeliveryZone = {
   id: string;
   location_id: string;
+  organization_id: string;
   name: string;
   fee: number;
   minimum_order_amount: number;
@@ -1270,11 +1330,9 @@ const reportEndpoints = [
   ['Refunds', 'refunds', 'reports.audit.read'],
   ['Tips', 'tips', 'reports.sales.read'],
 ] as const;
-function Reports({ permissions, locationId }: { permissions: string[]; locationId: string }) {
-  const [from, setFrom] = useState(() =>
-      new Date(Date.now() - 6 * 86400000).toISOString().slice(0, 10),
-    ),
-    [to, setTo] = useState(() => new Date().toISOString().slice(0, 10));
+function Reports({ permissions, organizationId, reportLocations }: { permissions: string[]; organizationId: string; reportLocations: string[] }) {
+  const [from, setFrom] = useState(() => new Date(Date.now() - 6 * 86400000).toISOString().slice(0, 10));
+  const [to, setTo] = useState(() => new Date().toISOString().slice(0, 10));
   let rangeError = '';
   let range: { from: string; to: string } | undefined;
   try {
@@ -1283,6 +1341,9 @@ function Reports({ permissions, locationId }: { permissions: string[]; locationI
     rangeError = error instanceof Error ? error.message : 'Invalid range';
   }
   const active = reportEndpoints.filter(([, , permission]) => permissions.includes(permission));
+  const isAll = reportLocations[0] === 'all';
+  const isMulti = isAll || reportLocations.length > 1;
+
   return (
     <section>
       <h2>Reports</h2>
@@ -1299,54 +1360,62 @@ function Reports({ permissions, locationId }: { permissions: string[]; locationI
       <ErrorNotice error={rangeError} />
       {range && (
         <div className="reports">
-          {active.map(([title, endpoint]) => (
-            <ReportTable
-              key={endpoint}
-              title={title}
-              path={`/api/v1/locations/${locationId}/reports/${endpoint}?from=${encodeURIComponent(range.from)}&to=${encodeURIComponent(range.to)}`}
-            />
-          ))}
+          {active.map(([title, endpoint]) => {
+            const basePath = isMulti 
+              ? `/api/v1/organizations/${organizationId}/reports/${endpoint}`
+              : `/api/v1/locations/${reportLocations[0]}/reports/${endpoint}`;
+            const qs = isMulti ? (isAll ? `&all=true` : `&location_ids=${reportLocations.join(',')}`) : '';
+            return (
+              <ReportTable
+                key={endpoint}
+                title={title}
+                path={`${basePath}?from=${encodeURIComponent(range!.from)}&to=${encodeURIComponent(range!.to)}${qs}`}
+                isMulti={isMulti}
+              />
+            );
+          })}
         </div>
       )}
     </section>
   );
 }
-function ReportTable({ title, path }: { title: string; path: string }) {
+function ReportTable({ title, path, isMulti }: { title: string; path: string; isMulti: boolean }) {
   const query = useQuery({
     queryKey: ['report', path],
-    queryFn: () => apiFetch<{ data: Array<Record<string, unknown>> }>(path),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    queryFn: () => apiFetch<{ data: any }>(path),
   });
-  const rows = query.data?.data ?? [];
-  const columns = rows[0] ? Object.keys(rows[0]) : [];
+
+  const renderTable = (rows: Array<Record<string, unknown>>, subTitle?: string) => {
+    const columns = rows[0] ? Object.keys(rows[0]) : [];
+    return (
+      <div key={subTitle ?? 'single'} style={{ marginBottom: '1rem' }}>
+        {subTitle && <h4 style={{ margin: '0.5rem 0' }}>{subTitle}</h4>}
+        {rows.length === 0 ? <p>No data in this range.</p> : (
+          <table>
+            <thead><tr>{columns.map(c => <th key={c}>{c.replaceAll('_', ' ')}</th>)}</tr></thead>
+            <tbody>
+              {rows.map((row, i) => (
+                <tr key={i}>{columns.map(c => <td key={c}>{String(row[c] ?? '')}</td>)}</tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    );
+  };
+
+  const data = query.data?.data ?? [];
   return (
     <article className="panel report">
       <h3>{title}</h3>
-      {query.isLoading ? (
-        <p>Loading…</p>
-      ) : (
+      {query.isLoading ? <p>Loading…</p> : (
         <>
           <ErrorNotice error={query.error} />
-          {rows.length === 0 ? (
-            <p>No data in this range.</p>
+          {isMulti ? (
+            data.length === 0 ? <p>No locations returned data.</p> : data.map((locGroup: { data: Array<Record<string, unknown>>; location_name: string }) => renderTable(locGroup.data, locGroup.location_name))
           ) : (
-            <table>
-              <thead>
-                <tr>
-                  {columns.map((column) => (
-                    <th key={column}>{column.replaceAll('_', ' ')}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row, i) => (
-                  <tr key={i}>
-                    {columns.map((column) => (
-                      <td key={column}>{String(row[column] ?? '—')}</td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            renderTable(data)
           )}
         </>
       )}

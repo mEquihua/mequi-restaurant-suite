@@ -198,28 +198,48 @@ export const identityRoute: FastifyPluginAsync<IdentityRouteOptions> = async (ap
       const body = request.body as EnrollTerminalBody;
       const enrolled = await withSession(request, async (actor) => {
         requirePermission(actor, 'iam.terminals.enroll');
-        if (body.location_id !== actor.locationId)
-          throw new IdentityHttpError(
-            403,
-            'LOCATION_SCOPE_DENIED',
-            'The session is not scoped to the requested location.',
-          );
+        const organizationId = actor.organizationId;
         if (!body.name?.trim())
           throw new IdentityHttpError(400, 'VALIDATION_ERROR', 'Terminal name is required.');
-        const terminalId = crypto.randomUUID();
-        const credential = createTerminalCredential(actor.locationId, terminalId);
-        const terminal = await actor.trx
-          .insertInto('terminals')
-          .values({
-            id: terminalId,
-            location_id: actor.locationId,
-            name: body.name.trim(),
-            device_profile: body.device_profile?.trim() || null,
-            credential_hash: hashSecret(credential),
-          })
-          .returningAll()
-          .executeTakeFirstOrThrow();
-        return { terminal: publicTerminal(terminal), terminal_credential: credential };
+        // The caller's own transaction (actor.trx) is RLS-scoped to their own
+        // session location (app.current_location_id = actor.locationId). The
+        // `terminals` table enforces a RESTRICTIVE RLS policy on INSERT
+        // matching that same setting, so inserting a row for a DIFFERENT
+        // location inside actor.trx is rejected by Postgres itself, not just
+        // an application-level check — relaxing the app-level location check
+        // alone is not sufficient. Enrolling a terminal for another location
+        // in the same organization requires its own transaction scoped to
+        // the TARGET location, exactly like the multi-location reports
+        // aggregation already does per-location.
+        return app.withLocationTransaction(body.location_id, async (trx) => {
+          const location = await trx
+            .selectFrom('locations')
+            .select('id')
+            .where('id', '=', body.location_id)
+            .where('organization_id', '=', organizationId)
+            .executeTakeFirst();
+          if (!location) {
+            throw new IdentityHttpError(
+              404,
+              'NOT_FOUND',
+              'Location was not found in this organization.',
+            );
+          }
+          const terminalId = crypto.randomUUID();
+          const credential = createTerminalCredential(body.location_id, terminalId);
+          const terminal = await trx
+            .insertInto('terminals')
+            .values({
+              id: terminalId,
+              location_id: body.location_id,
+              name: body.name.trim(),
+              device_profile: body.device_profile?.trim() || null,
+              credential_hash: hashSecret(credential),
+            })
+            .returningAll()
+            .executeTakeFirstOrThrow();
+          return { terminal: publicTerminal(terminal), terminal_credential: credential };
+        });
       });
       return reply.status(201).send(enrolled);
     },
@@ -407,6 +427,7 @@ export const identityRoute: FastifyPluginAsync<IdentityRouteOptions> = async (ap
       },
       location_id: actor.locationId,
       terminal_id: actor.terminalId,
+      organization_id: actor.organizationId,
       roles: actor.roles,
       permissions: actor.permissions,
     })),

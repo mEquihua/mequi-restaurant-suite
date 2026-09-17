@@ -45,6 +45,8 @@ describeIntegration('online ordering list endpoint integration tests against Pos
       'cancellations_and_voids',
       'payments',
       'order_fulfillments',
+      'reservations',
+      'reservation_settings',
       'customer_sessions',
       'customers',
       'order_line_modifiers',

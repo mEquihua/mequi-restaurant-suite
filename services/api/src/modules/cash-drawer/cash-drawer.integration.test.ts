@@ -53,6 +53,8 @@ describeIntegration('cash drawer API against PostgreSQL', () => {
       'order_lines',
       'orders',
       'accounts',
+      'reservations',
+      'reservation_settings',
       'visits',
       'table_sections',
       'sections',

@@ -106,6 +106,8 @@ export interface Database {
   ingredient_stock: IngredientStockTable;
   recipe_lines: RecipeLineTable;
   stock_adjustments: StockAdjustmentTable;
+  reservations: ReservationTable;
+  reservation_settings: ReservationSettingsTable;
 }
 
 export type TableName = keyof Database;
@@ -556,6 +558,41 @@ export interface StockAdjustmentTable {
   quantity_delta: string;
   reason: string;
   created_at: Generated<Date>;
+}
+
+export interface ReservationTable {
+  id: Generated<string>;
+  location_id: string;
+  customer_id: string | null;
+  party_size: number;
+  requested_at: Generated<Date>;
+  reservation_time: Date;
+  status: string;
+  customer_name: string;
+  customer_email: string | null;
+  customer_phone: string | null;
+  special_requests: string | null;
+  visit_id: string | null;
+  guest_token_hash: string | null;
+  confirmed_by_staff_id: string | null;
+  cancelled_by_staff_id: string | null;
+  version: Generated<number>;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
+export interface ReservationSettingsTable {
+  id: Generated<string>;
+  location_id: string;
+  accepts_reservations: Generated<boolean>;
+  operating_hours: Generated<unknown>;
+  estimated_visit_duration_minutes: Generated<number>;
+  minimum_lead_time_minutes: Generated<number>;
+  maximum_party_size: Generated<number>;
+  auto_confirm: Generated<boolean>;
+  version: Generated<number>;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
 }
 
 export type DatabaseTransaction = Transaction<Database>;

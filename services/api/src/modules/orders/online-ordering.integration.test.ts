@@ -33,12 +33,22 @@ describeIntegration('online ordering list endpoint integration tests against Pos
 
   beforeAll(async () => {
     // Clear relevant tables
-    for (const name of ['stock_adjustments', 'ingredient_stock', 'recipe_lines', 'ingredients', 
+    for (const name of [
+      'stock_adjustments',
+      'ingredient_stock',
+      'recipe_lines',
+      'ingredients',
       'cash_drawer_movements',
       'cash_drawer_sessions',
       'module_activations',
       'command_idempotency',
       'audit_events',
+      'loyalty_transactions',
+      'loyalty_redemptions',
+      'loyalty_accounts',
+      'loyalty_rewards',
+      'loyalty_coupons',
+      'loyalty_settings',
       'account_discounts',
       'outbox_events',
       'refunds',
@@ -53,6 +63,7 @@ describeIntegration('online ordering list endpoint integration tests against Pos
       'order_lines',
       'orders',
       'accounts',
+      'guest_sessions',
       'visits',
       'table_sections',
       'sections',
@@ -77,7 +88,7 @@ describeIntegration('online ordering list endpoint integration tests against Pos
       'roles',
       'delivery_zones',
       'locations',
-      'organizations',
+      'organizations'
     ] as const) {
       await db.deleteFrom(name).execute().catch(() => {});
     }

@@ -2415,6 +2415,182 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/loyalty-settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getLoyaltySettings"];
+        put: operations["updateLoyaltySettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/loyalty-rewards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listLoyaltyRewards"];
+        put?: never;
+        post: operations["createLoyaltyReward"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/loyalty-rewards/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["updateLoyaltyReward"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/loyalty-coupons": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listLoyaltyCoupons"];
+        put?: never;
+        post: operations["createLoyaltyCoupon"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/loyalty-coupons/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["updateLoyaltyCoupon"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/{customerId}/loyalty": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getCustomerLoyalty"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/{customerId}/loyalty/adjust": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["adjustCustomerLoyalty"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/locations/{locationId}/visits/{visitId}/attach-customer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["attachCustomerToVisit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/locations/{locationId}/visits/{visitId}/redeem-reward": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["redeemReward"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/me/loyalty": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getMyLoyalty"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/me/loyalty/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getMyLoyaltyHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3387,6 +3563,66 @@ export interface components {
             /** Format: uuid */
             visit_id?: string | null;
             version: number;
+        };
+        LoyaltySettings: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            organization_id: string;
+            spend_amount_for_one_point: number;
+            version: number;
+        };
+        LoyaltyReward: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            organization_id: string;
+            name: string;
+            description?: string | null;
+            cost_in_points?: number | null;
+            cost_in_visits?: number | null;
+            discount_type: string;
+            discount_value: number;
+            is_active: boolean;
+            version: number;
+        };
+        LoyaltyCoupon: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            organization_id: string;
+            code: string;
+            discount_type: string;
+            discount_value: number;
+            is_active: boolean;
+            version: number;
+        };
+        LoyaltyAccount: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            organization_id: string;
+            /** Format: uuid */
+            customer_id: string;
+            points_balance: number;
+            total_visits: number;
+            version: number;
+        };
+        LoyaltyTransaction: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            organization_id: string;
+            /** Format: uuid */
+            loyalty_account_id: string;
+            transaction_type: string;
+            points_delta: number;
+            visit_count_delta: number;
+            reason: string;
+            /** Format: uuid */
+            reference_visit_id?: string | null;
+            /** Format: date-time */
+            created_at?: string;
         };
     };
     responses: {
@@ -7076,6 +7312,391 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Reservation"];
+                };
+            };
+        };
+    };
+    getLoyaltySettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Loyalty settings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoyaltySettings"];
+                };
+            };
+        };
+    };
+    updateLoyaltySettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    spend_amount_for_one_point: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Updated loyalty settings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoyaltySettings"];
+                };
+            };
+        };
+    };
+    listLoyaltyRewards: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of rewards */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["LoyaltyReward"][];
+                    };
+                };
+            };
+        };
+    };
+    createLoyaltyReward: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name: string;
+                    description?: string | null;
+                    cost_in_points?: number | null;
+                    cost_in_visits?: number | null;
+                    discount_type: string;
+                    discount_value: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Created reward */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoyaltyReward"];
+                };
+            };
+        };
+    };
+    updateLoyaltyReward: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name?: string;
+                    description?: string | null;
+                    cost_in_points?: number | null;
+                    cost_in_visits?: number | null;
+                    discount_type?: string;
+                    discount_value?: number;
+                    is_active?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Updated reward */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoyaltyReward"];
+                };
+            };
+        };
+    };
+    listLoyaltyCoupons: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of coupons */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["LoyaltyCoupon"][];
+                    };
+                };
+            };
+        };
+    };
+    createLoyaltyCoupon: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    code: string;
+                    discount_type: string;
+                    discount_value: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Created coupon */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoyaltyCoupon"];
+                };
+            };
+        };
+    };
+    updateLoyaltyCoupon: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    discount_type?: string;
+                    discount_value?: number;
+                    is_active?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Updated coupon */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoyaltyCoupon"];
+                };
+            };
+        };
+    };
+    getCustomerLoyalty: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customerId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Customer loyalty data */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        account: components["schemas"]["LoyaltyAccount"];
+                        transactions: components["schemas"]["LoyaltyTransaction"][];
+                    };
+                };
+            };
+        };
+    };
+    adjustCustomerLoyalty: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customerId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    points_delta: number;
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Adjusted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoyaltyTransaction"];
+                };
+            };
+        };
+    };
+    attachCustomerToVisit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                locationId: string;
+                visitId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    phone: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Attached */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        customer_id: string;
+                    };
+                };
+            };
+        };
+    };
+    redeemReward: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                locationId: string;
+                visitId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    reward_id?: string;
+                    /** Format: uuid */
+                    order_line_id?: string;
+                    coupon_code?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Redeemed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        discount_id: string;
+                    };
+                };
+            };
+        };
+    };
+    getMyLoyalty: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Loyalty balance and available rewards */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        points_balance: number;
+                        total_visits: number;
+                        available_rewards: components["schemas"]["LoyaltyReward"][];
+                    };
+                };
+            };
+        };
+    };
+    getMyLoyaltyHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Loyalty history */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["LoyaltyTransaction"][];
+                    };
                 };
             };
         };

@@ -18,6 +18,7 @@ import {
   setTerminalCredential,
 } from './api.js';
 import { useRealtime } from './realtime.js';
+import { Loyalty } from './Loyalty.js';
 
 type Me = {
   staff: { first_name: string; last_name: string };
@@ -83,6 +84,7 @@ export const navForPermissions = (permissions: string[]) =>
     ['Inventory', '/inventory', 'inventory.stock.read'],
     ['Delivery Zones', '/delivery-zones', 'delivery.zones.read'],
     ['Reservations', '/reservations', 'reservations.settings.read'],
+    ['Loyalty', '/loyalty', 'loyalty.settings.read'],
     ['Module Center', '/modules', 'module_center.modules.read'],
     ['Staff & Roles', '/staff', 'iam.staff.read'],
     ['Reports', '/reports', 'reports.sales.read'],
@@ -327,6 +329,7 @@ function Workspace({ me }: { me: Me }) {
           <Route path="/modules" element={<Modules permissions={me.permissions} locationId={me.location_id} />} />
           <Route path="/delivery-zones" element={<DeliveryZones permissions={me.permissions} locationId={me.location_id} />} />
           <Route path="/reservations" element={<Reservations permissions={me.permissions} locationId={me.location_id} />} />
+          <Route path="/loyalty" element={<Loyalty permissions={me.permissions} />} />
           <Route path="/staff" element={<People permissions={me.permissions} locationId={me.location_id} />} />
           <Route path="/reports" element={<Reports permissions={me.permissions} organizationId={me.organization_id} reportLocations={reportLocations} />} />
           <Route path="/no-access" element={<section><h2>No Admin access</h2></section>} />

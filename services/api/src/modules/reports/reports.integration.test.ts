@@ -23,11 +23,75 @@ describeIntegration('reports API against PostgreSQL', () => {
   const auth = (token = salesToken) => ({ authorization: `Bearer ${token}` });
 
   beforeAll(async () => {
-    for (const table of ['stock_adjustments', 'ingredient_stock', 'recipe_lines', 'ingredients', 'cash_drawer_movements', 'cash_drawer_sessions', 'command_idempotency', 'audit_events', 'account_discounts', 'outbox_events', 'refunds', 'cancellations_and_voids', 'payments', 'order_fulfillments', 'order_line_modifiers', 'order_lines', 'orders', 'accounts', 'reservations', 'reservation_settings', 'visits', 'table_sections', 'sections', 'tables', 'areas', 'availability_rules', 'location_price_overrides', 'product_combo_items', 'product_combo_groups', 'product_modifier_groups', 'modifiers', 'modifier_groups', 'product_variants', 'products', 'categories', 'terminal_pin_attempts', 'staff_sessions', 'staff_roles', 'role_permissions', 'terminals', 'staff', 'roles', 'customer_sessions', 'customers', 'delivery_zones', 'locations', 'organizations'] as const)
+    for (const table of [
+      'stock_adjustments',
+      'ingredient_stock',
+      'recipe_lines',
+      'ingredients',
+      'cash_drawer_movements',
+      'cash_drawer_sessions',
+      'command_idempotency',
+      'audit_events',
+      'reservations',
+      'reservation_settings',
+      'loyalty_transactions',
+      'loyalty_redemptions',
+      'loyalty_accounts',
+      'loyalty_rewards',
+      'loyalty_coupons',
+      'loyalty_settings',
+      'account_discounts',
+      'outbox_events',
+      'refunds',
+      'cancellations_and_voids',
+      'payments',
+      'order_fulfillments',
+      'order_line_modifiers',
+      'order_lines',
+      'orders',
+      'accounts',
+      'guest_sessions',
+      'visits',
+      'table_sections',
+      'sections',
+      'tables',
+      'areas',
+      'availability_rules',
+      'location_price_overrides',
+      'product_combo_items',
+      'product_combo_groups',
+      'product_modifier_groups',
+      'modifiers',
+      'modifier_groups',
+      'product_variants',
+      'products',
+      'categories',
+      'terminal_pin_attempts',
+      'staff_sessions',
+      'staff_roles',
+      'role_permissions',
+      'terminals',
+      'staff',
+      'roles',
+      'customer_sessions',
+      'customers',
+      'delivery_zones',
+      'locations',
+      'organizations'] as const)
       await db.deleteFrom(table).execute();
     const org = (await db.insertInto('organizations').values({ name: 'Reports Integration' }).returning('id').executeTakeFirstOrThrow()).id;
-    location = (await db.insertInto('locations').values({ organization_id: org, name: 'Centro', timezone: 'America/Mexico_City' }).returning('id').executeTakeFirstOrThrow()).id;
-    const [salesRole, auditRole, noReportsRole] = await db.insertInto('roles').values([{ organization_id: org, name: 'Sales reporter' }, { organization_id: org, name: 'Audit reporter' }, { organization_id: org, name: 'No reports' }]).returning('id').execute();
+    location = (await db.insertInto('locations').values({ organization_id: org,
+      name: 'Centro',
+      timezone: 'America/Mexico_City' }).returning('id').executeTakeFirstOrThrow()).id;
+    const [salesRole,
+      auditRole,
+      noReportsRole] = await db.insertInto('roles').values([{ organization_id: org,
+      name: 'Sales reporter' },
+      { organization_id: org,
+      name: 'Audit reporter' },
+      { organization_id: org,
+      name: 'No reports' }
+    ]).returning('id').execute();
     await db.insertInto('role_permissions').values([{ role_id: salesRole.id, permission_name: 'reports.sales.read', scope: 'location' }, { role_id: auditRole.id, permission_name: 'reports.audit.read', scope: 'location' }]).execute();
     const pinHash = await argon2.hash('2468');
     [staff] = (await db.insertInto('staff').values([{ organization_id: org, first_name: 'Ada', last_name: 'Sales', pin_hash: pinHash }, { organization_id: org, first_name: 'Aria', last_name: 'Audit', pin_hash: pinHash }, { organization_id: org, first_name: 'Nora', last_name: 'None', pin_hash: pinHash }]).returning('id').execute()).map(({ id }) => id);

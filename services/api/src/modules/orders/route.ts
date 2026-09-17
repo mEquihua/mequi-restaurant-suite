@@ -1766,6 +1766,49 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
           .where('visit_id', '=', visitId)
           .execute();
 
+        if (updated.customer_id) {
+          // loyalty_accounts/loyalty_transactions carry organization-scoped RLS, but
+          // actor.trx here only has app.current_location_id set (staff sessions run in
+          // a location-scoped transaction) -- without this, the read below silently
+          // returns nothing and the writes are rejected by the RESTRICTIVE policy's
+          // WITH CHECK. set_config can be called again within the same transaction, so
+          // this preserves atomicity with the visit-close/reservation-completion work
+          // above rather than opening a second, separately-committed transaction.
+          await sql`SELECT set_config('app.current_organization_id', ${actor.organizationId}, true)`.execute(actor.trx);
+          const settings = await actor.trx.selectFrom('loyalty_settings').selectAll().where('organization_id', '=', actor.organizationId).executeTakeFirst();
+          if (settings) {
+            const sumAccounts = await actor.trx.selectFrom('accounts')
+              .select(sql<number>`coalesce(sum(subtotal), 0)`.as('total_subtotal'))
+              .where('visit_id', '=', visitId)
+              .where('status', 'in', ['PAID', 'CLOSED'])
+              .executeTakeFirst();
+            const totalSubtotal = sumAccounts?.total_subtotal ?? 0;
+            const pointsEarned = Math.floor(totalSubtotal / settings.spend_amount_for_one_point);
+            if (pointsEarned > 0 || totalSubtotal > 0) {
+              let account = await actor.trx.selectFrom('loyalty_accounts').selectAll().where('customer_id', '=', updated.customer_id).where('organization_id', '=', actor.organizationId).executeTakeFirst();
+              if (!account) {
+                account = await actor.trx.insertInto('loyalty_accounts').values({
+                  organization_id: actor.organizationId,
+                  customer_id: updated.customer_id,
+                }).returningAll().executeTakeFirstOrThrow();
+              }
+              await actor.trx.updateTable('loyalty_accounts')
+                .set({ points_balance: account.points_balance + pointsEarned, total_visits: account.total_visits + 1, version: sql<number>`version + 1` })
+                .where('id', '=', account.id)
+                .execute();
+              await actor.trx.insertInto('loyalty_transactions').values({
+                organization_id: actor.organizationId,
+                loyalty_account_id: account.id,
+                transaction_type: 'ACCRUAL',
+                points_delta: pointsEarned,
+                visit_count_delta: 1,
+                reason: 'Visit Accrual',
+                reference_visit_id: visitId
+              }).execute();
+            }
+          }
+        }
+
         await actor.trx
           .updateTable('guest_sessions')
           .set({ revoked_at: now() })

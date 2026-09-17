@@ -21,11 +21,70 @@ describeIntegration('Module Center API against PostgreSQL', () => {
   const auth = (token: string) => ({ authorization: `Bearer ${token}` });
 
   beforeAll(async () => {
-    for (const table of ['stock_adjustments', 'ingredient_stock', 'recipe_lines', 'ingredients', 'cash_drawer_movements', 'cash_drawer_sessions', 'module_activations', 'command_idempotency', 'audit_events', 'account_discounts', 'outbox_events', 'refunds', 'cancellations_and_voids', 'payments', 'order_fulfillments', 'order_line_modifiers', 'order_lines', 'orders', 'accounts', 'reservations', 'reservation_settings', 'visits', 'table_sections', 'sections', 'tables', 'areas', 'availability_rules', 'location_price_overrides', 'product_combo_items', 'product_combo_groups', 'product_modifier_groups', 'modifiers', 'modifier_groups', 'product_variants', 'products', 'categories', 'terminal_pin_attempts', 'staff_sessions', 'staff_roles', 'role_permissions', 'terminals', 'staff', 'roles', 'customer_sessions', 'customers', 'delivery_zones', 'locations', 'organizations'] as const) {
+    for (const table of [
+      'stock_adjustments',
+      'ingredient_stock',
+      'recipe_lines',
+      'ingredients',
+      'cash_drawer_movements',
+      'cash_drawer_sessions',
+      'module_activations',
+      'command_idempotency',
+      'audit_events',
+      'reservations',
+      'reservation_settings',
+      'loyalty_transactions',
+      'loyalty_redemptions',
+      'loyalty_accounts',
+      'loyalty_rewards',
+      'loyalty_coupons',
+      'loyalty_settings',
+      'account_discounts',
+      'outbox_events',
+      'refunds',
+      'cancellations_and_voids',
+      'payments',
+      'order_fulfillments',
+      'order_line_modifiers',
+      'order_lines',
+      'orders',
+      'accounts',
+      'guest_sessions',
+      'visits',
+      'table_sections',
+      'sections',
+      'tables',
+      'areas',
+      'availability_rules',
+      'location_price_overrides',
+      'product_combo_items',
+      'product_combo_groups',
+      'product_modifier_groups',
+      'modifiers',
+      'modifier_groups',
+      'product_variants',
+      'products',
+      'categories',
+      'terminal_pin_attempts',
+      'staff_sessions',
+      'staff_roles',
+      'role_permissions',
+      'terminals',
+      'staff',
+      'roles',
+      'customer_sessions',
+      'customers',
+      'delivery_zones',
+      'locations',
+      'organizations'] as const) {
       await db.deleteFrom(table).execute();
     }
     const organization = await db.insertInto('organizations').values({ name: 'Module Center Integration Restaurant' }).returning('id').executeTakeFirstOrThrow(); organizationId = organization.id;
-    const locations = await db.insertInto('locations').values([{ organization_id: organizationId, name: 'Downtown' }, { organization_id: organizationId, name: 'Airport' }]).returning('id').execute(); [locationA, locationB] = locations.map((location) => location.id);
+    const locations = await db.insertInto('locations').values([{ organization_id: organizationId,
+      name: 'Downtown' },
+      { organization_id: organizationId,
+      name: 'Airport' }
+    ]).returning('id').execute(); [locationA, locationB] = locations.map((location) => location.id);
     const role = await db.insertInto('roles').values({ organization_id: organizationId, name: 'Owner' }).returning('id').executeTakeFirstOrThrow();
     await db.insertInto('role_permissions').values(['module_center.modules.read', 'module_center.modules.write'].map((permission_name) => ({ role_id: role.id, permission_name, scope: 'organization' }))).execute();
     const owner = await db.insertInto('staff').values({ organization_id: organizationId, first_name: 'Module', last_name: 'Owner', pin_hash: await argon2.hash('2468') }).returning('id').executeTakeFirstOrThrow(); ownerId = owner.id;

@@ -39,22 +39,34 @@ describeIntegration('cash drawer API against PostgreSQL', () => {
   const auth = () => ({ authorization: `Bearer ${token}` });
 
   beforeAll(async () => {
-    for (const table of ['stock_adjustments', 'ingredient_stock', 'recipe_lines', 'ingredients', 
+    for (const table of [
+      'stock_adjustments',
+      'ingredient_stock',
+      'recipe_lines',
+      'ingredients',
       'cash_drawer_movements',
       'cash_drawer_sessions',
       'command_idempotency',
       'audit_events',
+      'reservations',
+      'reservation_settings',
+      'loyalty_transactions',
+      'loyalty_redemptions',
+      'loyalty_accounts',
+      'loyalty_rewards',
+      'loyalty_coupons',
+      'loyalty_settings',
       'account_discounts',
       'outbox_events',
       'refunds',
       'cancellations_and_voids',
       'payments',
-      'order_fulfillments', 'order_line_modifiers',
+      'order_fulfillments',
+      'order_line_modifiers',
       'order_lines',
       'orders',
       'accounts',
-      'reservations',
-      'reservation_settings',
+      'guest_sessions',
       'visits',
       'table_sections',
       'sections',
@@ -77,9 +89,12 @@ describeIntegration('cash drawer API against PostgreSQL', () => {
       'terminals',
       'staff',
       'roles',
-      'customer_sessions', 'customers', 'delivery_zones', 'locations',
+      'customer_sessions',
+      'customers',
+      'delivery_zones',
+      'locations',
       'organizations',
-    ] as const)
+      ] as const)
       await db.deleteFrom(table).execute();
 
     org = (
@@ -89,13 +104,16 @@ describeIntegration('cash drawer API against PostgreSQL', () => {
         .returning('id')
         .executeTakeFirstOrThrow()
     ).id;
-    [location, otherLocation] = (
+    [location,
+      otherLocation] = (
       await db
         .insertInto('locations')
         .values([
-          { organization_id: org, name: 'A' },
-          { organization_id: org, name: 'B' },
-        ])
+          { organization_id: org,
+      name: 'A' },
+      { organization_id: org,
+      name: 'B' }
+    ])
         .returning('id')
         .execute()
     ).map((row) => row.id);

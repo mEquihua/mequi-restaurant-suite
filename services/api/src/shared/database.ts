@@ -108,6 +108,13 @@ export interface Database {
   stock_adjustments: StockAdjustmentTable;
   reservations: ReservationTable;
   reservation_settings: ReservationSettingsTable;
+  loyalty_settings: LoyaltySettingsTable;
+  loyalty_accounts: LoyaltyAccountTable;
+  loyalty_rewards: LoyaltyRewardTable;
+  loyalty_coupons: LoyaltyCouponTable;
+  loyalty_transactions: LoyaltyTransactionTable;
+  loyalty_redemptions: LoyaltyRedemptionTable;
+
 }
 
 export type TableName = keyof Database;
@@ -457,7 +464,7 @@ export interface AccountDiscountTable {
   value: number;
   computed_amount: number;
   reason: string;
-  applied_by: string;
+  applied_by: string | null;
   is_override: boolean;
   created_at: Generated<Date>;
 }
@@ -593,6 +600,76 @@ export interface ReservationSettingsTable {
   version: Generated<number>;
   created_at: Generated<Date>;
   updated_at: Generated<Date>;
+}
+
+
+export interface LoyaltySettingsTable {
+  id: Generated<string>;
+  organization_id: string;
+  spend_amount_for_one_point: Generated<number>;
+  version: Generated<number>;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
+export interface LoyaltyAccountTable {
+  id: Generated<string>;
+  organization_id: string;
+  customer_id: string;
+  points_balance: Generated<number>;
+  total_visits: Generated<number>;
+  version: Generated<number>;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
+export interface LoyaltyRewardTable {
+  id: Generated<string>;
+  organization_id: string;
+  name: string;
+  description: string | null;
+  cost_in_points: number | null;
+  cost_in_visits: number | null;
+  discount_type: 'PERCENTAGE' | 'AMOUNT';
+  discount_value: number;
+  is_active: Generated<boolean>;
+  version: Generated<number>;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
+export interface LoyaltyCouponTable {
+  id: Generated<string>;
+  organization_id: string;
+  code: string;
+  discount_type: 'PERCENTAGE' | 'AMOUNT';
+  discount_value: number;
+  is_active: Generated<boolean>;
+  version: Generated<number>;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
+export interface LoyaltyTransactionTable {
+  id: Generated<string>;
+  organization_id: string;
+  loyalty_account_id: string;
+  transaction_type: string;
+  points_delta: number;
+  visit_count_delta: number;
+  reason: string;
+  reference_visit_id: string | null;
+  created_at: Generated<Date>;
+}
+
+export interface LoyaltyRedemptionTable {
+  id: Generated<string>;
+  organization_id: string;
+  loyalty_account_id: string | null;
+  reward_id: string | null;
+  coupon_id: string | null;
+  account_discount_id: string;
+  created_at: Generated<Date>;
 }
 
 export type DatabaseTransaction = Transaction<Database>;

@@ -339,4 +339,30 @@ describeIntegration('identity API against PostgreSQL', () => {
     });
     expect(reassigned.statusCode).toBe(200);
   });
+
+  it('enrolls a terminal for a DIFFERENT location in the SAME organization', async () => {
+    const enrolled = await app.inject({
+      method: 'POST',
+      url: '/api/v1/terminals/enroll',
+      headers: { authorization: `Bearer ${ownerSession}` },
+      payload: { location_id: locationB, name: 'POS 2' },
+    });
+    expect(enrolled.statusCode).toBe(201);
+  });
+
+  it('fails to enroll a terminal for a location that does not belong to the caller\'s organization', async () => {
+    // This codebase enforces a hard single-organization-per-install constraint
+    // (organizations.unq_is_single_org), so a genuinely separate organization
+    // row cannot exist alongside this test's own. A location id that simply
+    // doesn't exist exercises the exact same query path in the handler
+    // (`WHERE id = body.location_id AND organization_id = actor.organizationId`
+    // — no match either way) without violating that constraint.
+    const enrolled = await app.inject({
+      method: 'POST',
+      url: '/api/v1/terminals/enroll',
+      headers: { authorization: `Bearer ${ownerSession}` },
+      payload: { location_id: crypto.randomUUID(), name: 'POS 3' },
+    });
+    expect(enrolled.statusCode).toBe(404);
+  });
 });

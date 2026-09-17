@@ -16,7 +16,16 @@ export class ApiError extends Error {
 export const getSessionToken = () => sessionStorage.getItem('session_token');
 export const setSessionToken = (token: string) => sessionStorage.setItem('session_token', token);
 export const clearSessionToken = () => sessionStorage.removeItem('session_token');
-export function getTerminalCredential(): { terminal_id: string; secret: string } | null {
+export function getTerminalCredential(locationId?: string): { terminal_id: string; secret: string } | null {
+  const mapValue = localStorage.getItem('admin-terminal-credentials');
+  let map: Record<string, { terminal_id: string; secret: string }> = {};
+  try {
+    if (mapValue) map = JSON.parse(mapValue);
+  } catch { /* ignore */ }
+  
+  if (locationId && map[locationId]) return map[locationId];
+
+  // Fallback to legacy single credential if map lookup fails or no locationId provided
   const value = localStorage.getItem('terminal_credential');
   try {
     return value ? JSON.parse(value) : null;
@@ -24,8 +33,17 @@ export function getTerminalCredential(): { terminal_id: string; secret: string }
     return null;
   }
 }
-export const setTerminalCredential = (credential: { terminal_id: string; secret: string }) =>
+export const setTerminalCredential = (locationId: string, credential: { terminal_id: string; secret: string }) => {
+  const mapValue = localStorage.getItem('admin-terminal-credentials');
+  let map: Record<string, { terminal_id: string; secret: string }> = {};
+  try {
+    if (mapValue) map = JSON.parse(mapValue);
+  } catch { /* ignore */ }
+  map[locationId] = credential;
+  localStorage.setItem('admin-terminal-credentials', JSON.stringify(map));
+  // Keep legacy synced for current home location backward compatibility
   localStorage.setItem('terminal_credential', JSON.stringify(credential));
+};
 
 export async function apiFetch<T>(
   path: string,

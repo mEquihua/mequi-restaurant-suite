@@ -88,4 +88,33 @@ describeIntegration('reports API against PostgreSQL', () => {
     const audit = await app.inject({ method: 'GET', url: `/api/v1/locations/${location}/reports/voids-and-cancellations?${range}`, headers: auth() });
     expect(audit.statusCode).toBe(403); expect(audit.json().error.code).toBe('FORBIDDEN');
   });
+
+  it('multi-location org reports', async () => {
+    const org = await db.selectFrom('organizations').select('id').executeTakeFirstOrThrow();
+    // This codebase enforces a hard single-organization-per-install constraint
+    // (organizations.unq_is_single_org), so a genuinely separate organization
+    // row cannot exist alongside this test's own. A location id that simply
+    // doesn't exist exercises the exact same "not in this org's location set"
+    // path the handler filters on, without violating that constraint.
+    const otherLocationId = crypto.randomUUID();
+
+    // Test all=true returns every location in the org
+    const all = await app.inject({ method: 'GET', url: `/api/v1/organizations/${org.id}/reports/sales/by-day?${range}&all=true`, headers: auth() });
+    expect(all.statusCode).toBe(200);
+    const dataAll = all.json().data;
+    expect(dataAll).toHaveLength(1);
+    expect(dataAll[0].location_name).toBe('Centro');
+    expect(dataAll[0].data).toEqual([{ day: '2026-09-15', gross_sales: 1_650, discounts: 100, refunds: 200, net_sales: 1_350 }]);
+
+    // Test explicit location_ids returns only those, silently dropping ones not in this org
+    const some = await app.inject({ method: 'GET', url: `/api/v1/organizations/${org.id}/reports/sales/by-day?${range}&location_ids=${location},${otherLocationId}`, headers: auth() });
+    expect(some.statusCode).toBe(200);
+    const dataSome = some.json().data;
+    expect(dataSome).toHaveLength(1);
+    expect(dataSome[0].location_id).toBe(location);
+
+    // Permission enforcement
+    const forbidden = await app.inject({ method: 'GET', url: `/api/v1/organizations/${org.id}/reports/sales/by-day?${range}&all=true`, headers: auth(noSalesToken) });
+    expect(forbidden.statusCode).toBe(403);
+  });
 });

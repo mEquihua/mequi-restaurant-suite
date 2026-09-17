@@ -1,3 +1,4 @@
+import { Timeclock } from './Timeclock.js';
 /* eslint-disable react-refresh/only-export-components */
 import {
   QueryClient,
@@ -85,6 +86,7 @@ export const navForPermissions = (permissions: string[]) =>
     ['Delivery Zones', '/delivery-zones', 'delivery.zones.read'],
     ['Reservations', '/reservations', 'reservations.settings.read'],
     ['Loyalty', '/loyalty', 'loyalty.settings.read'],
+    ['Employee Clocking', '/timeclock', 'timeclock.shifts.read'],
     ['Module Center', '/modules', 'module_center.modules.read'],
     ['Staff & Roles', '/staff', 'iam.staff.read'],
     ['Reports', '/reports', 'reports.sales.read'],
@@ -330,6 +332,7 @@ function Workspace({ me }: { me: Me }) {
           <Route path="/delivery-zones" element={<DeliveryZones permissions={me.permissions} locationId={me.location_id} />} />
           <Route path="/reservations" element={<Reservations permissions={me.permissions} locationId={me.location_id} />} />
           <Route path="/loyalty" element={<Loyalty permissions={me.permissions} />} />
+          <Route path="/timeclock" element={<Timeclock permissions={me.permissions} locationId={me.location_id} />} />
           <Route path="/staff" element={<People permissions={me.permissions} locationId={me.location_id} />} />
           <Route path="/reports" element={<Reports permissions={me.permissions} organizationId={me.organization_id} reportLocations={reportLocations} />} />
           <Route path="/no-access" element={<section><h2>No Admin access</h2></section>} />

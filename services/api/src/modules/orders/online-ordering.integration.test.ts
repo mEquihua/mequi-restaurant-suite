@@ -84,6 +84,7 @@ describeIntegration('online ordering list endpoint integration tests against Pos
       'staff_roles',
       'role_permissions',
       'terminals',
+      'timeclock_shifts',
       'staff',
       'roles',
       'delivery_zones',

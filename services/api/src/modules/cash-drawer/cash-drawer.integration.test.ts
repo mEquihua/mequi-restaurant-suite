@@ -87,6 +87,7 @@ describeIntegration('cash drawer API against PostgreSQL', () => {
       'staff_roles',
       'role_permissions',
       'terminals',
+      'timeclock_shifts',
       'staff',
       'roles',
       'customer_sessions',

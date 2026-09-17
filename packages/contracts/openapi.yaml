@@ -4125,6 +4125,223 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/LoyaltyTransaction'
+  /api/v1/staff/me/shifts:
+    get:
+      summary: Get my shifts
+      operationId: getMyShifts
+      security:
+      - staffSession: []
+      responses:
+        '200':
+          description: List of my recent shifts
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TimeclockShift'
+  /api/v1/locations/{loc_id}/shifts/clock-in:
+    post:
+      summary: Clock in
+      operationId: clockIn
+      security:
+      - staffSession: []
+      parameters:
+      - name: loc_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '201':
+          description: Clocked in
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TimeclockShift'
+        '409':
+          description: Already clocked in
+  /api/v1/locations/{loc_id}/shifts/{id}/clock-out:
+    post:
+      summary: Clock out
+      operationId: clockOut
+      security:
+      - staffSession: []
+      parameters:
+      - name: loc_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: If-Match
+        in: header
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Clocked out
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TimeclockShift'
+        '409':
+          description: Optimistic concurrency conflict or already closed
+  /api/v1/locations/{loc_id}/shifts:
+    get:
+      summary: List shifts
+      operationId: listShifts
+      security:
+      - staffSession: []
+      parameters:
+      - name: loc_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: staff_id
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - name: start_date
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: end_date
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      responses:
+        '200':
+          description: List of shifts
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TimeclockShift'
+    post:
+      summary: Create shift manually
+      operationId: createShift
+      security:
+      - staffSession: []
+      parameters:
+      - name: loc_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - staff_id
+              - status
+              - clocked_in_at
+              properties:
+                staff_id:
+                  type: string
+                  format: uuid
+                status:
+                  type: string
+                  enum:
+                  - OPEN
+                  - CLOSED
+                clocked_in_at:
+                  type: string
+                  format: date-time
+                clocked_out_at:
+                  type: string
+                  format: date-time
+                  nullable: true
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TimeclockShift'
+  /api/v1/locations/{loc_id}/shifts/{id}:
+    put:
+      summary: Update shift manually
+      operationId: updateShift
+      security:
+      - staffSession: []
+      parameters:
+      - name: loc_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: If-Match
+        in: header
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum:
+                  - OPEN
+                  - CLOSED
+                clocked_in_at:
+                  type: string
+                  format: date-time
+                clocked_out_at:
+                  type: string
+                  format: date-time
+                  nullable: true
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TimeclockShift'
+        '409':
+          description: Optimistic concurrency conflict
 components:
   securitySchemes:
     staffSession:
@@ -7064,5 +7281,54 @@ components:
           format: uuid
           nullable: true
         created_at:
+          type: string
+          format: date-time
+    TimeclockShift:
+      type: object
+      required:
+      - id
+      - location_id
+      - staff_id
+      - status
+      - clocked_in_at
+      - clocked_in_by_staff_id
+      - version
+      - created_at
+      - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        location_id:
+          type: string
+          format: uuid
+        staff_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+          - OPEN
+          - CLOSED
+        clocked_in_at:
+          type: string
+          format: date-time
+        clocked_out_at:
+          type: string
+          format: date-time
+          nullable: true
+        clocked_in_by_staff_id:
+          type: string
+          format: uuid
+        clocked_out_by_staff_id:
+          type: string
+          format: uuid
+          nullable: true
+        version:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
           type: string
           format: date-time

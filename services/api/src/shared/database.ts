@@ -56,7 +56,23 @@ export interface OrderFulfillmentTable {
   updated_at: Generated<Date>;
 }
 
+
+export interface TimeclockShiftTable {
+  id: Generated<string>;
+  location_id: string;
+  staff_id: string;
+  status: 'OPEN' | 'CLOSED';
+  clocked_in_at: Generated<Date>;
+  clocked_out_at: Date | null;
+  clocked_in_by_staff_id: string;
+  clocked_out_by_staff_id: string | null;
+  version: Generated<number>;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
 export interface Database {
+  timeclock_shifts: TimeclockShiftTable;
   customers: CustomerTable;
   customer_sessions: CustomerSessionTable;
   delivery_zones: DeliveryZoneTable;

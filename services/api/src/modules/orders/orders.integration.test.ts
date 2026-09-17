@@ -6,6 +6,7 @@ import Fastify from 'fastify';
 import { identityModule } from '../identity/index.js';
 import { menuModule } from '../menu/index.js';
 import { floorModule } from '../floor/index.js';
+import { inventoryModule } from '../inventory/index.js';
 import { createDatabase, installDatabase } from '../../shared/index.js';
 import { ordersModule } from './index.js';
 
@@ -22,6 +23,7 @@ describeIntegration('orders API against PostgreSQL', () => {
   app.register(identityModule);
   app.register(menuModule);
   app.register(floorModule);
+  app.register(inventoryModule);
   app.register(ordersModule);
   let org = '';
   let location = '';
@@ -35,8 +37,7 @@ describeIntegration('orders API against PostgreSQL', () => {
   let line = '';
   const auth = () => ({ authorization: `Bearer ${token}` });
   beforeAll(async () => {
-    for (const table of [
-      'cash_drawer_movements',
+    for (const table of ['stock_adjustments', 'ingredient_stock', 'recipe_lines', 'ingredients', 'cash_drawer_movements',
       'cash_drawer_sessions',
       'command_idempotency',
       'audit_events',
@@ -120,6 +121,9 @@ describeIntegration('orders API against PostgreSQL', () => {
           'payments.payments.create',
           'payments.refunds.create',
           'kitchen.tickets.update_status',
+          'menu.products.write',
+          'inventory.ingredients.write',
+          'inventory.recipes.write',
         ].map((permission_name) => ({ role_id: role.id, permission_name, scope: 'organization' })),
       )
       .execute();
@@ -361,4 +365,60 @@ describeIntegration('orders API against PostgreSQL', () => {
     );
     expect(hidden).toEqual([]);
   });
+
+  it('decrements ingredient stock on order line SENT without erroring on unmapped items', async () => {
+    const ingRes = await app.inject({ method: 'POST', url: '/api/v1/ingredients', headers: auth(), payload: { name: 'Cheese', unit_of_measure: 'g' } });
+    expect(ingRes.statusCode).toBe(201);
+    const ingredientId = ingRes.json().id;
+
+    const prodRes = await app.inject({ method: 'POST', url: '/api/v1/products', headers: auth(), payload: { name: 'Cheeseburger', base_price: 500 } });
+    expect(prodRes.statusCode).toBe(201);
+    const productId = prodRes.json().id;
+
+    const recipeRes = await app.inject({ method: 'POST', url: '/api/v1/recipes', headers: auth(), payload: { product_id: productId, ingredient_id: ingredientId, quantity_per_unit: 50 } });
+    expect(recipeRes.statusCode).toBe(201);
+
+    // Product with no recipe defined at all — sending its line must not error.
+    const prod2Res = await app.inject({ method: 'POST', url: '/api/v1/products', headers: auth(), payload: { name: 'Water', base_price: 100 } });
+    expect(prod2Res.statusCode).toBe(201);
+    const product2Id = prod2Res.json().id;
+
+    await db.insertInto('ingredient_stock').values({ location_id: location, ingredient_id: ingredientId, quantity_on_hand: '1000', version: 1 }).execute();
+
+    const visitRes = await app.inject({ method: 'POST', url: `/api/v1/locations/${location}/visits`, headers: auth(), payload: { guest_count: 1 } });
+    expect(visitRes.statusCode).toBe(201);
+    const visitId = visitRes.json().id;
+
+    const accountRes = await app.inject({ method: 'POST', url: `/api/v1/locations/${location}/visits/${visitId}/accounts`, headers: auth(), payload: {} });
+    expect(accountRes.statusCode).toBe(201);
+    const accountId = accountRes.json().id;
+
+    const orderRes = await app.inject({ method: 'POST', url: `/api/v1/locations/${location}/visits/${visitId}/orders`, headers: { ...auth(), 'if-match': '1' }, payload: { order_type: 'DINE_IN' } });
+    expect(orderRes.statusCode).toBe(201);
+    const orderId = orderRes.json().id;
+
+    const addedRes = await app.inject({
+      method: 'POST',
+      url: `/api/v1/locations/${location}/orders/${orderId}/lines`,
+      headers: { ...auth(), 'if-match': '1' },
+      payload: { lines: [
+        { account_id: accountId, product_id: productId, quantity: 2 },
+        { account_id: accountId, product_id: product2Id, quantity: 1 },
+      ] },
+    });
+    expect(addedRes.statusCode).toBe(201);
+    const [lineWithRecipe, lineWithoutRecipe] = addedRes.json().lines;
+
+    const sendRes = await app.inject({
+      method: 'POST',
+      url: `/api/v1/locations/${location}/orders/${orderId}/send`,
+      headers: { ...auth(), 'if-match': String(addedRes.json().order.version), 'idempotency-key': 'inventory-decrement-test' },
+      payload: { line_ids: [lineWithRecipe.id, lineWithoutRecipe.id] },
+    });
+    expect(sendRes.statusCode).toBe(200);
+
+    const stock = await db.selectFrom('ingredient_stock').selectAll().where('ingredient_id', '=', ingredientId).where('location_id', '=', location).executeTakeFirst();
+    expect(stock?.quantity_on_hand).toBe('900.0000'); // 1000 - 50*2
+  });
+
 });

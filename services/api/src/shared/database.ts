@@ -102,6 +102,10 @@ export interface Database {
   outbox_events: OutboxEventTable;
   audit_events: AuditEventTable;
   command_idempotency: CommandIdempotencyTable;
+  ingredients: IngredientTable;
+  ingredient_stock: IngredientStockTable;
+  recipe_lines: RecipeLineTable;
+  stock_adjustments: StockAdjustmentTable;
 }
 
 export type TableName = keyof Database;
@@ -509,6 +513,48 @@ export interface CommandIdempotencyTable {
   idempotency_key: string;
   payload_hash: string;
   response: unknown;
+  created_at: Generated<Date>;
+}
+
+export interface IngredientTable {
+  id: Generated<string>;
+  organization_id: string;
+  name: string;
+  unit_of_measure: string;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
+export interface IngredientStockTable {
+  id: Generated<string>;
+  location_id: string;
+  ingredient_id: string;
+  quantity_on_hand: Generated<string>;
+  low_stock_threshold: string | null;
+  version: Generated<number>;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
+export interface RecipeLineTable {
+  id: Generated<string>;
+  organization_id: string;
+  product_id: string | null;
+  variant_id: string | null;
+  modifier_id: string | null;
+  ingredient_id: string;
+  quantity_per_unit: string;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
+export interface StockAdjustmentTable {
+  id: Generated<string>;
+  location_id: string;
+  ingredient_id: string;
+  staff_id: string;
+  quantity_delta: string;
+  reason: string;
   created_at: Generated<Date>;
 }
 

@@ -33,7 +33,7 @@ describeIntegration('online ordering list endpoint integration tests against Pos
 
   beforeAll(async () => {
     // Clear relevant tables
-    for (const name of [
+    for (const name of ['stock_adjustments', 'ingredient_stock', 'recipe_lines', 'ingredients', 
       'cash_drawer_movements',
       'cash_drawer_sessions',
       'module_activations',

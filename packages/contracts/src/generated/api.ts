@@ -1958,6 +1958,127 @@ export interface paths {
         };
         trace?: never;
     };
+    "/api/v1/ingredients": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List organization ingredients */
+        get: operations["listIngredients"];
+        put?: never;
+        /** Create a new ingredient */
+        post: operations["createIngredient"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ingredients/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update an ingredient */
+        put: operations["updateIngredient"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/recipes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List recipe lines */
+        get: operations["listRecipes"];
+        put?: never;
+        /** Create a recipe line */
+        post: operations["createRecipeLine"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/recipes/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a recipe line */
+        delete: operations["deleteRecipeLine"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/locations/{locationId}/inventory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get location inventory */
+        get: operations["getLocationInventory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/locations/{locationId}/inventory/low-stock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get location low stock */
+        get: operations["getLocationLowStock"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/locations/{locationId}/inventory/{ingredientId}/adjust": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Adjust inventory stock */
+        post: operations["adjustInventoryStock"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2821,6 +2942,83 @@ export interface components {
             fee?: number;
             minimum_order_amount?: number;
             active?: boolean;
+        };
+        Ingredient: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            organization_id: string;
+            name: string;
+            unit_of_measure: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        IngredientStock: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            location_id: string;
+            /** Format: uuid */
+            ingredient_id: string;
+            quantity_on_hand: string;
+            low_stock_threshold?: string | null;
+            version: number;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        RecipeLine: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            organization_id: string;
+            /** Format: uuid */
+            product_id?: string | null;
+            /** Format: uuid */
+            variant_id?: string | null;
+            /** Format: uuid */
+            modifier_id?: string | null;
+            /** Format: uuid */
+            ingredient_id: string;
+            quantity_per_unit: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        StockAdjustment: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            location_id: string;
+            /** Format: uuid */
+            ingredient_id: string;
+            /** Format: uuid */
+            staff_id: string;
+            quantity_delta: string;
+            reason: string;
+            /** Format: date-time */
+            created_at: string;
+        };
+        InventoryItem: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            organization_id: string;
+            name: string;
+            unit_of_measure: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+            quantity_on_hand?: string | null;
+            low_stock_threshold?: string | null;
+            version?: number | null;
+            /** Format: uuid */
+            stock_id?: string | null;
         };
     };
     responses: {
@@ -5582,6 +5780,246 @@ export interface operations {
                 content: {
                     "application/json": {
                         [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    listIngredients: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A list of ingredients */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["Ingredient"][];
+                    };
+                };
+            };
+        };
+    };
+    createIngredient: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name: string;
+                    unit_of_measure: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The created ingredient */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Ingredient"];
+                };
+            };
+        };
+    };
+    updateIngredient: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name?: string;
+                    unit_of_measure?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The updated ingredient */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Ingredient"];
+                };
+            };
+        };
+    };
+    listRecipes: {
+        parameters: {
+            query?: {
+                product_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of recipe lines */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["RecipeLine"][];
+                    };
+                };
+            };
+        };
+    };
+    createRecipeLine: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    product_id?: string;
+                    /** Format: uuid */
+                    variant_id?: string;
+                    /** Format: uuid */
+                    modifier_id?: string;
+                    /** Format: uuid */
+                    ingredient_id: string;
+                    quantity_per_unit: number;
+                };
+            };
+        };
+        responses: {
+            /** @description The created recipe line */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecipeLine"];
+                };
+            };
+        };
+    };
+    deleteRecipeLine: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getLocationInventory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                locationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Location inventory */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["InventoryItem"][];
+                    };
+                };
+            };
+        };
+    };
+    getLocationLowStock: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                locationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Location low stock items */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["InventoryItem"][];
+                    };
+                };
+            };
+        };
+    };
+    adjustInventoryStock: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required once a stock row already exists for this ingredient at this location; omit for the first-ever adjustment, which creates the row. */
+                "If-Match"?: string;
+            };
+            path: {
+                locationId: string;
+                ingredientId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    new_quantity: number;
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Stock adjusted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        stock: components["schemas"]["IngredientStock"];
+                        adjustment: components["schemas"]["StockAdjustment"];
                     };
                 };
             };

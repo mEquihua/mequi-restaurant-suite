@@ -39,7 +39,7 @@ describeIntegration('cash drawer API against PostgreSQL', () => {
   const auth = () => ({ authorization: `Bearer ${token}` });
 
   beforeAll(async () => {
-    for (const table of [
+    for (const table of ['stock_adjustments', 'ingredient_stock', 'recipe_lines', 'ingredients', 
       'cash_drawer_movements',
       'cash_drawer_sessions',
       'command_idempotency',

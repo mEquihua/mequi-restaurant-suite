@@ -82,6 +82,7 @@ describeIntegration('guest table sessions against PostgreSQL', () => {
       'customer_sessions',
       'customers',
       'delivery_zones',
+      'scheduled_order_settings',
       'locations',
       'organizations'
     ] as const) await db.deleteFrom(name).execute();

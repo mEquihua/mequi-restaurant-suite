@@ -1634,6 +1634,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/locations/{loc_id}/scheduled-order-settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Scheduled Order Settings */
+        get: operations["getScheduledOrderSettings"];
+        /** Update Scheduled Order Settings */
+        put: operations["updateScheduledOrderSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/locations/{loc_id}/online-orders/checkout": {
         parameters: {
             query?: never;
@@ -2681,6 +2699,17 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        ScheduledOrderSettingsRow: {
+            accepts_scheduled_orders: boolean;
+            minimum_lead_time_minutes: number;
+            maximum_lead_time_days: number;
+            operating_hours: {
+                day_of_week: number;
+                open_time: string;
+                close_time: string;
+            }[];
+            version: number;
+        };
         ReportResponse: {
             data: {
                 [key: string]: unknown;
@@ -5053,6 +5082,7 @@ export interface operations {
     listVisits: {
         parameters: {
             query?: {
+                exclude_future_scheduled?: boolean;
                 status?: "OPEN" | "COMPLETED" | "CANCELLED";
                 table_id?: components["schemas"]["Uuid"];
             };
@@ -5243,6 +5273,7 @@ export interface operations {
     listOrderLines: {
         parameters: {
             query?: {
+                exclude_future_scheduled?: boolean;
                 status?: string;
             };
             header?: never;
@@ -6242,6 +6273,7 @@ export interface operations {
         parameters: {
             query?: {
                 terminal_id?: components["schemas"]["Uuid"];
+                exclude_future_scheduled?: boolean;
                 status?: "OPEN" | "CLOSED";
             };
             header?: never;
@@ -6494,6 +6526,54 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+        };
+    };
+    getScheduledOrderSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                loc_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScheduledOrderSettingsRow"];
+                };
+            };
+        };
+    };
+    updateScheduledOrderSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                loc_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScheduledOrderSettingsRow"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScheduledOrderSettingsRow"];
                 };
             };
         };

@@ -1336,6 +1336,11 @@ paths:
         required: true
         schema:
           $ref: '#/components/schemas/Uuid'
+      - name: exclude_future_scheduled
+        in: query
+        required: false
+        schema:
+          type: boolean
       - name: status
         in: query
         required: false
@@ -1559,6 +1564,11 @@ paths:
         required: true
         schema:
           $ref: '#/components/schemas/Uuid'
+      - name: exclude_future_scheduled
+        in: query
+        required: false
+        schema:
+          type: boolean
       - name: status
         in: query
         required: false
@@ -2345,6 +2355,11 @@ paths:
         required: false
         schema:
           $ref: '#/components/schemas/Uuid'
+      - name: exclude_future_scheduled
+        in: query
+        required: false
+        schema:
+          type: boolean
       - name: status
         in: query
         required: false
@@ -2721,6 +2736,53 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/OnlineOrderListResponse'
+  /api/v1/locations/{loc_id}/scheduled-order-settings:
+    get:
+      summary: Get Scheduled Order Settings
+      operationId: getScheduledOrderSettings
+      x-required-permission: online_ordering.settings.read
+      security:
+      - staffSession: []
+      parameters:
+      - name: loc_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScheduledOrderSettingsRow'
+    put:
+      summary: Update Scheduled Order Settings
+      operationId: updateScheduledOrderSettings
+      x-required-permission: online_ordering.settings.write
+      security:
+      - staffSession: []
+      parameters:
+      - name: loc_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScheduledOrderSettingsRow'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScheduledOrderSettingsRow'
   /api/v1/locations/{loc_id}/online-orders/checkout:
     post:
       summary: Checkout online order
@@ -4419,6 +4481,40 @@ components:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
   schemas:
+    ScheduledOrderSettingsRow:
+      type: object
+      additionalProperties: false
+      required:
+      - accepts_scheduled_orders
+      - minimum_lead_time_minutes
+      - maximum_lead_time_days
+      - operating_hours
+      - version
+      properties:
+        accepts_scheduled_orders:
+          type: boolean
+        minimum_lead_time_minutes:
+          type: integer
+        maximum_lead_time_days:
+          type: integer
+        operating_hours:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required:
+            - day_of_week
+            - open_time
+            - close_time
+            properties:
+              day_of_week:
+                type: integer
+              open_time:
+                type: string
+              close_time:
+                type: string
+        version:
+          type: integer
     ReportResponse:
       type: object
       additionalProperties: false

@@ -2012,6 +2012,7 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
           additionalProperties: false,
           properties: {
             status: { type: 'string' },
+            exclude_future_scheduled: { type: 'boolean' }
           },
         },
       },
@@ -2020,7 +2021,7 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
       withSession(request, async (actor) => {
         requirePermission(actor, 'kitchen.tickets.read');
         const locationId = scoped(request, actor);
-        const { status } = request.query as { status?: string };
+        const { status, exclude_future_scheduled } = request.query as { status?: string, exclude_future_scheduled?: boolean };
 
         let query = actor.trx
           .selectFrom('order_lines as ol')
@@ -2029,6 +2030,14 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
           .selectAll('ol')
           .select(['o.visit_id', 'v.table_id', 'o.created_at as order_created_at'])
           .where('v.location_id', '=', locationId);
+
+        if (exclude_future_scheduled) {
+          query = query.leftJoin('order_fulfillments as of', 'of.order_id', 'ol.order_id')
+            .where((eb) => eb.or([
+              eb('of.scheduled_for', 'is', null),
+              eb('of.scheduled_for', '<=', sql<Date>`NOW() + INTERVAL '60 minutes'`)
+            ]));
+        }
 
         if (status) {
           const statuses = status.split(',');

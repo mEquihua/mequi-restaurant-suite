@@ -90,6 +90,7 @@ describeIntegration('Delivery Zones & Checkout Enforcement', () => {
       'customer_sessions',
       'customers',
       'delivery_zones',
+      'scheduled_order_settings',
       'locations',
       'organizations'
     ] as const) {

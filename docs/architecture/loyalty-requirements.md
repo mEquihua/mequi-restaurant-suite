@@ -45,8 +45,8 @@ Admin-configured catalog of available rewards.
 *   `description` (TEXT)
 *   `cost_in_points` (INTEGER) — Nullable.
 *   `cost_in_visits` (INTEGER) — Nullable.
-*   `discount_type` (VARCHAR, NOT NULL) — `PERCENTAGE`, `AMOUNT`, or `FREE_ITEM`.
-*   `discount_value` (INTEGER, NOT NULL)
+*   `discount_type` (VARCHAR, NOT NULL) — `PERCENTAGE` or `AMOUNT` only, matching the existing `account_discounts.discount_type` CHECK constraint (`012_account_discounts.js`) exactly, since every redemption ultimately writes an `account_discounts` row and that table's CHECK rejects any other value. A "free item" reward (idea.md: "100 puntos = producto gratuito") is modeled as `discount_type = 'PERCENTAGE'`, `discount_value = 100`, applied to the specific `order_line_id` the redeemer selects at redemption time — `account_discounts.order_line_id` is already nullable and already supports scoping a discount to one line, and `value <= 100` is already enforced by `chk_account_discount_percentage_value`, so this needs no schema alteration beyond the `applied_by` change noted below.
+*   `discount_value` (INTEGER, NOT NULL) — a `PERCENTAGE` value must be `<= 100`, matching `account_discounts`' own constraint; enforce the same CHECK here.
 *   `is_active` (BOOLEAN, NOT NULL, DEFAULT TRUE)
 *   `version` (INTEGER, NOT NULL, DEFAULT 1)
 *   `created_at`, `updated_at` (TIMESTAMPTZ, Default NOW, trigger `set_updated_at`)
@@ -57,7 +57,7 @@ Promo codes not tied to a points balance.
 *   `id` (UUID, Primary Key, Default `gen_random_uuid()`)
 *   `organization_id` (UUID, NOT NULL, FK to `organizations`)
 *   `code` (VARCHAR, NOT NULL, UNIQUE)
-*   `discount_type` (VARCHAR, NOT NULL)
+*   `discount_type` (VARCHAR, NOT NULL) — `PERCENTAGE` or `AMOUNT`, same constraint as `loyalty_rewards.discount_type` above (a coupon always applies to the whole account, not a single line, so `PERCENTAGE` here has no free-item use case).
 *   `discount_value` (INTEGER, NOT NULL)
 *   `is_active` (BOOLEAN, NOT NULL, DEFAULT TRUE)
 *   `version` (INTEGER, NOT NULL, DEFAULT 1)
@@ -131,8 +131,8 @@ Following the established precedents in `017_customer_accounts.js` and `020_inve
     *   *Action*: Looks up `customers` by phone. If missing, creates a skeleton customer record. Updates `visits.customer_id` with the result, ensuring the visit will earn points upon closure.
 *   **`POST /api/v1/locations/{loc_id}/visits/{visitId}/redeem-reward`**
     *   *Auth*: Dual-path (Staff session token OR exact `guestSession` token matching the visit).
-    *   *Payload*: `{ reward_id: UUID }` or `{ coupon_code: string }`.
-    *   *Action*: Verifies the visit has a `customer_id` (for rewards). Deducts points, creates an `account_discounts` record on the primary open account, and logs a `loyalty_redemptions`.
+    *   *Payload*: `{ reward_id: UUID, order_line_id?: UUID }` or `{ coupon_code: string }` — `order_line_id` is required when the target reward's `discount_type` is `PERCENTAGE` with `discount_value = 100` (a free-item reward), since that must scope to one line rather than the whole account; omitted otherwise.
+    *   *Action*: Verifies the visit has a `customer_id` (for rewards). Deducts points, creates an `account_discounts` record (on the specified `order_line_id`, or unscoped on the primary open account otherwise), and logs a `loyalty_redemptions`.
 
 ### 4.4 Customer-Facing Endpoints
 *   **`GET /api/v1/customers/me/loyalty`**

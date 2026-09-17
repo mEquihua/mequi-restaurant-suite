@@ -35,6 +35,7 @@ The core record of a booking request and its lifecycle.
 * `customer_phone` (VARCHAR, Nullable)
 * `special_requests` (TEXT, Nullable)
 * `visit_id` (UUID, Nullable, FK to visits) — Set during the `SEATED` transition.
+* `guest_token_hash` (VARCHAR, Nullable) — SHA-256 hash of a random token minted at creation time for a GUEST booking (`customer_id IS NULL`), mirroring the exact mechanism already established for guest online orders (`order_fulfillments.guest_token_hash`, `services/api/src/modules/orders/online-ordering.ts`). idea.md section 74 requires that a customer be able to check status and cancel — this applies to guests too, not only authenticated customers, and without a token a guest booking would otherwise be permanently unreachable after creation. `NULL` for a reservation made by an authenticated customer.
 * `confirmed_by_staff_id` (UUID, Nullable, FK to staff)
 * `cancelled_by_staff_id` (UUID, Nullable, FK to staff)
 * `version` (INTEGER, NOT NULL, DEFAULT 1) — Optimistic concurrency.
@@ -45,7 +46,7 @@ Configuration dictating how and when a location accepts reservations.
 * `id` (UUID, Primary Key)
 * `location_id` (UUID, NOT NULL, UNIQUE, FK to locations) — *RESTRICTIVE RLS applied here.*
 * `accepts_reservations` (BOOLEAN, NOT NULL, DEFAULT false)
-* `operating_hours` (JSONB, NOT NULL) — Reuses the existing format for location operating hours, defining when reservations can be booked.
+* `operating_hours` (JSONB, NOT NULL, DEFAULT `[]`) — **Correction**: `location_operating_config` (`services/api/migrations/001_foundation.js`) exists in the schema but is read/written by zero code anywhere in this codebase today — there is no existing operating-hours format to reuse, and this document should not claim otherwise. Define a self-contained shape instead: an array of `{day_of_week: 1-7 (ISO weekday, matching the convention already used by `availability_rules.days_of_week`), open_time: "HH:MM", close_time: "HH:MM"}` objects, one entry per open day; a day with no entry is closed for reservations. This is intentionally simple JSONB rather than a normalized table, since it's a single low-write-frequency settings row, not a queried/joined dataset.
 * `estimated_visit_duration_minutes` (INTEGER, NOT NULL, DEFAULT 90)
 * `minimum_lead_time_minutes` (INTEGER, NOT NULL, DEFAULT 60)
 * `maximum_party_size` (INTEGER, NOT NULL, DEFAULT 8)
@@ -60,11 +61,11 @@ The following defines the strict, legal lifecycle of a reservation.
 | Current Status | Target Status | Triggered By | Side Effects & Mechanics |
 | :--- | :--- | :--- | :--- |
 | `REQUESTED` | `CONFIRMED` | System, Staff | If `auto_confirm` is true, system triggers immediately. Otherwise, staff triggers. Sets `confirmed_by_staff_id`. |
-| `REQUESTED` / `CONFIRMED` | `CANCELLED` | Customer, Staff | Sets `cancelled_by_staff_id` if by staff. Terminal state. |
+| `REQUESTED` / `CONFIRMED` | `CANCELLED` | Customer (authenticated or guest, via their own reservation only — section 4.1's cancel endpoint), Staff | Sets `cancelled_by_staff_id` if by staff, left `NULL` if by the customer/guest themselves. Terminal state. |
 | `CONFIRMED` | `ARRIVED` | Staff | Marks the party as physically present and waiting in the lobby. |
 | `CONFIRMED` / `ARRIVED` | `NO_SHOW` | Staff | Terminal state for parties that never arrived. |
 | `ARRIVED` | `SEATED` | Staff | **Combined action**: The Host assigns a physical `table_id`. This executes the equivalent of `POST /api/v1/locations/:locationId/visits` to open a new `visit` and set the table to `OCCUPIED`. The resulting `visit_id` is saved to the reservation. |
-| `SEATED` | `COMPLETED` | System | Triggered automatically when the linked `visit` is closed via `POST /api/v1/locations/:locationId/visits/:visitId/close`. Terminal state. |
+| `SEATED` | `COMPLETED` | System | **Mechanism (must be specified precisely, not left as "triggered automatically")**: this is a direct, synchronous side effect added to the EXISTING `POST /api/v1/locations/:locationId/visits/:visitId/close` handler (`services/api/src/modules/orders/route.ts`) — inside that same transaction, after the visit closes successfully, check for a `reservations` row with `visit_id` equal to the closed visit and, if found, update its status to `COMPLETED` in the same transaction. This is a plain in-process database update, not an outbox-published event — this codebase's outbox/Valkey pub-sub pattern is reserved for cross-service realtime notifications (e.g., kitchen ticket updates), and a reservation's historical status does not need that. Terminal state. |
 
 ## 4. API Surface
 
@@ -72,23 +73,29 @@ These endpoints utilize standard `withAuthenticatedSession` guards.
 
 ### 4.1 Customer-Facing Endpoints
 * **`POST /api/v1/locations/{loc_id}/reservations/request`**
-  * *Auth*: Dual-path (Public for guests, Bearer token for authenticated customers).
-  * *Action*: Validates lead time, party size, and hours against `reservation_settings`. Creates the reservation. Applies `auto_confirm` logic to set initial status.
+  * *Auth*: Dual-path (Public for guests, Bearer token for authenticated customers) — identical convention to `POST /online-orders/checkout`.
+  * *Action*: Validates lead time, party size, and hours against `reservation_settings`. Creates the reservation. Applies `auto_confirm` logic to set initial status. For a guest booking, mints a random token, stores its hash as `guest_token_hash`, and returns the plaintext token once in the response (`{reservation_id, guest_token}`, `guest_token: null` for an authenticated customer) — exactly mirroring `POST /online-orders/checkout`'s `{order_id, order_token}` shape.
+* **`GET /api/v1/locations/{loc_id}/reservations/{id}`** — shared with the staff-facing route of the same path/method in section 4.2 (a single registered route, branching internally by token shape, same as the shared `cancel` endpoint below).
+  * *Auth*: For a non-staff caller — an authenticated customer may fetch their own reservation (`customer_id` matches the session) with no extra param; a guest must supply the exact token from creation via `?guest_token=...` (rejecting the reservation's own `id` as a substitute, matching the online-ordering guest-token hardening) — `403 FORBIDDEN` otherwise.
+  * *Action*: Returns the reservation's current status and details.
 * **`GET /api/v1/customers/me/reservations`**
   * *Auth*: Bearer token (Authenticated customers only).
-  * *Action*: Returns the user's historical and upcoming reservations. Note: Guest reservations have no ongoing lookup mechanism and are not returned here, matching the established online-ordering token limitation.
+  * *Action*: Returns the user's historical and upcoming reservations. Guest reservations are never returned here (an authenticated customer session has no way to enumerate a guest booking it didn't itself make) — a guest relies entirely on the `guest_token` they were given at creation, via the two endpoints above.
 
 ### 4.2 Staff & Admin Endpoints
 * **`GET /api/v1/locations/{loc_id}/reservations`** — requires `reservations.reservations.read`.
   * *Action*: Lists reservations, typically filtered by date for the Host stand.
-* **`GET /api/v1/locations/{loc_id}/reservations/{id}`** — requires `reservations.reservations.read`.
+* **`GET /api/v1/locations/{loc_id}/reservations/{id}`** — the staff branch of the shared route from section 4.1; requires `reservations.reservations.read` when a staff token is presented.
 * **`POST /api/v1/locations/{loc_id}/reservations`** — requires `reservations.reservations.write`.
   * *Action*: Staff creating a manual reservation (e.g., over the phone).
 * **`PUT /api/v1/locations/{loc_id}/reservations/{id}`** — requires `reservations.reservations.write`.
   * *Action*: Updates details (party size, time, notes) using `If-Match` for optimistic concurrency.
-* **`POST /api/v1/locations/{loc_id}/reservations/{id}/status`** — requires corresponding status permission.
-  * *Payload*: `{ status: 'CONFIRMED' | 'ARRIVED' | 'SEATED' | 'CANCELLED' | 'NO_SHOW', table_id?: UUID }`.
-  * *Action*: Executes the state machine transitions.
+* **Status transitions as separate, action-named endpoints** — matching this codebase's established convention for multi-action state machines (order lines' `hold`/`send`/`void`, module-center's `activate`/`pause`/`deactivate`, fulfillment's `dispatch`/`deliver`) rather than one generic endpoint that branches its required permission at runtime based on body content:
+  * **`POST /api/v1/locations/{loc_id}/reservations/{id}/confirm`** — requires `reservations.reservations.update_status`.
+  * **`POST /api/v1/locations/{loc_id}/reservations/{id}/arrive`** — requires `reservations.reservations.update_status`.
+  * **`POST /api/v1/locations/{loc_id}/reservations/{id}/no-show`** — requires `reservations.reservations.update_status`.
+  * **`POST /api/v1/locations/{loc_id}/reservations/{id}/seat`** — requires `reservations.reservations.seat`. *Payload*: `{ table_id: UUID }`. All take `If-Match` for optimistic concurrency, matching every other status-changing endpoint in this codebase.
+* **`POST /api/v1/locations/{loc_id}/reservations/{id}/cancel`** — a SINGLE shared endpoint for both audiences, not two separately-registered routes (registering the same path/method twice would conflict). Detects which caller it is by bearer token shape, the same way `services/api/src/modules/orders/online-ordering.ts`'s GET handler already distinguishes a `Bearer customer.*` token from a guest request (that existing code only branches customer-vs-guest, not staff — this endpoint additionally checks for a staff-shaped token first): if a staff `Authorization: Bearer` token is present, require `reservations.reservations.cancel` and record `cancelled_by_staff_id`; otherwise, fall back to the customer/guest dual-path rule from section 4.1 (session match or exact `guest_token`) and leave `cancelled_by_staff_id` null. Same state-machine effect either way.
 * **`GET /api/v1/locations/{loc_id}/reservation-settings`** — requires `reservations.settings.read`.
 * **`PUT /api/v1/locations/{loc_id}/reservation-settings`** — requires `reservations.settings.write`.
 
@@ -120,12 +127,12 @@ A simple settings form managing the fields in `reservation_settings`:
 ### 6.2 Staff App "Host" UI
 The **Staff App** (`apps/staff`) hosts the reservation management screen, as it is the operational tool for Hosts and Waiters.
 * Shows a list of today's reservations.
-* Provides quick-action buttons to progress the state: Confirm, Arrive, Cancel, No-Show.
-* The "Seat" action opens a modal to select an `AVAILABLE` or `NEEDS_CLEANING` table from the floor plan, executing the single, combined API call that both transitions the reservation to `SEATED` and opens the visit on that table.
+* Provides quick-action buttons calling the separate `confirm`/`arrive`/`no-show`/`cancel` endpoints (section 4.2) to progress the state.
+* The "Seat" action opens a modal to select an `AVAILABLE` table from the floor plan (a table `NEEDS_CLEANING` or `OUT_OF_ORDER` must not be offered — seating onto one would contradict the entire purpose of that status) and calls `POST .../reservations/{id}/seat`, the single combined action that both transitions the reservation to `SEATED` and opens the visit on that table.
 
 ### 6.3 Customer App UI
-* **Booking Form**: A clean interface asking for Location, Date, Time, Party Size, Name, Contact, and Optional Comment.
-* **Status View**: A "My Reservations" list showing upcoming (Requested/Confirmed) and past (Cancelled/Completed) bookings for authenticated users.
+* **Booking Form**: A clean interface asking for Location, Date, Time, Party Size, Name, Contact, and Optional Comment. On success for a guest booking, persist `{reservation_id, location_id, guest_token}` to `localStorage`, mirroring exactly how `apps/customer` already tracks guest online orders (see `StoredOrder`/`storeOrder` in `apps/customer/src/App.tsx`), since that token is a guest's only way to look up or cancel the booking afterward.
+* **Status View**: A "My Reservations" list showing upcoming (Requested/Confirmed) and past (Cancelled/Completed) bookings — for an authenticated customer via `GET /api/v1/customers/me/reservations`, and for a guest by re-fetching each locally-stored `{location_id, reservation_id, guest_token}` entry via `GET /api/v1/locations/{loc_id}/reservations/{id}?guest_token=...`, exactly matching the existing guest online-order history pattern.
 
 ## 7. Explicitly Out of Scope (Non-Goals)
 

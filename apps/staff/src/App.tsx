@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { apiFetch, getSessionToken, getTerminalCredential, setTerminalCredential, setSessionToken, clearSessionToken } from './api.js';
 import { WaiterMode } from './waiter/WaiterMode.js';
 import { POSMode } from './pos/POSMode.js';
+import { HostMode } from './host/HostMode.js';
 
 const queryClient = new QueryClient();
 
@@ -86,13 +87,14 @@ function PinUnlockScreen() {
   );
 }
 
-function ModeSwitcher() {
+function ModeSwitcher({ hasWaiter, hasPos, hasHost }: { hasWaiter: boolean; hasPos: boolean; hasHost: boolean }) {
   const navigate = useNavigate();
   return (
     <div style={{ padding: '2rem' }}>
       <h1>Select Mode</h1>
-      <button onClick={() => navigate('/waiter')} style={{ marginRight: '1rem', padding: '1rem' }}>Waiter Mode</button>
-      <button onClick={() => navigate('/pos')} style={{ padding: '1rem' }}>POS Mode</button>
+      {hasWaiter && <button onClick={() => navigate('/waiter')} style={{ marginRight: '1rem', padding: '1rem' }}>Waiter Mode</button>}
+      {hasPos && <button onClick={() => navigate('/pos')} style={{ marginRight: '1rem', padding: '1rem' }}>POS Mode</button>}
+      {hasHost && <button onClick={() => navigate('/host')} style={{ padding: '1rem' }}>Host Mode</button>}
     </div>
   );
 }
@@ -109,19 +111,24 @@ function MainApp() {
   const typedUser = user as { permissions: { permission_name: string }[]; location_id: string };
   const hasWaiter = typedUser.permissions.some((p: { permission_name: string }) => p.permission_name === 'orders.visits.create');
   const hasPos = typedUser.permissions.some((p: { permission_name: string }) => p.permission_name === 'orders.orders.create');
+  const hasHost = typedUser.permissions.some((p: { permission_name: string }) => p.permission_name === 'reservations.reservations.read');
   
-  if (hasWaiter && hasPos) {
+  const modeCount = [hasWaiter, hasPos, hasHost].filter(Boolean).length;
+
+  if (modeCount > 1) {
     return (
       <Routes>
-        <Route path="/" element={<ModeSwitcher />} />
+        <Route path="/" element={<ModeSwitcher hasWaiter={hasWaiter} hasPos={hasPos} hasHost={hasHost} />} />
         <Route path="/waiter/*" element={<WaiterMode locationId={typedUser.location_id} />} />
         <Route path="/pos/*" element={<POSMode locationId={typedUser.location_id} />} />
+        <Route path="/host/*" element={<HostMode locationId={typedUser.location_id} />} />
       </Routes>
     );
   }
-  
+
   if (hasWaiter) return <WaiterMode locationId={typedUser.location_id} />;
   if (hasPos) return <POSMode locationId={typedUser.location_id} />;
+  if (hasHost) return <HostMode locationId={typedUser.location_id} />;
 
   return <div>You don't have access to any operational modes.</div>;
 }

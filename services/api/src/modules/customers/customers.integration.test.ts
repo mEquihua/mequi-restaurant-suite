@@ -33,7 +33,8 @@ describeIntegration('customer accounts and online ordering against PostgreSQL', 
 
   beforeAll(async () => {
     // Clear relevant tables
-    for (const name of ['stock_adjustments', 'ingredient_stock', 'recipe_lines', 'ingredients', 
+    for (const name of ['stock_adjustments', 'ingredient_stock', 'recipe_lines', 'ingredients',
+      'reservations', 'reservation_settings',
       'order_fulfillments', 'customer_sessions', 'customers',
       'order_fulfillments', 'order_line_modifiers', 'order_lines', 'orders', 'accounts', 'visits',
       'product_variants', 'products', 'categories',

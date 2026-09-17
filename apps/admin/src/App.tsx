@@ -82,6 +82,7 @@ export const navForPermissions = (permissions: string[]) =>
     ['Menu', '/menu', 'menu.catalog.read'],
     ['Inventory', '/inventory', 'inventory.stock.read'],
     ['Delivery Zones', '/delivery-zones', 'delivery.zones.read'],
+    ['Reservations', '/reservations', 'reservations.settings.read'],
     ['Module Center', '/modules', 'module_center.modules.read'],
     ['Staff & Roles', '/staff', 'iam.staff.read'],
     ['Reports', '/reports', 'reports.sales.read'],
@@ -325,6 +326,7 @@ function Workspace({ me }: { me: Me }) {
           <Route path="/inventory" element={<Inventory permissions={me.permissions} locationId={me.location_id} />} />
           <Route path="/modules" element={<Modules permissions={me.permissions} locationId={me.location_id} />} />
           <Route path="/delivery-zones" element={<DeliveryZones permissions={me.permissions} locationId={me.location_id} />} />
+          <Route path="/reservations" element={<Reservations permissions={me.permissions} locationId={me.location_id} />} />
           <Route path="/staff" element={<People permissions={me.permissions} locationId={me.location_id} />} />
           <Route path="/reports" element={<Reports permissions={me.permissions} organizationId={me.organization_id} reportLocations={reportLocations} />} />
           <Route path="/no-access" element={<section><h2>No Admin access</h2></section>} />
@@ -1889,5 +1891,140 @@ function StockRow({
       <td>{item.unit_of_measure}</td>
       <td>{write && <button onClick={() => setEditing(true)}>Adjust</button>}</td>
     </tr>
+  );
+}
+
+type ReservationSettings = {
+  accepts_reservations: boolean;
+  operating_hours: Array<{ day_of_week: number; open_time: string; close_time: string }>;
+  estimated_visit_duration_minutes: number;
+  minimum_lead_time_minutes: number;
+  maximum_party_size: number;
+  auto_confirm: boolean;
+  version: number;
+};
+
+function Reservations({ permissions, locationId }: { permissions: string[]; locationId: string }) {
+  const qc = useQueryClient();
+  const settings = useQuery({
+    queryKey: ['reservation-settings', locationId],
+    queryFn: () => apiFetch<ReservationSettings>(`/api/v1/locations/${locationId}/reservation-settings`),
+  });
+  
+  const [error, setError] = useState<unknown>();
+  const write = permissions.includes('reservations.settings.write');
+  
+  async function save(e: FormEvent) {
+    e.preventDefault();
+    if (!settings.data) return;
+    try {
+      await apiFetch(`/api/v1/locations/${locationId}/reservation-settings`, {
+        method: 'PUT',
+        body: JSON.stringify(settings.data),
+      });
+      void qc.invalidateQueries({ queryKey: ['reservation-settings', locationId] });
+      setError(undefined);
+    } catch (err) {
+      setError(err);
+    }
+  }
+
+  if (settings.isLoading) return <section>Loading settings...</section>;
+  if (!settings.data) return <section><ErrorNotice error={settings.error} /></section>;
+
+  const form = settings.data;
+
+  return (
+    <section>
+      <h2>Reservation Settings</h2>
+      <ErrorNotice error={error} />
+      <form className="form-grid" onSubmit={save}>
+        <label>
+          <input
+            type="checkbox"
+            disabled={!write}
+            checked={form.accepts_reservations}
+            onChange={(e) => qc.setQueryData(['reservation-settings', locationId], { ...form, accepts_reservations: e.target.checked })}
+          />
+          Accepts Reservations
+        </label>
+        <label>
+          <input
+            type="checkbox"
+            disabled={!write}
+            checked={form.auto_confirm}
+            onChange={(e) => qc.setQueryData(['reservation-settings', locationId], { ...form, auto_confirm: e.target.checked })}
+          />
+          Auto-Confirm Reservations
+        </label>
+        <label>
+          Max Party Size
+          <input
+            type="number"
+            disabled={!write}
+            value={form.maximum_party_size}
+            onChange={(e) => qc.setQueryData(['reservation-settings', locationId], { ...form, maximum_party_size: +e.target.value })}
+          />
+        </label>
+        <label>
+          Est. Visit Duration (minutes)
+          <input
+            type="number"
+            disabled={!write}
+            value={form.estimated_visit_duration_minutes}
+            onChange={(e) => qc.setQueryData(['reservation-settings', locationId], { ...form, estimated_visit_duration_minutes: +e.target.value })}
+          />
+        </label>
+        <label>
+          Min Lead Time (minutes)
+          <input
+            type="number"
+            disabled={!write}
+            value={form.minimum_lead_time_minutes}
+            onChange={(e) => qc.setQueryData(['reservation-settings', locationId], { ...form, minimum_lead_time_minutes: +e.target.value })}
+          />
+        </label>
+        <div style={{ gridColumn: '1 / -1' }}>
+          <h4>Operating Hours</h4>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            {[1, 2, 3, 4, 5, 6, 7].map((day) => {
+              const h = form.operating_hours.find(x => x.day_of_week === day);
+              return (
+                <div key={day} style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                  <span style={{ width: '100px' }}>Day {day}</span>
+                  <label>
+                    <input type="checkbox" checked={!!h} onChange={(e) => {
+                      let next = [...form.operating_hours];
+                      if (e.target.checked) next.push({ day_of_week: day, open_time: '09:00', close_time: '17:00' });
+                      else next = next.filter(x => x.day_of_week !== day);
+                      qc.setQueryData(['reservation-settings', locationId], { ...form, operating_hours: next });
+                    }} disabled={!write} />
+                    Open
+                  </label>
+                  {h && (
+                    <>
+                      <input type="time" disabled={!write} value={h.open_time} onChange={e => {
+                        const next = [...form.operating_hours];
+                        const idx = next.findIndex(x => x.day_of_week === day);
+                        next[idx] = { ...next[idx], open_time: e.target.value };
+                        qc.setQueryData(['reservation-settings', locationId], { ...form, operating_hours: next });
+                      }} />
+                      to
+                      <input type="time" disabled={!write} value={h.close_time} onChange={e => {
+                        const next = [...form.operating_hours];
+                        const idx = next.findIndex(x => x.day_of_week === day);
+                        next[idx] = { ...next[idx], close_time: e.target.value };
+                        qc.setQueryData(['reservation-settings', locationId], { ...form, operating_hours: next });
+                      }} />
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        {write && <button style={{ gridColumn: '1 / -1', marginTop: '1rem' }}>Save Settings</button>}
+      </form>
+    </section>
   );
 }

@@ -11,15 +11,16 @@ import { customersModule } from '../customers/index.js';
 
 const databaseUrl = process.env.DATABASE_URL;
 const db = createDatabase({ databaseUrl });
+const describeIntegration = databaseUrl ? describe : describe.skip;
 
 function terminalCredential(locationId: string, terminalId: string) {
-  return `terminal.${locationId}.${terminalId}.${randomBytes(32).toString('base64url')}`;
+  return `${locationId}.${terminalId}.${randomBytes(32).toString('base64url')}`;
 }
 function credentialHash(credential: string) {
-  return createHash('sha256').update(credential.split('.')[3]).digest('hex');
+  return createHash('sha256').update(credential).digest('hex');
 }
 
-describe('reservations module', () => {
+describeIntegration('reservations module', () => {
   const app = Fastify();
   installDatabase(app, { databaseUrl });
   app.register(identityModule, {});
@@ -32,7 +33,6 @@ describe('reservations module', () => {
   let ownerId: string;
   let staffSession: string;
   let customerSession: string;
-  let customerId: string;
 
   beforeAll(async () => {
     for (const table of ['reservations', 'reservation_settings', 'stock_adjustments', 'ingredient_stock', 'recipe_lines', 'ingredients', 'cash_drawer_movements', 'cash_drawer_sessions', 'module_activations', 'command_idempotency', 'audit_events', 'account_discounts', 'outbox_events', 'refunds', 'cancellations_and_voids', 'payments', 'order_fulfillments', 'order_line_modifiers', 'order_lines', 'orders', 'accounts', 'visits', 'table_sections', 'sections', 'tables', 'areas', 'availability_rules', 'location_price_overrides', 'product_combo_items', 'product_combo_groups', 'product_modifier_groups', 'modifiers', 'modifier_groups', 'product_variants', 'products', 'categories', 'terminal_pin_attempts', 'staff_sessions', 'staff_roles', 'role_permissions', 'terminals', 'staff', 'roles', 'customer_sessions', 'customers', 'delivery_zones', 'locations', 'organizations'] as const) {
@@ -69,7 +69,7 @@ describe('reservations module', () => {
       url: `/api/v1/organizations/${organizationId}/customers`,
       payload: { email: 'res@example.com', password: 'secure123', name: 'Test Customer', phone: '555-1234' }
     });
-    customerId = reg.json().id;
+    if (reg.statusCode >= 300) throw new Error(`customer registration failed: ${reg.statusCode} ${reg.body}`);
 
     const login = await app.inject({
       method: 'POST',
@@ -151,7 +151,8 @@ describe('reservations module', () => {
     const visitRow = await db.selectFrom('visits').selectAll().where('id', '=', visitId).executeTakeFirstOrThrow();
     const closeRes = await app.inject({
       method: 'POST', url: `/api/v1/locations/${locationId}/visits/${visitId}/close`,
-      headers: { authorization: `Bearer ${staffSession}`, 'if-match': `"${visitRow.version}"` }
+      headers: { authorization: `Bearer ${staffSession}`, 'if-match': `"${visitRow.version}"` },
+      payload: {}
     });
     expect(closeRes.statusCode).toBe(200);
 
@@ -169,7 +170,7 @@ describe('reservations module', () => {
       payload: { party_size: 2, reservation_time: future, customer_name: 'Test' }
     });
     expect(res.statusCode).toBe(400);
-    expect(res.json().code).toBe('RESERVATIONS_NOT_ACCEPTED');
+    expect(res.json().error.code).toBe('RESERVATIONS_NOT_ACCEPTED');
 
     await db.insertInto('reservation_settings').values({
       location_id: loc2.id,
@@ -188,7 +189,7 @@ describe('reservations module', () => {
       payload: { party_size: 5, reservation_time: future, customer_name: 'Test' }
     });
     expect(res.statusCode).toBe(400);
-    expect(res.json().code).toBe('PARTY_SIZE_TOO_LARGE');
+    expect(res.json().error.code).toBe('PARTY_SIZE_TOO_LARGE');
 
     // 3. LEAD_TIME_TOO_SHORT
     const soon = new Date(Date.now() + 30 * 60000).toISOString();
@@ -197,7 +198,7 @@ describe('reservations module', () => {
       payload: { party_size: 2, reservation_time: soon, customer_name: 'Test' }
     });
     expect(res.statusCode).toBe(400);
-    expect(res.json().code).toBe('LEAD_TIME_TOO_SHORT');
+    expect(res.json().error.code).toBe('LEAD_TIME_TOO_SHORT');
 
     // 4. OUTSIDE_OPERATING_HOURS
     await db.updateTable('reservation_settings').set({ operating_hours: JSON.stringify([]) }).where('location_id', '=', loc2.id).execute();
@@ -206,7 +207,7 @@ describe('reservations module', () => {
       payload: { party_size: 2, reservation_time: future, customer_name: 'Test' }
     });
     expect(res.statusCode).toBe(400);
-    expect(res.json().code).toBe('OUTSIDE_OPERATING_HOURS');
+    expect(res.json().error.code).toBe('OUTSIDE_OPERATING_HOURS');
   });
 
   it('illegal state transitions', async () => {
@@ -229,7 +230,7 @@ describe('reservations module', () => {
       payload: { table_id: table.id }
     });
     expect(seat.statusCode).toBe(409);
-    expect(seat.json().code).toBe('ILLEGAL_RESERVATION_STATUS_TRANSITION');
+    expect(seat.json().error.code).toBe('ILLEGAL_RESERVATION_STATUS_TRANSITION');
 
     // arrive while REQUESTED -> fails
     const arrive = await app.inject({
@@ -237,7 +238,7 @@ describe('reservations module', () => {
       headers: { authorization: `Bearer ${staffSession}`, 'if-match': `"${v1}"` }
     });
     expect(arrive.statusCode).toBe(409);
-    expect(arrive.json().code).toBe('ILLEGAL_RESERVATION_STATUS_TRANSITION');
+    expect(arrive.json().error.code).toBe('ILLEGAL_RESERVATION_STATUS_TRANSITION');
   });
 
   it('guest-token flow works and protects against wrong tokens', async () => {

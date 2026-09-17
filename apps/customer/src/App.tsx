@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider, useMutation, useQuery } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { BrowserRouter, Link, Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import {
@@ -119,7 +119,8 @@ function Header({
         {location.name}
       </Link>
       <nav>
-        <Link to="/">Menu</Link>
+                <Link to="/">Menu</Link>
+        <Link to="/reservations">Book a Table</Link>
         <Link to="/history">Orders</Link>
         <Link to="/checkout">Cart ({cartCount})</Link>
         {customer ? (
@@ -845,7 +846,9 @@ function CustomerRoutes({ location }: { location: Location }) {
           path="/orders/:orderId"
           element={<OrderStatus location={location} customer={customer} />}
         />
-        <Route path="/history" element={<History location={location} customer={customer} />} />
+                <Route path="/history" element={<History location={location} customer={customer} />} />
+        <Route path="/reservations" element={<ReservationRequest location={location} customer={customer} />} />
+        <Route path="/reservations/:id" element={<ReservationStatus location={location} customer={customer} />} />
       </Routes>
     </>
   );
@@ -857,5 +860,162 @@ export function App() {
         <LocationGate>{(location) => <CustomerRoutes location={location} />}</LocationGate>
       </BrowserRouter>
     </QueryClientProvider>
+  );
+}
+
+const resHistoryKey = (customer?: Customer | null) => `customer-reservations:${ORGANIZATION_ID}:${customer?.id ?? 'guest'}`;
+
+type StoredReservation = { id: string; locationId: string; guestToken: string | null; createdAt: string };
+
+function storeReservation(res: StoredReservation, customer?: Customer | null) {
+  let current: StoredReservation[] = [];
+  try {
+    current = JSON.parse(localStorage.getItem(resHistoryKey(customer)) ?? '[]');
+  } catch {
+    // ignore malformed localStorage state
+  }
+  current = current.filter((item) => item.id !== res.id);
+  localStorage.setItem(resHistoryKey(customer), JSON.stringify([res, ...current].slice(0, 20)));
+}
+
+function readReservations(customer?: Customer | null) {
+  try {
+    return JSON.parse(localStorage.getItem(resHistoryKey(customer)) ?? '[]') as { id: string; locationId: string; guestToken: string | null; createdAt: string }[];
+  } catch {
+    return [];
+  }
+}
+
+function ReservationRequest({ location, customer }: { location: Location; customer?: Customer | null }) {
+  const navigate = useNavigate();
+  const mutation = useMutation({
+    mutationFn: (form: HTMLFormElement) => {
+      const data = new FormData(form);
+      const reqTime = data.get('reservation_time');
+      const partySize = data.get('party_size');
+      return apiFetch<{ reservation_id: string; guest_token: string | null }>(`/api/v1/locations/${location.id}/reservations/request`, {
+        method: 'POST',
+        body: JSON.stringify({
+          reservation_time: reqTime ? new Date(String(reqTime)).toISOString() : null,
+          party_size: Number(partySize),
+          customer_name: String(data.get('customer_name')),
+          customer_email: String(data.get('customer_email') || ''),
+          customer_phone: String(data.get('customer_phone') || ''),
+          special_requests: String(data.get('special_requests') || '')
+        })
+      });
+    },
+    onSuccess: (data) => {
+      storeReservation({
+        id: data.reservation_id,
+        locationId: location.id,
+        guestToken: data.guest_token,
+        createdAt: new Date().toISOString()
+      }, customer);
+      navigate(`/reservations/${data.reservation_id}?token=${encodeURIComponent(data.guest_token || '')}`);
+    }
+  });
+
+  return (
+    <main className="narrow">
+      <h1>Book a Table</h1>
+      <p>Reserve a spot at {location.name}.</p>
+      <form onSubmit={(e) => { e.preventDefault(); mutation.mutate(e.currentTarget); }}>
+        <label>
+          Name
+          <input name="customer_name" required defaultValue={customer?.name || ''} />
+        </label>
+        <label>
+          Email
+          <input name="customer_email" type="email" defaultValue={customer?.email || ''} />
+        </label>
+        <label>
+          Phone
+          <input name="customer_phone" defaultValue={customer?.phone || ''} />
+        </label>
+        <label>
+          Party Size
+          <input name="party_size" type="number" min="1" required defaultValue="2" />
+        </label>
+        <label>
+          Reservation Time
+          <input name="reservation_time" type="datetime-local" required />
+        </label>
+        <label>
+          Special Requests
+          <textarea name="special_requests" />
+        </label>
+        {mutation.isError && <ErrorMessage error={mutation.error} />}
+        <button className="primary" disabled={mutation.isPending}>Request Reservation</button>
+      </form>
+      
+      <div style={{ marginTop: '2rem' }}>
+        <h2>Your Recent Reservations</h2>
+        <ul>
+          {readReservations(customer).map(r => (
+            <li key={r.id}>
+              <Link to={`/reservations/${r.id}?token=${encodeURIComponent(r.guestToken || '')}`}>
+                Reservation on {new Date(r.createdAt).toLocaleDateString()}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </main>
+  );
+}
+
+interface ReservationDetail {
+  status: string;
+  reservation_time: string;
+  party_size: number;
+  customer_name: string;
+  version: number;
+}
+
+function ReservationStatus({ location, customer }: { location: Location; customer?: Customer | null }) {
+  const { id } = useParams();
+  const token = new URLSearchParams(window.location.search).get('token') || readReservations(customer).find(r => r.id === id)?.guestToken || null;
+  const qc = useQueryClient();
+
+  const query = useQuery({
+    queryKey: ['reservation', location.id, id, token],
+    queryFn: () => apiFetch<ReservationDetail>(`/api/v1/locations/${location.id}/reservations/${id}${token ? `?guest_token=${encodeURIComponent(token)}` : ''}`),
+    refetchInterval: 10000
+  });
+
+  const cancelMut = useMutation({
+    mutationFn: (version: number) => {
+      const payload: { guest_token?: string } = {};
+      if (token && !customer) payload.guest_token = token;
+      return apiFetch(`/api/v1/locations/${location.id}/reservations/${id}/cancel`, {
+        method: 'POST',
+        headers: { 'if-match': `"${version}"` },
+        body: JSON.stringify(payload)
+      });
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['reservation', location.id, id, token] });
+    }
+  });
+
+  if (query.isPending) return <main className="centered">Loading...</main>;
+  if (query.isError) return <main className="centered"><ErrorMessage error={query.error} /></main>;
+
+  const r = query.data;
+
+  return (
+    <main className="narrow confirmation">
+      <p className="eyebrow">Reservation Status</p>
+      <h1>{r.status}</h1>
+      <p>Time: {new Date(r.reservation_time).toLocaleString()}</p>
+      <p>Party of {r.party_size}</p>
+      <p>Name: {r.customer_name}</p>
+      {['REQUESTED', 'CONFIRMED'].includes(r.status) && (
+        <button onClick={() => cancelMut.mutate(r.version)} disabled={cancelMut.isPending} style={{ marginTop: '1rem' }}>
+          Cancel Reservation
+        </button>
+      )}
+    </main>
   );
 }

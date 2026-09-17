@@ -11,6 +11,7 @@ import { guestSessionsModule, type GuestSessionsRouteOptions } from './modules/g
 import { reportsModule, type ReportsRouteOptions } from './modules/reports/index.js';
 import { cashDrawerModule, type CashDrawerRouteOptions } from './modules/cash-drawer/index.js';
 import { inventoryModule } from './modules/inventory/index.js';
+import { reservationsModule } from './modules/reservations/index.js';
 import { realtimeModule } from './modules/realtime/index.js';
 import { pingModule } from './modules/ping/index.js';
 
@@ -65,6 +66,7 @@ export function createApp(options: AppOptions = {}): FastifyInstance {
   app.register(reportsModule, options.reports ?? {});
   app.register(cashDrawerModule, options.cashDrawer ?? {});
   app.register(inventoryModule, {});
+  app.register(reservationsModule, {});
   app.register(realtimeModule);
 
   return app;

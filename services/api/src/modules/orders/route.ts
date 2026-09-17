@@ -1761,6 +1761,12 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
         if (!updated) throw conflict(visit, visit);
 
         await actor.trx
+          .updateTable('reservations')
+          .set({ status: 'COMPLETED', version: sql<number>`version + 1` })
+          .where('visit_id', '=', visitId)
+          .execute();
+
+        await actor.trx
           .updateTable('guest_sessions')
           .set({ revoked_at: now() })
           .where('visit_id', '=', visitId)

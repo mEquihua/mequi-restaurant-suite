@@ -47,6 +47,8 @@ describeIntegration('floor API against PostgreSQL', () => {
     await db.deleteFrom('order_lines').execute();
     await db.deleteFrom('orders').execute();
     await db.deleteFrom('accounts').execute();
+    await db.deleteFrom('reservations').execute();
+    await db.deleteFrom('reservation_settings').execute();
     await db.deleteFrom('visits').execute();
     await db.deleteFrom('table_sections').execute();
     await db.deleteFrom('sections').execute();

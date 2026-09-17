@@ -21,6 +21,10 @@ describeIntegration('identity API against PostgreSQL', () => {
   let ownerSession = '';
 
   beforeAll(async () => {
+    await db.deleteFrom('stock_adjustments').execute();
+    await db.deleteFrom('ingredient_stock').execute();
+    await db.deleteFrom('recipe_lines').execute();
+    await db.deleteFrom('ingredients').execute();
     await db.deleteFrom('cash_drawer_movements').execute();
     await db.deleteFrom('cash_drawer_sessions').execute();
     await db.deleteFrom('command_idempotency').execute();
@@ -56,7 +60,7 @@ describeIntegration('identity API against PostgreSQL', () => {
     await db.deleteFrom('terminals').execute();
     await db.deleteFrom('staff').execute();
     await db.deleteFrom('roles').execute();
-    await db.deleteFrom('stock_adjustments').execute();    await db.deleteFrom('ingredient_stock').execute();    await db.deleteFrom('recipe_lines').execute();    await db.deleteFrom('ingredients').execute();    await db.deleteFrom('customer_sessions').execute();    await db.deleteFrom('customers').execute();    await db.deleteFrom('delivery_zones').execute();    await db.deleteFrom('locations').execute();
+    await db.deleteFrom('customer_sessions').execute();    await db.deleteFrom('customers').execute();    await db.deleteFrom('delivery_zones').execute();    await db.deleteFrom('locations').execute();
     await db.deleteFrom('organizations').execute();
 
     const organization = await db

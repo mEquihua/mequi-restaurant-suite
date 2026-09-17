@@ -45,12 +45,17 @@ describeIntegration('timeclock module', () => {
       'ingredient_stock',
       'recipe_lines',
       'ingredients',
-      
+      'cash_drawer_movements',
       'cash_drawer_sessions',
-      
-      'cancellations_and_voids',
+      'module_activations',
+      'command_idempotency',
+      'audit_events',
+      'account_discounts',
+      'outbox_events',
       'refunds',
+      'cancellations_and_voids',
       'payments',
+      'order_fulfillments',
       'order_line_modifiers',
       'order_lines',
       'orders',
@@ -116,12 +121,12 @@ describeIntegration('timeclock module', () => {
       .executeTakeFirstOrThrow();
     workerId = worker.id;
 
-    const termCred = terminalCredential(locationId, '00000000-0000-0000-0000-000000000000');
-    const terminal = await db
+    const terminalId = crypto.randomUUID();
+    const termCred = terminalCredential(locationId, terminalId);
+    await db
       .insertInto('terminals')
-      .values({ location_id: locationId, name: 'T1', credential_hash: credentialHash(termCred) })
-      .returning('id')
-      .executeTakeFirstOrThrow();
+      .values({ id: terminalId, location_id: locationId, name: 'T1', credential_hash: credentialHash(termCred) })
+      .execute();
     
     // Add all permissions to owner
     const role = await db.insertInto('roles').values({ organization_id: organizationId, name: 'Admin' }).returning('id').executeTakeFirstOrThrow();
@@ -141,18 +146,20 @@ describeIntegration('timeclock module', () => {
 
     let res = await app.inject({
       method: 'POST',
-      url: '/api/v1/auth/session',
-      headers: { authorization: `Basic ${Buffer.from(`:${termCred}`).toString('base64')}` },
-      payload: { pin: '1234' }
+      url: '/api/v1/auth/pin-unlock',
+      headers: { 'x-terminal-credential': termCred },
+      payload: { staff_id: ownerId, pin: '1234' }
     });
+    if (res.statusCode >= 300) throw new Error(`owner pin-unlock failed: ${res.statusCode} ${res.body}`);
     ownerSession = res.json().token;
 
     res = await app.inject({
       method: 'POST',
-      url: '/api/v1/auth/session',
-      headers: { authorization: `Basic ${Buffer.from(`:${termCred}`).toString('base64')}` },
-      payload: { pin: '4321' }
+      url: '/api/v1/auth/pin-unlock',
+      headers: { 'x-terminal-credential': termCred },
+      payload: { staff_id: workerId, pin: '4321' }
     });
+    if (res.statusCode >= 300) throw new Error(`worker pin-unlock failed: ${res.statusCode} ${res.body}`);
     workerSession = res.json().token;
   });
 
@@ -183,7 +190,7 @@ describeIntegration('timeclock module', () => {
 
   it('allows clock-out (self) with only .clock permission', async () => {
     // Get shift
-    let get = await app.inject({
+    const get = await app.inject({
       method: 'GET',
       url: `/api/v1/staff/me/shifts`,
       headers: { authorization: `Bearer ${workerSession}` }
@@ -192,7 +199,7 @@ describeIntegration('timeclock module', () => {
     const shift = get.json().data[0];
     
     // Clock out self
-    let res = await app.inject({
+    const res = await app.inject({
       method: 'POST',
       url: `/api/v1/locations/${locationId}/shifts/${shift.id}/clock-out`,
       headers: { authorization: `Bearer ${workerSession}`, 'if-match': `"${shift.version}"` }
@@ -204,7 +211,7 @@ describeIntegration('timeclock module', () => {
 
   it('manager can clock out a different staff member but worker cannot', async () => {
     // Worker clocks in
-    let req = await app.inject({
+    const req = await app.inject({
       method: 'POST',
       url: `/api/v1/locations/${locationId}/shifts/clock-in`,
       headers: { authorization: `Bearer ${workerSession}` }
@@ -212,7 +219,7 @@ describeIntegration('timeclock module', () => {
     const shift = req.json();
 
     // Owner (has .write) clocks them out
-    let res = await app.inject({
+    const res = await app.inject({
       method: 'POST',
       url: `/api/v1/locations/${locationId}/shifts/${shift.id}/clock-out`,
       headers: { authorization: `Bearer ${ownerSession}`, 'if-match': `"${shift.version}"` }
@@ -221,14 +228,14 @@ describeIntegration('timeclock module', () => {
     expect(res.json().clocked_out_by_staff_id).toBe(ownerId);
     
     // Test that worker cannot clock out owner
-    let ownerReq = await app.inject({
+    const ownerReq = await app.inject({
       method: 'POST',
       url: `/api/v1/locations/${locationId}/shifts/clock-in`,
       headers: { authorization: `Bearer ${ownerSession}` }
     });
     const ownerShift = ownerReq.json();
 
-    let failRes = await app.inject({
+    const failRes = await app.inject({
       method: 'POST',
       url: `/api/v1/locations/${locationId}/shifts/${ownerShift.id}/clock-out`,
       headers: { authorization: `Bearer ${workerSession}`, 'if-match': `"${ownerShift.version}"` }
@@ -245,7 +252,7 @@ describeIntegration('timeclock module', () => {
 
   it('manual shift creation and edit with optimistic concurrency', async () => {
     // Create shift manually
-    let createRes = await app.inject({
+    const createRes = await app.inject({
       method: 'POST',
       url: `/api/v1/locations/${locationId}/shifts`,
       headers: { authorization: `Bearer ${ownerSession}` },
@@ -259,7 +266,7 @@ describeIntegration('timeclock module', () => {
     const shift = createRes.json();
 
     // Edit shift
-    let updateRes = await app.inject({
+    const updateRes = await app.inject({
       method: 'PUT',
       url: `/api/v1/locations/${locationId}/shifts/${shift.id}`,
       headers: { authorization: `Bearer ${ownerSession}`, 'if-match': `"${shift.version}"` },
@@ -271,7 +278,7 @@ describeIntegration('timeclock module', () => {
     expect(updateRes.statusCode).toBe(200);
 
     // Edit again with old version (Conflict)
-    let conflictRes = await app.inject({
+    const conflictRes = await app.inject({
       method: 'PUT',
       url: `/api/v1/locations/${locationId}/shifts/${shift.id}`,
       headers: { authorization: `Bearer ${ownerSession}`, 'if-match': `"${shift.version}"` },

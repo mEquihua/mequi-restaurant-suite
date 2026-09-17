@@ -22,7 +22,7 @@ export function Timeclock({ permissions, locationId }: { permissions: string[]; 
 
   const { data: staffList } = useQuery({
     queryKey: ['staff', locationId],
-    queryFn: () => apiFetch<{ data: Array<{ id: string; first_name: string; last_name: string }> }>(`/api/v1/locations/${locationId}/staff`),
+    queryFn: () => apiFetch<{ data: Array<{ id: string; first_name: string; last_name: string }> }>(`/api/v1/staff`),
   });
 
   const staffMap = new Map(staffList?.data.map(s => [s.id, `${s.first_name} ${s.last_name}`]));

@@ -1,3 +1,4 @@
+import { TimeclockWidget } from './TimeclockWidget.js';
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
@@ -113,24 +114,47 @@ function MainApp() {
   const hasPos = typedUser.permissions.some((p: { permission_name: string }) => p.permission_name === 'orders.orders.create');
   const hasHost = typedUser.permissions.some((p: { permission_name: string }) => p.permission_name === 'reservations.reservations.read');
   
+
+  const clockWidget = <TimeclockWidget locationId={typedUser.location_id} permissions={typedUser.permissions} />;
+
   const modeCount = [hasWaiter, hasPos, hasHost].filter(Boolean).length;
 
+  
   if (modeCount > 1) {
     return (
-      <Routes>
-        <Route path="/" element={<ModeSwitcher hasWaiter={hasWaiter} hasPos={hasPos} hasHost={hasHost} />} />
-        <Route path="/waiter/*" element={<WaiterMode locationId={typedUser.location_id} />} />
-        <Route path="/pos/*" element={<POSMode locationId={typedUser.location_id} />} />
-        <Route path="/host/*" element={<HostMode locationId={typedUser.location_id} />} />
-      </Routes>
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '1rem', borderBottom: '1px solid #ccc' }}>
+          {clockWidget}
+        </div>
+        <div style={{ flex: 1, overflow: 'auto' }}>
+          <Routes>
+            <Route path="/" element={<ModeSwitcher hasWaiter={hasWaiter} hasPos={hasPos} hasHost={hasHost} />} />
+            <Route path="/waiter/*" element={<WaiterMode locationId={typedUser.location_id} />} />
+            <Route path="/pos/*" element={<POSMode locationId={typedUser.location_id} />} />
+            <Route path="/host/*" element={<HostMode locationId={typedUser.location_id} />} />
+          </Routes>
+        </div>
+      </div>
     );
   }
 
-  if (hasWaiter) return <WaiterMode locationId={typedUser.location_id} />;
-  if (hasPos) return <POSMode locationId={typedUser.location_id} />;
-  if (hasHost) return <HostMode locationId={typedUser.location_id} />;
+  const renderSingleMode = () => {
+    if (hasWaiter) return <WaiterMode locationId={typedUser.location_id} />;
+    if (hasPos) return <POSMode locationId={typedUser.location_id} />;
+    if (hasHost) return <HostMode locationId={typedUser.location_id} />;
+    return <div>You don't have access to any operational modes.</div>;
+  };
 
-  return <div>You don't have access to any operational modes.</div>;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '1rem', borderBottom: '1px solid #ccc' }}>
+        {clockWidget}
+      </div>
+      <div style={{ flex: 1, overflow: 'auto' }}>
+        {renderSingleMode()}
+      </div>
+    </div>
+  );
 }
 
 export function App() {

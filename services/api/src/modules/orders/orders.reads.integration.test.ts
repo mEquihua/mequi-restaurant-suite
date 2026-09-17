@@ -92,6 +92,7 @@ describeIntegration('orders API reads and table side effects against PostgreSQL'
       'customer_sessions',
       'customers',
       'delivery_zones',
+      'scheduled_order_settings',
       'locations',
       'organizations',
       ] as const)

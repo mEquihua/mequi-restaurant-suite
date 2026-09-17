@@ -10,6 +10,16 @@ import {
   type AuthenticatedSession,
 } from '../identity/index.js';
 import { addOrderLines } from './commands.js';
+import type { DatabaseTransaction } from '../../shared/index.js';
+
+interface ScheduledOrderSettingsRow {
+  accepts_scheduled_orders: boolean;
+  minimum_lead_time_minutes: number;
+  maximum_lead_time_days: number;
+  operating_hours: Array<{ day_of_week: number; open_time: string; close_time: string }>;
+  version: number;
+}
+
 
 const uuid = { type: 'string', format: 'uuid' } as const;
 const ifMatchAsBody = {
@@ -104,6 +114,60 @@ function hashGuestOrderToken(token: string): string {
 }
 
 export const onlineOrdersRoute: FastifyPluginAsync = async (app) => {
+  const getSettings = async (trx: DatabaseTransaction, loc_id: string): Promise<ScheduledOrderSettingsRow> => {
+    const settings = await trx
+      .selectFrom('scheduled_order_settings')
+      .selectAll()
+      .where('location_id', '=', loc_id)
+      .executeTakeFirst();
+    if (!settings) {
+      return {
+        accepts_scheduled_orders: false,
+        minimum_lead_time_minutes: 60,
+        maximum_lead_time_days: 7,
+        operating_hours: [],
+        version: 1,
+      };
+    }
+    return settings as unknown as ScheduledOrderSettingsRow;
+  };
+
+  const validateScheduledRequest = (
+    settings: ScheduledOrderSettingsRow,
+    scheduledFor: string,
+    now: Date
+  ) => {
+    if (!settings.accepts_scheduled_orders) {
+      throw new IdentityHttpError(400, 'SCHEDULED_ORDERS_NOT_ACCEPTED', 'Location does not accept scheduled orders.');
+    }
+    const reqTime = new Date(scheduledFor);
+    if (reqTime.getTime() < now.getTime()) {
+      throw new IdentityHttpError(400, 'TIME_IN_PAST', 'Scheduled time cannot be in the past.');
+    }
+    const leadTimeMinutes = (reqTime.getTime() - now.getTime()) / 60000;
+    if (leadTimeMinutes < settings.minimum_lead_time_minutes) {
+      throw new IdentityHttpError(400, 'LEAD_TIME_TOO_SHORT', 'Scheduled lead time is too short.');
+    }
+    const maxLeadTimeMinutes = settings.maximum_lead_time_days * 24 * 60;
+    if (leadTimeMinutes > maxLeadTimeMinutes) {
+      throw new IdentityHttpError(400, 'LEAD_TIME_TOO_LONG', 'Scheduled time is too far in the future.');
+    }
+    const dayOfWeek = reqTime.getDay() || 7; // 1-7 ISO
+    const hoursStr =
+      reqTime.getHours().toString().padStart(2, '0') +
+      ':' +
+      reqTime.getMinutes().toString().padStart(2, '0');
+
+    const dayHours = (settings.operating_hours || []).find((h) => h.day_of_week === dayOfWeek);
+    if (!dayHours || hoursStr < dayHours.open_time || hoursStr > dayHours.close_time) {
+      throw new IdentityHttpError(
+        400,
+        'OUTSIDE_OPERATING_HOURS',
+        'Scheduled time is outside operating hours.'
+      );
+    }
+  };
+
   app.setErrorHandler((error, request, reply) => {
     if (error instanceof IdentityHttpError || error instanceof CustomerSessionHttpError)
       return fail(reply, request, error);
@@ -165,6 +229,11 @@ export const onlineOrdersRoute: FastifyPluginAsync = async (app) => {
             'FORBIDDEN',
             'The customer session belongs to a different organization.',
           );
+
+        if (body.scheduled_for) {
+          const settings = await getSettings(trx, loc_id);
+          validateScheduledRequest(settings, body.scheduled_for, new Date());
+        }
 
         const visit = await trx
           .insertInto('visits')
@@ -747,5 +816,118 @@ export const onlineOrdersRoute: FastifyPluginAsync = async (app) => {
         },
       );
     },
+  );
+
+  app.get<{ Params: { loc_id: string } }>(
+    '/api/v1/locations/:loc_id/scheduled-order-settings',
+    {
+      schema: {
+        params: { type: 'object', properties: { loc_id: uuid }, required: ['loc_id'] }
+      }
+    },
+    async (request) => {
+      const { loc_id } = request.params;
+      return withAuthenticatedSession(app, request, new Date(), 15 * 60 * 1000, async (actor) => {
+        requirePermission(actor, 'online_ordering.settings.read');
+        return app.withLocationTransaction(loc_id, async (trx) => {
+          return getSettings(trx, loc_id);
+        });
+      });
+    }
+  );
+
+  app.put<{ Params: { loc_id: string }; Body: ScheduledOrderSettingsRow }>(
+    '/api/v1/locations/:loc_id/scheduled-order-settings',
+    {
+      schema: {
+        params: { type: 'object', properties: { loc_id: uuid }, required: ['loc_id'] },
+        body: {
+          type: 'object',
+          properties: {
+            accepts_scheduled_orders: { type: 'boolean' },
+            minimum_lead_time_minutes: { type: 'integer' },
+            maximum_lead_time_days: { type: 'integer' },
+            operating_hours: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  day_of_week: { type: 'integer' },
+                  open_time: { type: 'string' },
+                  close_time: { type: 'string' }
+                }
+              }
+            },
+            version: { type: 'integer' }
+          },
+          required: [
+            'accepts_scheduled_orders',
+            'minimum_lead_time_minutes',
+            'maximum_lead_time_days',
+            'operating_hours',
+            'version'
+          ]
+        }
+      }
+    },
+    async (request, reply) => {
+      const { loc_id } = request.params;
+      return withAuthenticatedSession(app, request, new Date(), 15 * 60 * 1000, async (actor) => {
+        requirePermission(actor, 'online_ordering.settings.write');
+        const res = await app.withLocationTransaction(loc_id, async (trx) => {
+          const body = request.body;
+          const current = await trx
+            .selectFrom('scheduled_order_settings')
+            .selectAll()
+            .where('location_id', '=', loc_id)
+            .executeTakeFirst();
+          if (current) {
+            if (current.version !== body.version) {
+              throw new IdentityHttpError(
+                409,
+                'OPTIMISTIC_CONCURRENCY_CONFLICT',
+                'Resource modified since last read.',
+                { current_version: current.version, current_state: current }
+              );
+            }
+            const updated = await trx
+              .updateTable('scheduled_order_settings')
+              .set({
+                accepts_scheduled_orders: body.accepts_scheduled_orders,
+                minimum_lead_time_minutes: body.minimum_lead_time_minutes,
+                maximum_lead_time_days: body.maximum_lead_time_days,
+                operating_hours: JSON.stringify(body.operating_hours),
+                version: sql<number>`version + 1`,
+              })
+              .where('location_id', '=', loc_id)
+              .where('version', '=', body.version)
+              .returningAll()
+              .executeTakeFirst();
+            if (!updated) {
+              throw new IdentityHttpError(
+                409,
+                'OPTIMISTIC_CONCURRENCY_CONFLICT',
+                'Resource modified since last read.',
+                { current_version: current.version, current_state: current }
+              );
+            }
+            return updated;
+          } else {
+            return trx
+              .insertInto('scheduled_order_settings')
+              .values({
+                location_id: loc_id,
+                accepts_scheduled_orders: body.accepts_scheduled_orders,
+                minimum_lead_time_minutes: body.minimum_lead_time_minutes,
+                maximum_lead_time_days: body.maximum_lead_time_days,
+                operating_hours: JSON.stringify(body.operating_hours),
+              })
+              .returningAll()
+              .executeTakeFirstOrThrow();
+          }
+        });
+        return reply.status(200).send(res);
+      });
+    }
   );
 };

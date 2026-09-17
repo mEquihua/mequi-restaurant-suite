@@ -86,6 +86,7 @@ describeIntegration('orders API security boundaries against PostgreSQL', () => {
       'customer_sessions',
       'customers',
       'delivery_zones',
+      'scheduled_order_settings',
       'locations',
       'organizations'
     ] as const) await db.deleteFrom(table).execute();

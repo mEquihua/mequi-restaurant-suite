@@ -475,6 +475,7 @@ function Checkout({
 }) {
   const navigate = useNavigate();
   const [fulfillment, setFulfillment] = useState<'PICKUP' | 'DELIVERY'>('PICKUP');
+  const [isScheduled, setIsScheduled] = useState(false);
   const [deliveryZoneId, setDeliveryZoneId] = useState<string>('');
   const { data: zonesData } = useQuery({
     queryKey: ['delivery-zones', location.id],
@@ -495,7 +496,7 @@ function Checkout({
           modifiers: item.modifierIds.map((modifier_id) => ({ modifier_id, quantity: 1 })),
         })),
         fulfillment_type: fulfillment,
-        scheduled_for: data.get('scheduled_for')
+        scheduled_for: isScheduled && data.get('scheduled_for')
           ? new Date(String(data.get('scheduled_for'))).toISOString()
           : null,
         customer_name: String(data.get('name')),
@@ -567,10 +568,31 @@ function Checkout({
             Phone
             <input name="phone" required defaultValue={customer?.phone ?? ''} />
           </label>
-          <label>
-            Schedule for later (optional)
-            <input name="scheduled_for" type="datetime-local" />
-          </label>
+          <fieldset className="schedule-fieldset">
+            <legend>When would you like this order?</legend>
+            <div className="toggle">
+              <button
+                type="button"
+                className={!isScheduled ? 'active' : ''}
+                onClick={() => setIsScheduled(false)}
+              >
+                ASAP
+              </button>
+              <button
+                type="button"
+                className={isScheduled ? 'active' : ''}
+                onClick={() => setIsScheduled(true)}
+              >
+                Scheduled
+              </button>
+            </div>
+            {isScheduled && (
+              <label>
+                Select time:
+                <input name="scheduled_for" type="datetime-local" required={isScheduled} />
+              </label>
+            )}
+          </fieldset>
           {requiresDeliveryAddress(fulfillment) && (
             <>
               <label>

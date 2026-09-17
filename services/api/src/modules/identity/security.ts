@@ -102,6 +102,7 @@ const OWNER_AND_MANAGER_PERMISSIONS: readonly string[] = [
   'payments.payments.create', 'payments.refunds.create', 'payments.refunds.override', 'payments.cash.open_drawer', 'payments.cash.reconcile',
   'kitchen.tickets.read', 'kitchen.tickets.update_status',
   'reports.sales.read', 'reports.audit.read',
+  'online_ordering.settings.read', 'online_ordering.settings.write',
 ];
 
 export const SYSTEM_ROLE_TEMPLATES: ReadonlyArray<{ name: string; description: string; permissions: readonly string[] }> = [

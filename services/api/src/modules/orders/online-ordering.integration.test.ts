@@ -88,6 +88,7 @@ describeIntegration('online ordering list endpoint integration tests against Pos
       'staff',
       'roles',
       'delivery_zones',
+      'scheduled_order_settings',
       'locations',
       'organizations'
     ] as const) {

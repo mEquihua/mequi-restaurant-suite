@@ -67,6 +67,7 @@ describeIntegration('customer accounts and online ordering against PostgreSQL', 
       'staff',
       'roles',
       'delivery_zones',
+      'scheduled_order_settings',
       'locations',
       'organizations'
     ] as const) {

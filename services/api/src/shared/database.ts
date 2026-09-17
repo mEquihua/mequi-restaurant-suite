@@ -71,7 +71,20 @@ export interface TimeclockShiftTable {
   updated_at: Generated<Date>;
 }
 
+export interface ScheduledOrderSettingsTable {
+  id: Generated<string>;
+  location_id: string;
+  accepts_scheduled_orders: Generated<boolean>;
+  minimum_lead_time_minutes: Generated<number>;
+  maximum_lead_time_days: Generated<number>;
+  operating_hours: Generated<unknown>;
+  version: Generated<number>;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
 export interface Database {
+  scheduled_order_settings: ScheduledOrderSettingsTable;
   timeclock_shifts: TimeclockShiftTable;
   customers: CustomerTable;
   customer_sessions: CustomerSessionTable;

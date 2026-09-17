@@ -15,6 +15,8 @@ Furthermore, clocking is **independent of session expiry**. An open shift does n
 ### 1.3 Module Gating
 This feature is gated behind `module_activations` using the module key `timeclock`. `idea.md` specifies "Clock-in / clock-out cuando el restaurante utilice esa capacidad", meaning a restaurant must explicitly activate this feature to use it, preventing clutter for organizations that manage payroll and attendance entirely externally.
 
+**Implementation note**: `module_definitions` was originally seeded in `008_module_center.js` with `pos`, `table_service`, `kitchen_display`, `qr_ordering`, `kiosk`, `online_ordering`, `pickup`, `delivery`, `reservations`, `loyalty`, and `inventory` — anticipating those features ahead of time. `timeclock` was not anticipated and must be added via `INSERT INTO module_definitions (key, display_name, description) VALUES ('timeclock', ...) ON CONFLICT (key) DO NOTHING;` in the new migration, matching that exact statement's shape. Also note that neither the shipped `reservations` nor `loyalty` route handlers actually check `module_activations` status at the API layer — that table today only backs the Module Center catalog/toggle UI, not per-request backend enforcement. Match this existing (lack of) precedent exactly: register the `timeclock` catalog entry so it can be listed and toggled like every other module, but do not invent a new backend enforcement check the sibling features don't have.
+
 ## 2. Data Model
 
 All tables must implement the `PERMISSIVE` + `RESTRICTIVE` Row-Level Security (RLS) pattern based on `location_id` used throughout the foundation database schema, matching `011_orders_row_level_security.js`.

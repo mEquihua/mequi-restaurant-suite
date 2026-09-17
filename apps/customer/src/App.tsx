@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import { BrowserRouter, Link, Route, Routes, useNavigate, useParams } from 'react-router-dom';
+import { BrowserRouter, Link, Route, Routes, useNavigate, useParams, Navigate } from 'react-router-dom';
 import {
   ApiError,
   LOCATION_HOURS,
@@ -121,6 +121,7 @@ function Header({
       <nav>
                 <Link to="/">Menu</Link>
         <Link to="/reservations">Book a Table</Link>
+        {customer && <Link to="/loyalty">Loyalty</Link>}
         <Link to="/history">Orders</Link>
         <Link to="/checkout">Cart ({cartCount})</Link>
         {customer ? (
@@ -790,6 +791,73 @@ function HistoryItem({ stored }: { stored: StoredOrder }) {
   );
 }
 
+
+type CustomerLoyaltyReward = {
+  id: string;
+  name: string;
+  description: string | null;
+  cost_in_points: number | null;
+  cost_in_visits: number | null;
+};
+type CustomerLoyalty = { points_balance: number; total_visits: number; available_rewards: CustomerLoyaltyReward[] };
+type LoyaltyTransaction = { id: string; points_delta: number; reason: string; created_at: string };
+
+function LoyaltyScreen() {
+  const account = useQuery({
+    queryKey: ['customer-loyalty'],
+    queryFn: () => apiFetch<CustomerLoyalty>(`/api/v1/customers/me/loyalty`),
+  });
+
+  const history = useQuery({
+    queryKey: ['customer-loyalty-history'],
+    queryFn: () => apiFetch<{ data: LoyaltyTransaction[] }>(`/api/v1/customers/me/loyalty/history`),
+  });
+
+  if (account.isPending || history.isPending) return <main className="narrow">Loading...</main>;
+  if (account.isError) return <main className="narrow"><ErrorMessage error={account.error} /></main>;
+
+  return (
+    <main className="narrow">
+      <h1>Your Loyalty Rewards</h1>
+      <div className="panel" style={{ padding: '2rem', textAlign: 'center', background: '#f8f9fa', borderRadius: '8px', marginBottom: '2rem' }}>
+        <h2>{account.data?.points_balance ?? 0} points</h2>
+        <p className="muted">Total lifetime visits: {account.data?.total_visits ?? 0}</p>
+      </div>
+
+      <h3>Available Rewards</h3>
+      <ul style={{ listStyle: 'none', padding: 0 }}>
+        {account.data?.available_rewards.map((r) => (
+          <li key={r.id} style={{ padding: '1rem', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between' }}>
+            <div>
+              <strong>{r.name}</strong>
+              {r.description && <div className="muted"><small>{r.description}</small></div>}
+            </div>
+            <div>
+              {r.cost_in_points ? <span>{r.cost_in_points} pts</span> : null}
+              {r.cost_in_visits ? <span>{r.cost_in_visits} visits</span> : null}
+            </div>
+          </li>
+        ))}
+        {account.data?.available_rewards.length === 0 && <p className="muted">No rewards currently available.</p>}
+      </ul>
+
+      <h3 style={{ marginTop: '2rem' }}>Recent History</h3>
+      <ul style={{ listStyle: 'none', padding: 0 }}>
+        {history.data?.data.map((tx) => (
+          <li key={tx.id} style={{ padding: '1rem', borderBottom: '1px solid #eee' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <strong>{tx.points_delta > 0 ? '+' : ''}{tx.points_delta} pts</strong>
+              <small className="muted">{new Date(tx.created_at).toLocaleDateString()}</small>
+            </div>
+            <div className="muted"><small>{tx.reason}</small></div>
+          </li>
+        ))}
+        {history.data?.data.length === 0 && <p className="muted">No history yet.</p>}
+      </ul>
+    </main>
+  );
+}
+
 function CustomerRoutes({ location }: { location: Location }) {
   const [cart, setCart] = useState<CartItem[]>([]);
   const session = useQuery({
@@ -814,6 +882,10 @@ function CustomerRoutes({ location }: { location: Location }) {
       />
       <Routes>
         <Route path="/" element={<Menu location={location} setCart={setCart} />} />
+        <Route
+          path="/loyalty"
+          element={customer ? <LoyaltyScreen /> : <Navigate to="/login" />}
+        />
         <Route
           path="/checkout"
           element={

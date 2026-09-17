@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { apiFetch, ApiError } from '../api.js';
+import { LoyaltyLookup } from './LoyaltyLookup.js';
 import type { components } from '@restaurant-suite/contracts';
 
 type Product = components['schemas']['Product'];
@@ -110,6 +111,7 @@ export function POSMode({ locationId }: { locationId: string }) {
             </div>
           ))}
         </div>
+        <LoyaltyLookup locationId={locationId} />
       </div>
       <div style={{ width: '300px', borderLeft: '1px solid #ccc', paddingLeft: '1rem' }}>
         <h2>Cart</h2>

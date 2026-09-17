@@ -440,6 +440,7 @@ function GuestExperience({ locationId, kiosk }: { locationId: string; kiosk: boo
           categories={categories.data.data}
           onAdd={(line) => add.mutate(line)}
         />
+
         <SharedOrder
           order={order.data}
           products={products.data.data}
@@ -447,6 +448,8 @@ function GuestExperience({ locationId, kiosk }: { locationId: string; kiosk: boo
           paymentMode={mode}
           onConfirm={kiosk ? () => setConfirmed(true) : undefined}
         />
+        <LoyaltyWidget locationId={locationId} visitId={info.data.visit_id} />
+
       </div>
       {!kiosk && (
         <ServiceButtons locationId={locationId} billPrimary={requestBillIsPrimary(mode)} />
@@ -623,3 +626,87 @@ export function App() {
   );
 }
 export default App;
+
+
+type GuestLoyaltyReward = {
+  id: string;
+  name: string;
+  is_active: boolean;
+  cost_in_points: number | null;
+  cost_in_visits: number | null;
+};
+type GuestLoyaltyAccount = { points_balance: number; total_visits: number };
+type GuestLoyaltyInfo = { account: GuestLoyaltyAccount | null; history: unknown[]; available_rewards: GuestLoyaltyReward[] };
+
+function LoyaltyWidget({ locationId, visitId }: { locationId: string; visitId: string }) {
+  const qc = useQueryClient();
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [couponCode, setCouponCode] = useState('');
+  const [rewardId, setRewardId] = useState('');
+
+  const loyalty = useQuery({
+    queryKey: ['guest-loyalty', locationId],
+    queryFn: () => apiFetch<GuestLoyaltyInfo>(`/api/v1/locations/${locationId}/guest-sessions/current/loyalty`),
+    retry: false,
+  });
+
+  const attach = useMutation({
+    mutationFn: (phone: string) =>
+      apiFetch(`/api/v1/locations/${locationId}/visits/${visitId}/attach-customer`, {
+        method: 'POST',
+        body: JSON.stringify({ phone })
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['guest-loyalty', locationId] });
+      setPhoneNumber('');
+    },
+  });
+
+  const redeem = useMutation({
+    mutationFn: (body: { reward_id: string } | { coupon_code: string }) =>
+      apiFetch(`/api/v1/locations/${locationId}/visits/${visitId}/redeem-reward`, {
+        method: 'POST',
+        body: JSON.stringify(body)
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['guest-loyalty', locationId] });
+      qc.invalidateQueries({ queryKey: ['guest-order', locationId] });
+      setCouponCode('');
+      setRewardId('');
+    },
+  });
+
+  return (
+    <div className="panel" style={{ marginTop: '1rem' }}>
+      <h3>Loyalty & Rewards</h3>
+      {loyalty.data?.account ? (
+        <div>
+          <p>Welcome back! You have <strong>{loyalty.data.account.points_balance}</strong> points.</p>
+          <div style={{ marginTop: '1rem' }}>
+            <h4>Redeem Reward</h4>
+            <select value={rewardId} onChange={e => setRewardId(e.target.value)}>
+              <option value="">Select a reward...</option>
+              {loyalty.data.available_rewards.map(r => (
+                <option key={r.id} value={r.id}>{r.name} - {r.cost_in_points ?? r.cost_in_visits} {r.cost_in_points ? 'pts' : 'visits'}</option>
+              ))}
+            </select>
+            <button onClick={() => rewardId && redeem.mutate({ reward_id: rewardId })} disabled={!rewardId || redeem.isPending}>Redeem</button>
+          </div>
+        </div>
+      ) : (
+        <form onSubmit={e => { e.preventDefault(); attach.mutate(phoneNumber); }} style={{ display: 'flex', gap: '0.5rem' }}>
+          <input placeholder="Phone number" value={phoneNumber} onChange={e => setPhoneNumber(e.target.value)} required />
+          <button type="submit" disabled={attach.isPending}>Join / Sign In</button>
+        </form>
+      )}
+      <div style={{ marginTop: '1rem' }}>
+        <h4>Apply Coupon</h4>
+        <form onSubmit={e => { e.preventDefault(); redeem.mutate({ coupon_code: couponCode }); }} style={{ display: 'flex', gap: '0.5rem' }}>
+          <input placeholder="Coupon code" value={couponCode} onChange={e => setCouponCode(e.target.value)} required />
+          <button type="submit" disabled={redeem.isPending}>Apply</button>
+        </form>
+      </div>
+    </div>
+  );
+}
+

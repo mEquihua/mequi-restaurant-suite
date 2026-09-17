@@ -38,32 +38,101 @@ describeIntegration('orders API reads and table side effects against PostgreSQL'
   const authB = () => ({ authorization: `Bearer ${tokenB}` });
 
   beforeAll(async () => {
-    for (const table of ['stock_adjustments', 'ingredient_stock', 'recipe_lines', 'ingredients', 
-      'cash_drawer_movements', 'cash_drawer_sessions', 'command_idempotency', 'audit_events',
-      'account_discounts', 'outbox_events', 'refunds', 'cancellations_and_voids', 'payments',
-      'order_fulfillments', 'order_line_modifiers', 'order_lines', 'orders', 'accounts', 'reservations', 'reservation_settings', 'visits', 'table_sections',
-      'sections', 'tables', 'areas', 'availability_rules', 'location_price_overrides',
-      'product_combo_items', 'product_combo_groups', 'product_modifier_groups', 'modifiers',
-      'modifier_groups', 'product_variants', 'products', 'categories', 'terminal_pin_attempts',
-      'staff_sessions', 'staff_roles', 'role_permissions', 'terminals', 'staff', 'roles',
-      'customer_sessions', 'customers', 'delivery_zones', 'locations', 'organizations',
-    ] as const)
+    for (const table of [
+      'stock_adjustments',
+      'ingredient_stock',
+      'recipe_lines',
+      'ingredients',
+      'cash_drawer_movements',
+      'cash_drawer_sessions',
+      'command_idempotency',
+      'audit_events',
+      'reservations',
+      'reservation_settings',
+      'loyalty_transactions',
+      'loyalty_redemptions',
+      'loyalty_accounts',
+      'loyalty_rewards',
+      'loyalty_coupons',
+      'loyalty_settings',
+      'account_discounts',
+      'outbox_events',
+      'refunds',
+      'cancellations_and_voids',
+      'payments',
+      'order_fulfillments',
+      'order_line_modifiers',
+      'order_lines',
+      'orders',
+      'accounts',
+      'guest_sessions',
+      'visits',
+      'table_sections',
+      'sections',
+      'tables',
+      'areas',
+      'availability_rules',
+      'location_price_overrides',
+      'product_combo_items',
+      'product_combo_groups',
+      'product_modifier_groups',
+      'modifiers',
+      'modifier_groups',
+      'product_variants',
+      'products',
+      'categories',
+      'terminal_pin_attempts',
+      'staff_sessions',
+      'staff_roles',
+      'role_permissions',
+      'terminals',
+      'staff',
+      'roles',
+      'customer_sessions',
+      'customers',
+      'delivery_zones',
+      'locations',
+      'organizations',
+      ] as const)
       await db.deleteFrom(table).execute();
 
     org = (await db.insertInto('organizations').values({ name: 'Org' }).returning('id').executeTakeFirstOrThrow()).id;
-    locationA = (await db.insertInto('locations').values({ organization_id: org, name: 'Loc A' }).returning('id').executeTakeFirstOrThrow()).id;
-    locationB = (await db.insertInto('locations').values({ organization_id: org, name: 'Loc B' }).returning('id').executeTakeFirstOrThrow()).id;
+    locationA = (await db.insertInto('locations').values({ organization_id: org,
+      name: 'Loc A' }).returning('id').executeTakeFirstOrThrow()).id;
+    locationB = (await db.insertInto('locations').values({ organization_id: org,
+      name: 'Loc B' }).returning('id').executeTakeFirstOrThrow()).id;
     
-    staffA = (await db.insertInto('staff').values({ organization_id: org, first_name: 'A', last_name: 'A', pin_hash: await argon2.hash('1234') }).returning('id').executeTakeFirstOrThrow()).id;
-    const staffB = (await db.insertInto('staff').values({ organization_id: org, first_name: 'B', last_name: 'B', pin_hash: await argon2.hash('1234') }).returning('id').executeTakeFirstOrThrow()).id;
+    staffA = (await db.insertInto('staff').values({ organization_id: org,
+      first_name: 'A',
+      last_name: 'A',
+      pin_hash: await argon2.hash('1234') }).returning('id').executeTakeFirstOrThrow()).id;
+    const staffB = (await db.insertInto('staff').values({ organization_id: org,
+      first_name: 'B',
+      last_name: 'B',
+      pin_hash: await argon2.hash('1234') }).returning('id').executeTakeFirstOrThrow()).id;
     
-    const role = (await db.insertInto('roles').values({ organization_id: org, name: 'Manager' }).returning('id').executeTakeFirstOrThrow()).id;
+    const role = (await db.insertInto('roles').values({ organization_id: org,
+      name: 'Manager' }).returning('id').executeTakeFirstOrThrow()).id;
     await db.insertInto('role_permissions').values([
-      'orders.visits.create', 'orders.visits.read_all', 'orders.visits.close', 'orders.orders.create', 'accounts.accounts.create',
-      'orders.lines.add', 'orders.lines.send', 'kitchen.tickets.read',
-    ].map(p => ({ role_id: role, permission_name: p, scope: 'organization' as const }))).execute();
+      'orders.visits.create',
+      'orders.visits.read_all',
+      'orders.visits.close',
+      'orders.orders.create',
+      'accounts.accounts.create',
+      'orders.lines.add',
+      'orders.lines.send',
+      'kitchen.tickets.read',
+      ].map(p => ({ role_id: role,
+      permission_name: p,
+      scope: 'organization' as const }))).execute();
     
-    await db.insertInto('staff_roles').values([{ location_id: locationA, staff_id: staffA, role_id: role }, { location_id: locationB, staff_id: staffB, role_id: role }]).execute();
+    await db.insertInto('staff_roles').values([{ location_id: locationA,
+      staff_id: staffA,
+      role_id: role },
+      { location_id: locationB,
+      staff_id: staffB,
+      role_id: role }
+    ]).execute();
 
     const termA = (await db.insertInto('terminals').values({ location_id: locationA, name: 'Term A', credential_hash: 'hash' }).returning('id').executeTakeFirstOrThrow()).id;
     const termB = (await db.insertInto('terminals').values({ location_id: locationB, name: 'Term B', credential_hash: 'hash' }).returning('id').executeTakeFirstOrThrow()).id;

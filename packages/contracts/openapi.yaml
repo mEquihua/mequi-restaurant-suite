@@ -3709,6 +3709,422 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Reservation'
+  /api/v1/loyalty-settings:
+    get:
+      operationId: getLoyaltySettings
+      security:
+      - staffSession: []
+      responses:
+        '200':
+          description: Loyalty settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoyaltySettings'
+    put:
+      operationId: updateLoyaltySettings
+      security:
+      - staffSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - spend_amount_for_one_point
+              properties:
+                spend_amount_for_one_point:
+                  type: integer
+      responses:
+        '200':
+          description: Updated loyalty settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoyaltySettings'
+  /api/v1/loyalty-rewards:
+    get:
+      operationId: listLoyaltyRewards
+      security:
+      - staffSession: []
+      responses:
+        '200':
+          description: List of rewards
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LoyaltyReward'
+    post:
+      operationId: createLoyaltyReward
+      security:
+      - staffSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - name
+              - discount_type
+              - discount_value
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                  nullable: true
+                cost_in_points:
+                  type: integer
+                  nullable: true
+                cost_in_visits:
+                  type: integer
+                  nullable: true
+                discount_type:
+                  type: string
+                discount_value:
+                  type: integer
+      responses:
+        '201':
+          description: Created reward
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoyaltyReward'
+  /api/v1/loyalty-rewards/{id}:
+    put:
+      operationId: updateLoyaltyReward
+      security:
+      - staffSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: If-Match
+        in: header
+        required: true
+        schema:
+          type: string
+          pattern: ^"?[1-9][0-9]*"?$
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                  nullable: true
+                cost_in_points:
+                  type: integer
+                  nullable: true
+                cost_in_visits:
+                  type: integer
+                  nullable: true
+                discount_type:
+                  type: string
+                discount_value:
+                  type: integer
+                is_active:
+                  type: boolean
+      responses:
+        '200':
+          description: Updated reward
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoyaltyReward'
+  /api/v1/loyalty-coupons:
+    get:
+      operationId: listLoyaltyCoupons
+      security:
+      - staffSession: []
+      responses:
+        '200':
+          description: List of coupons
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LoyaltyCoupon'
+    post:
+      operationId: createLoyaltyCoupon
+      security:
+      - staffSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - code
+              - discount_type
+              - discount_value
+              properties:
+                code:
+                  type: string
+                discount_type:
+                  type: string
+                discount_value:
+                  type: integer
+      responses:
+        '201':
+          description: Created coupon
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoyaltyCoupon'
+  /api/v1/loyalty-coupons/{id}:
+    put:
+      operationId: updateLoyaltyCoupon
+      security:
+      - staffSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: If-Match
+        in: header
+        required: true
+        schema:
+          type: string
+          pattern: ^"?[1-9][0-9]*"?$
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                discount_type:
+                  type: string
+                discount_value:
+                  type: integer
+                is_active:
+                  type: boolean
+      responses:
+        '200':
+          description: Updated coupon
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoyaltyCoupon'
+  /api/v1/customers/{customerId}/loyalty:
+    get:
+      operationId: getCustomerLoyalty
+      security:
+      - staffSession: []
+      parameters:
+      - name: customerId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Customer loyalty data
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - account
+                - transactions
+                properties:
+                  account:
+                    $ref: '#/components/schemas/LoyaltyAccount'
+                  transactions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LoyaltyTransaction'
+  /api/v1/customers/{customerId}/loyalty/adjust:
+    post:
+      operationId: adjustCustomerLoyalty
+      security:
+      - staffSession: []
+      parameters:
+      - name: customerId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - points_delta
+              - reason
+              properties:
+                points_delta:
+                  type: integer
+                reason:
+                  type: string
+      responses:
+        '200':
+          description: Adjusted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoyaltyTransaction'
+  /api/v1/locations/{locationId}/visits/{visitId}/attach-customer:
+    post:
+      operationId: attachCustomerToVisit
+      security:
+      - staffSession: []
+      - guestSession: []
+      parameters:
+      - &id023
+        name: locationId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: visitId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - phone
+              properties:
+                phone:
+                  type: string
+      responses:
+        '200':
+          description: Attached
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - customer_id
+                properties:
+                  customer_id:
+                    type: string
+                    format: uuid
+  /api/v1/locations/{locationId}/visits/{visitId}/redeem-reward:
+    post:
+      operationId: redeemReward
+      security:
+      - staffSession: []
+      - guestSession: []
+      parameters:
+      - *id023
+      - name: visitId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reward_id:
+                  type: string
+                  format: uuid
+                order_line_id:
+                  type: string
+                  format: uuid
+                coupon_code:
+                  type: string
+      responses:
+        '200':
+          description: Redeemed
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - discount_id
+                properties:
+                  discount_id:
+                    type: string
+                    format: uuid
+  /api/v1/customers/me/loyalty:
+    get:
+      operationId: getMyLoyalty
+      security:
+      - CustomerBearerAuth: []
+      responses:
+        '200':
+          description: Loyalty balance and available rewards
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - points_balance
+                - total_visits
+                - available_rewards
+                properties:
+                  points_balance:
+                    type: integer
+                  total_visits:
+                    type: integer
+                  available_rewards:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LoyaltyReward'
+  /api/v1/customers/me/loyalty/history:
+    get:
+      operationId: getMyLoyaltyHistory
+      security:
+      - CustomerBearerAuth: []
+      responses:
+        '200':
+          description: Loyalty history
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LoyaltyTransaction'
 components:
   securitySchemes:
     staffSession:
@@ -6509,3 +6925,144 @@ components:
           nullable: true
         version:
           type: integer
+    LoyaltySettings:
+      type: object
+      required:
+      - id
+      - organization_id
+      - spend_amount_for_one_point
+      - version
+      properties:
+        id:
+          type: string
+          format: uuid
+        organization_id:
+          type: string
+          format: uuid
+        spend_amount_for_one_point:
+          type: integer
+        version:
+          type: integer
+    LoyaltyReward:
+      type: object
+      required:
+      - id
+      - organization_id
+      - name
+      - discount_type
+      - discount_value
+      - is_active
+      - version
+      properties:
+        id:
+          type: string
+          format: uuid
+        organization_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        cost_in_points:
+          type: integer
+          nullable: true
+        cost_in_visits:
+          type: integer
+          nullable: true
+        discount_type:
+          type: string
+        discount_value:
+          type: integer
+        is_active:
+          type: boolean
+        version:
+          type: integer
+    LoyaltyCoupon:
+      type: object
+      required:
+      - id
+      - organization_id
+      - code
+      - discount_type
+      - discount_value
+      - is_active
+      - version
+      properties:
+        id:
+          type: string
+          format: uuid
+        organization_id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        discount_type:
+          type: string
+        discount_value:
+          type: integer
+        is_active:
+          type: boolean
+        version:
+          type: integer
+    LoyaltyAccount:
+      type: object
+      required:
+      - id
+      - organization_id
+      - customer_id
+      - points_balance
+      - total_visits
+      - version
+      properties:
+        id:
+          type: string
+          format: uuid
+        organization_id:
+          type: string
+          format: uuid
+        customer_id:
+          type: string
+          format: uuid
+        points_balance:
+          type: integer
+        total_visits:
+          type: integer
+        version:
+          type: integer
+    LoyaltyTransaction:
+      type: object
+      required:
+      - id
+      - organization_id
+      - loyalty_account_id
+      - transaction_type
+      - points_delta
+      - visit_count_delta
+      - reason
+      properties:
+        id:
+          type: string
+          format: uuid
+        organization_id:
+          type: string
+          format: uuid
+        loyalty_account_id:
+          type: string
+          format: uuid
+        transaction_type:
+          type: string
+        points_delta:
+          type: integer
+        visit_count_delta:
+          type: integer
+        reason:
+          type: string
+        reference_visit_id:
+          type: string
+          format: uuid
+          nullable: true
+        created_at:
+          type: string
+          format: date-time

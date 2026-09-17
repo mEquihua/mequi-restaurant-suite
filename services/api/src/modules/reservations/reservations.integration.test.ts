@@ -35,46 +35,133 @@ describeIntegration('reservations module', () => {
   let customerSession: string;
 
   beforeAll(async () => {
-    for (const table of ['reservations', 'reservation_settings', 'stock_adjustments', 'ingredient_stock', 'recipe_lines', 'ingredients', 'cash_drawer_movements', 'cash_drawer_sessions', 'module_activations', 'command_idempotency', 'audit_events', 'account_discounts', 'outbox_events', 'refunds', 'cancellations_and_voids', 'payments', 'order_fulfillments', 'order_line_modifiers', 'order_lines', 'orders', 'accounts', 'visits', 'table_sections', 'sections', 'tables', 'areas', 'availability_rules', 'location_price_overrides', 'product_combo_items', 'product_combo_groups', 'product_modifier_groups', 'modifiers', 'modifier_groups', 'product_variants', 'products', 'categories', 'terminal_pin_attempts', 'staff_sessions', 'staff_roles', 'role_permissions', 'terminals', 'staff', 'roles', 'customer_sessions', 'customers', 'delivery_zones', 'locations', 'organizations'] as const) {
+    for (const table of [
+      'reservations',
+      'reservation_settings',
+      'stock_adjustments',
+      'ingredient_stock',
+      'recipe_lines',
+      'ingredients',
+      'cash_drawer_movements',
+      'cash_drawer_sessions',
+      'module_activations',
+      'command_idempotency',
+      'audit_events',
+      'loyalty_transactions',
+      'loyalty_redemptions',
+      'loyalty_accounts',
+      'loyalty_rewards',
+      'loyalty_coupons',
+      'loyalty_settings',
+      'account_discounts',
+      'outbox_events',
+      'refunds',
+      'cancellations_and_voids',
+      'payments',
+      'order_fulfillments',
+      'order_line_modifiers',
+      'order_lines',
+      'orders',
+      'accounts',
+      'guest_sessions',
+      'visits',
+      'table_sections',
+      'sections',
+      'tables',
+      'areas',
+      'availability_rules',
+      'location_price_overrides',
+      'product_combo_items',
+      'product_combo_groups',
+      'product_modifier_groups',
+      'modifiers',
+      'modifier_groups',
+      'product_variants',
+      'products',
+      'categories',
+      'terminal_pin_attempts',
+      'staff_sessions',
+      'staff_roles',
+      'role_permissions',
+      'terminals',
+      'staff',
+      'roles',
+      'customer_sessions',
+      'customers',
+      'delivery_zones',
+      'locations',
+      'organizations'] as const) {
       await db.deleteFrom(table).execute();
     }
 
     const organization = await db.insertInto('organizations').values({ name: 'Reservations Integration' }).returning('id').executeTakeFirstOrThrow();
     organizationId = organization.id;
 
-    const location = await db.insertInto('locations').values({ organization_id: organizationId, name: 'Downtown' }).returning('id').executeTakeFirstOrThrow();
+    const location = await db.insertInto('locations').values({ organization_id: organizationId,
+      name: 'Downtown' }).returning('id').executeTakeFirstOrThrow();
     locationId = location.id;
 
-    const role = await db.insertInto('roles').values({ organization_id: organizationId, name: 'Owner' }).returning('id').executeTakeFirstOrThrow();
+    const role = await db.insertInto('roles').values({ organization_id: organizationId,
+      name: 'Owner' }).returning('id').executeTakeFirstOrThrow();
     await db.insertInto('role_permissions').values([
-      'reservations.reservations.read', 'reservations.reservations.write', 'reservations.reservations.update_status', 'reservations.reservations.seat', 'reservations.reservations.cancel',
-      'reservations.settings.read', 'reservations.settings.write', 'orders.visits.close', 'orders.visits.create'
-    ].map(p => ({ role_id: role.id, permission_name: p, scope: 'organization' }))).execute();
+      'reservations.reservations.read',
+      'reservations.reservations.write',
+      'reservations.reservations.update_status',
+      'reservations.reservations.seat',
+      'reservations.reservations.cancel',
+      'reservations.settings.read',
+      'reservations.settings.write',
+      'orders.visits.close',
+      'orders.visits.create'
+    ].map(p => ({ role_id: role.id,
+      permission_name: p,
+      scope: 'organization' }))).execute();
 
-    const owner = await db.insertInto('staff').values({ organization_id: organizationId, first_name: 'Res', last_name: 'Owner', pin_hash: await argon2.hash('1234') }).returning('id').executeTakeFirstOrThrow();
+    const owner = await db.insertInto('staff').values({ organization_id: organizationId,
+      first_name: 'Res',
+      last_name: 'Owner',
+      pin_hash: await argon2.hash('1234') }).returning('id').executeTakeFirstOrThrow();
     ownerId = owner.id;
-    await db.insertInto('staff_roles').values({ staff_id: ownerId, role_id: role.id, location_id: null }).execute();
+    await db.insertInto('staff_roles').values({ staff_id: ownerId,
+      role_id: role.id,
+      location_id: null }).execute();
 
     const terminalId = crypto.randomUUID();
-    const credential = terminalCredential(locationId, terminalId);
-    await db.insertInto('terminals').values({ id: terminalId, location_id: locationId, name: 'T1', credential_hash: credentialHash(credential) }).execute();
-    const unlock = await app.inject({ method: 'POST', url: '/api/v1/auth/pin-unlock', headers: { 'x-terminal-credential': credential }, payload: { staff_id: ownerId, pin: '1234' } });
+    const credential = terminalCredential(locationId,
+      terminalId);
+    await db.insertInto('terminals').values({ id: terminalId,
+      location_id: locationId,
+      name: 'T1',
+      credential_hash: credentialHash(credential) }).execute();
+    const unlock = await app.inject({ method: 'POST',
+      url: '/api/v1/auth/pin-unlock',
+      headers: { 'x-terminal-credential': credential },
+      payload: { staff_id: ownerId,
+      pin: '1234' } });
     staffSession = unlock.json().token;
 
-    const area = await db.insertInto('areas').values({ location_id: locationId, name: 'Main' }).returning('id').executeTakeFirstOrThrow();
-    await db.insertInto('tables').values({ location_id: locationId, area_id: area.id, name: 'T1', max_capacity: 4 }).execute();
+    const area = await db.insertInto('areas').values({ location_id: locationId,
+      name: 'Main' }).returning('id').executeTakeFirstOrThrow();
+    await db.insertInto('tables').values({ location_id: locationId,
+      area_id: area.id,
+      name: 'T1',
+      max_capacity: 4 }).execute();
 
     const reg = await app.inject({
       method: 'POST',
       url: `/api/v1/organizations/${organizationId}/customers`,
-      payload: { email: 'res@example.com', password: 'secure123', name: 'Test Customer', phone: '555-1234' }
+      payload: { email: 'res@example.com',
+      password: 'secure123',
+      name: 'Test Customer',
+      phone: '555-1234' }
     });
     if (reg.statusCode >= 300) throw new Error(`customer registration failed: ${reg.statusCode} ${reg.body}`);
 
     const login = await app.inject({
       method: 'POST',
       url: `/api/v1/organizations/${organizationId}/customer-sessions`,
-      payload: { email: 'res@example.com', password: 'secure123' }
+      payload: { email: 'res@example.com',
+      password: 'secure123' }
     });
     customerSession = login.json().token;
   });
@@ -84,59 +171,94 @@ describeIntegration('reservations module', () => {
     await db.destroy();
   });
 
-  it('can set reservation settings', async () => {
+  it('can set reservation settings',
+      async () => {
     const res = await app.inject({
       method: 'PUT',
       url: `/api/v1/locations/${locationId}/reservation-settings`,
       headers: { authorization: `Bearer ${staffSession}` },
       payload: {
         accepts_reservations: true,
-        operating_hours: [{ day_of_week: 1, open_time: '00:00', close_time: '23:59' }, { day_of_week: 2, open_time: '00:00', close_time: '23:59' }, { day_of_week: 3, open_time: '00:00', close_time: '23:59' }, { day_of_week: 4, open_time: '00:00', close_time: '23:59' }, { day_of_week: 5, open_time: '00:00', close_time: '23:59' }, { day_of_week: 6, open_time: '00:00', close_time: '23:59' }, { day_of_week: 7, open_time: '00:00', close_time: '23:59' }],
-        estimated_visit_duration_minutes: 90,
-        minimum_lead_time_minutes: 0,
-        maximum_party_size: 10,
-        auto_confirm: false,
-        version: 1
+      operating_hours: [{ day_of_week: 1,
+      open_time: '00:00',
+      close_time: '23:59' },
+      { day_of_week: 2,
+      open_time: '00:00',
+      close_time: '23:59' },
+      { day_of_week: 3,
+      open_time: '00:00',
+      close_time: '23:59' },
+      { day_of_week: 4,
+      open_time: '00:00',
+      close_time: '23:59' },
+      { day_of_week: 5,
+      open_time: '00:00',
+      close_time: '23:59' },
+      { day_of_week: 6,
+      open_time: '00:00',
+      close_time: '23:59' },
+      { day_of_week: 7,
+      open_time: '00:00',
+      close_time: '23:59' }],
+      estimated_visit_duration_minutes: 90,
+      minimum_lead_time_minutes: 0,
+      maximum_party_size: 10,
+      auto_confirm: false,
+      version: 1
       }
     });
     expect(res.statusCode).toBe(200);
   });
   
-  it('validations and happy path state machine', async () => {
+  it('validations and happy path state machine',
+      async () => {
     // 1. request
     const future = new Date(Date.now() + 86400000).toISOString();
     const req1 = await app.inject({
       method: 'POST',
       url: `/api/v1/locations/${locationId}/reservations/request`,
-      payload: { party_size: 4, reservation_time: future, customer_name: 'Guest 1' }
+      payload: { party_size: 4,
+      reservation_time: future,
+      customer_name: 'Guest 1' }
     });
     expect(req1.statusCode).toBe(201);
-    const { reservation_id, guest_token } = req1.json();
+    const { reservation_id,
+      guest_token } = req1.json();
     expect(guest_token).toBeTruthy();
 
     // 2. confirm
-    const get1 = await app.inject({ method: 'GET', url: `/api/v1/locations/${locationId}/reservations/${reservation_id}`, headers: { authorization: `Bearer ${staffSession}` } });
+    const get1 = await app.inject({ method: 'GET',
+      url: `/api/v1/locations/${locationId}/reservations/${reservation_id}`,
+      headers: { authorization: `Bearer ${staffSession}` } });
     const v1 = get1.json().version;
     const conf = await app.inject({
-      method: 'POST', url: `/api/v1/locations/${locationId}/reservations/${reservation_id}/confirm`,
-      headers: { authorization: `Bearer ${staffSession}`, 'if-match': `"${v1}"` }
+      method: 'POST',
+      url: `/api/v1/locations/${locationId}/reservations/${reservation_id}/confirm`,
+      headers: { authorization: `Bearer ${staffSession}`,
+      'if-match': `"${v1}"` }
     });
     expect(conf.statusCode).toBe(200);
 
     // 3. arrive
     const v2 = conf.json().version;
     const arrive = await app.inject({
-      method: 'POST', url: `/api/v1/locations/${locationId}/reservations/${reservation_id}/arrive`,
-      headers: { authorization: `Bearer ${staffSession}`, 'if-match': `"${v2}"` }
+      method: 'POST',
+      url: `/api/v1/locations/${locationId}/reservations/${reservation_id}/arrive`,
+      headers: { authorization: `Bearer ${staffSession}`,
+      'if-match': `"${v2}"` }
     });
     expect(arrive.statusCode).toBe(200);
 
     // 4. seat
     const v3 = arrive.json().version;
-    const table = await db.selectFrom('tables').select('id').where('name', '=', 'T1').executeTakeFirstOrThrow();
+    const table = await db.selectFrom('tables').select('id').where('name',
+      '=',
+      'T1').executeTakeFirstOrThrow();
     const seat = await app.inject({
-      method: 'POST', url: `/api/v1/locations/${locationId}/reservations/${reservation_id}/seat`,
-      headers: { authorization: `Bearer ${staffSession}`, 'if-match': `"${v3}"` },
+      method: 'POST',
+      url: `/api/v1/locations/${locationId}/reservations/${reservation_id}/seat`,
+      headers: { authorization: `Bearer ${staffSession}`,
+      'if-match': `"${v3}"` },
       payload: { table_id: table.id }
     });
     expect(seat.statusCode).toBe(200);
@@ -144,30 +266,43 @@ describeIntegration('reservations module', () => {
     expect(visitId).toBeTruthy();
 
     // 5. check table occupied
-    const tableRow = await db.selectFrom('tables').selectAll().where('id', '=', table.id).executeTakeFirstOrThrow();
+    const tableRow = await db.selectFrom('tables').selectAll().where('id',
+      '=',
+      table.id).executeTakeFirstOrThrow();
     expect(tableRow.status).toBe('OCCUPIED');
 
     // 6. close visit should auto-complete reservation
-    const visitRow = await db.selectFrom('visits').selectAll().where('id', '=', visitId).executeTakeFirstOrThrow();
+    const visitRow = await db.selectFrom('visits').selectAll().where('id',
+      '=',
+      visitId).executeTakeFirstOrThrow();
     const closeRes = await app.inject({
-      method: 'POST', url: `/api/v1/locations/${locationId}/visits/${visitId}/close`,
-      headers: { authorization: `Bearer ${staffSession}`, 'if-match': `"${visitRow.version}"` },
+      method: 'POST',
+      url: `/api/v1/locations/${locationId}/visits/${visitId}/close`,
+      headers: { authorization: `Bearer ${staffSession}`,
+      'if-match': `"${visitRow.version}"` },
       payload: {}
     });
     expect(closeRes.statusCode).toBe(200);
 
-    const check = await db.selectFrom('reservations').select('status').where('id', '=', reservation_id).executeTakeFirstOrThrow();
+    const check = await db.selectFrom('reservations').select('status').where('id',
+      '=',
+      reservation_id).executeTakeFirstOrThrow();
     expect(check.status).toBe('COMPLETED');
   });
 
-  it('rejects requests with validation errors', async () => {
-    const loc2 = await db.insertInto('locations').values({ organization_id: organizationId, name: 'NoRes' }).returning('id').executeTakeFirstOrThrow();
+  it('rejects requests with validation errors',
+      async () => {
+    const loc2 = await db.insertInto('locations').values({ organization_id: organizationId,
+      name: 'NoRes' }).returning('id').executeTakeFirstOrThrow();
     const future = new Date(Date.now() + 86400000).toISOString();
     
     // 1. RESERVATIONS_NOT_ACCEPTED
     let res = await app.inject({
-      method: 'POST', url: `/api/v1/locations/${loc2.id}/reservations/request`,
-      payload: { party_size: 2, reservation_time: future, customer_name: 'Test' }
+      method: 'POST',
+      url: `/api/v1/locations/${loc2.id}/reservations/request`,
+      payload: { party_size: 2,
+      reservation_time: future,
+      customer_name: 'Test' }
     });
     expect(res.statusCode).toBe(400);
     expect(res.json().error.code).toBe('RESERVATIONS_NOT_ACCEPTED');
@@ -175,7 +310,10 @@ describeIntegration('reservations module', () => {
     await db.insertInto('reservation_settings').values({
       location_id: loc2.id,
       accepts_reservations: true,
-      operating_hours: JSON.stringify([{ day_of_week: new Date(future).getDay() || 7, open_time: '00:00', close_time: '23:59' }]),
+      operating_hours: JSON.stringify([{ day_of_week: new Date(future).getDay() || 7,
+      open_time: '00:00',
+      close_time: '23:59' }
+    ]),
       estimated_visit_duration_minutes: 90,
       minimum_lead_time_minutes: 60,
       maximum_party_size: 4,

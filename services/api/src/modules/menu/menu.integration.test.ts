@@ -43,6 +43,12 @@ describeIntegration('menu API against PostgreSQL', () => {
     await db.deleteFrom('cash_drawer_sessions').execute();
     await db.deleteFrom('command_idempotency').execute();
     await db.deleteFrom('audit_events').execute();
+    await db.deleteFrom('loyalty_transactions').execute();
+    await db.deleteFrom('loyalty_redemptions').execute();
+    await db.deleteFrom('loyalty_accounts').execute();
+    await db.deleteFrom('loyalty_rewards').execute();
+    await db.deleteFrom('loyalty_coupons').execute();
+    await db.deleteFrom('loyalty_settings').execute();
     await db.deleteFrom('account_discounts').execute();
     await db.deleteFrom('outbox_events').execute();
     await db.deleteFrom('refunds').execute();
@@ -54,6 +60,7 @@ describeIntegration('menu API against PostgreSQL', () => {
     await db.deleteFrom('accounts').execute();
     await db.deleteFrom('reservations').execute();
     await db.deleteFrom('reservation_settings').execute();
+    await db.deleteFrom('guest_sessions').execute();
     await db.deleteFrom('visits').execute();
     await db.deleteFrom('table_sections').execute();
     await db.deleteFrom('sections').execute();

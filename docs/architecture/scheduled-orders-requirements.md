@@ -51,8 +51,8 @@ These endpoints follow the standard `withAuthenticatedSession` and `withCustomer
     5. Reject if the time falls outside the location's `operating_hours` for that `day_of_week`.
 
 ### 4.2 Kitchen Display Query Changes
-* **`GET /api/v1/locations/{loc_id}/order-lines`**
-  * *Change*: Add an optional query parameter `exclude_future_scheduled` (boolean).
+* **`GET /api/v1/locations/:locationId/order-lines`** (real param name is `:locationId`, not `:loc_id` — this specific endpoint's existing schema names it that way; do not rename it)
+  * *Change*: Add an optional query parameter `exclude_future_scheduled` (boolean). This endpoint's existing `querystring` schema has `additionalProperties: false` with only `status` currently declared — the new property must be added there explicitly, or Fastify/AJV will reject any request that includes it.
   * *Action*: When `exclude_future_scheduled=true`, the query must `LEFT JOIN order_fulfillments as of ON of.order_id = ol.order_id` and append a `WHERE of.scheduled_for IS NULL OR of.scheduled_for <= NOW() + INTERVAL '60 minutes'`. The 60-minute hardcoded threshold ensures the order only appears on the kitchen's live queue when it is time to start prepping it.
 
 ### 4.3 Admin Settings Endpoints

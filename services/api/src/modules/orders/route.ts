@@ -878,6 +878,55 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
               .returningAll()
               .executeTakeFirst();
             if (!sent) throw conflict(line, line);
+
+            const lineModifiers = await actor.trx
+              .selectFrom('order_line_modifiers')
+              .select('modifier_id')
+              .where('order_line_id', '=', line.id)
+              .execute();
+            const modifierIds = lineModifiers.map(m => m.modifier_id);
+
+            const recipeLines = await actor.trx
+              .selectFrom('recipe_lines')
+              .selectAll()
+              .where((eb) => {
+                const conditions = [
+                  eb.and([
+                    eb('product_id', '=', line.product_id),
+                    eb('modifier_id', 'is', null),
+                    line.variant_id 
+                      ? eb.or([eb('variant_id', '=', line.variant_id), eb('variant_id', 'is', null)]) 
+                      : eb('variant_id', 'is', null)
+                  ])
+                ];
+                if (modifierIds.length > 0) {
+                  conditions.push(eb('modifier_id', 'in', modifierIds));
+                }
+                return eb.or(conditions);
+              })
+              .execute();
+
+            const consumptionByIngredient = new Map<string, number>();
+            for (const r of recipeLines) {
+              const qtyPerUnit = parseFloat(r.quantity_per_unit);
+              const totalQty = qtyPerUnit * line.quantity;
+              consumptionByIngredient.set(
+                r.ingredient_id, 
+                (consumptionByIngredient.get(r.ingredient_id) || 0) + totalQty
+              );
+            }
+
+            for (const [ingredientId, consumedQty] of consumptionByIngredient.entries()) {
+               await actor.trx
+                 .updateTable('ingredient_stock')
+                 .set({
+                    quantity_on_hand: sql<string>`quantity_on_hand - ${consumedQty}`,
+                    version: sql<number>`version + 1`
+                 })
+                 .where('ingredient_id', '=', ingredientId)
+                 .where('location_id', '=', actor.locationId)
+                 .execute();
+            }
             await outbox(actor, line.id, 'order_line.sent', {
               line_id: line.id,
               order_id: orderId,

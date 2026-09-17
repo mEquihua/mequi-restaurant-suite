@@ -38,7 +38,7 @@ describeIntegration('orders API reads and table side effects against PostgreSQL'
   const authB = () => ({ authorization: `Bearer ${tokenB}` });
 
   beforeAll(async () => {
-    for (const table of [
+    for (const table of ['stock_adjustments', 'ingredient_stock', 'recipe_lines', 'ingredients', 
       'cash_drawer_movements', 'cash_drawer_sessions', 'command_idempotency', 'audit_events',
       'account_discounts', 'outbox_events', 'refunds', 'cancellations_and_voids', 'payments',
       'order_fulfillments', 'order_line_modifiers', 'order_lines', 'orders', 'accounts', 'visits', 'table_sections',

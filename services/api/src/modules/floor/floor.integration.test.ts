@@ -30,6 +30,10 @@ describeIntegration('floor API against PostgreSQL', () => {
   const auth = (token: string) => ({ authorization: `Bearer ${token}` });
 
   beforeAll(async () => {
+    await db.deleteFrom('stock_adjustments').execute();
+    await db.deleteFrom('ingredient_stock').execute();
+    await db.deleteFrom('recipe_lines').execute();
+    await db.deleteFrom('ingredients').execute();
     await db.deleteFrom('cash_drawer_movements').execute();
     await db.deleteFrom('cash_drawer_sessions').execute();
     await db.deleteFrom('command_idempotency').execute();

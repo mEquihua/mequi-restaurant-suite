@@ -79,6 +79,7 @@ const csv = (s: string) =>
 export const navForPermissions = (permissions: string[]) =>
   [
     ['Menu', '/menu', 'menu.catalog.read'],
+    ['Inventory', '/inventory', 'inventory.stock.read'],
     ['Delivery Zones', '/delivery-zones', 'delivery.zones.read'],
     ['Module Center', '/modules', 'module_center.modules.read'],
     ['Staff & Roles', '/staff', 'iam.staff.read'],
@@ -240,6 +241,10 @@ function Workspace({ me }: { me: Me }) {
             element={<Menu permissions={me.permissions} locationId={me.location_id} />}
           />
 
+          <Route
+            path="/inventory"
+            element={<Inventory permissions={me.permissions} locationId={me.location_id} />}
+          />
           <Route
             path="/modules"
             element={<Modules permissions={me.permissions} locationId={me.location_id} />}
@@ -683,18 +688,26 @@ function Availability({
   );
 }
 
-
-type DeliveryZone = { id: string, location_id: string, name: string, fee: number, minimum_order_amount: number, active: boolean, version: number };
+type DeliveryZone = {
+  id: string;
+  location_id: string;
+  name: string;
+  fee: number;
+  minimum_order_amount: number;
+  active: boolean;
+  version: number;
+};
 
 function DeliveryZones({ permissions, locationId }: { permissions: string[]; locationId: string }) {
   const qc = useQueryClient();
   const zones = useQuery({
     queryKey: ['delivery-zones', locationId],
-    queryFn: () => apiFetch<{ data: DeliveryZone[] }>(`/api/v1/locations/${locationId}/delivery-zones/admin`),
+    queryFn: () =>
+      apiFetch<{ data: DeliveryZone[] }>(`/api/v1/locations/${locationId}/delivery-zones/admin`),
   });
   const write = permissions.includes('delivery.zones.write');
   const [error, setError] = useState<unknown>();
-  
+
   const [name, setName] = useState('');
   const [fee, setFee] = useState('');
   const [minimum, setMinimum] = useState('');
@@ -704,9 +717,15 @@ function DeliveryZones({ permissions, locationId }: { permissions: string[]; loc
     try {
       await apiFetch(`/api/v1/locations/${locationId}/delivery-zones`, {
         method: 'POST',
-        body: JSON.stringify({ name, fee: Math.round(+fee * 100), minimum_order_amount: Math.round(+minimum * 100) }),
+        body: JSON.stringify({
+          name,
+          fee: Math.round(+fee * 100),
+          minimum_order_amount: Math.round(+minimum * 100),
+        }),
       });
-      setName(''); setFee(''); setMinimum('');
+      setName('');
+      setFee('');
+      setMinimum('');
       void qc.invalidateQueries({ queryKey: ['delivery-zones', locationId] });
       setError(undefined);
     } catch (err) {
@@ -717,8 +736,13 @@ function DeliveryZones({ permissions, locationId }: { permissions: string[]; loc
   return (
     <section>
       <h2>Delivery Zones</h2>
-      <Conflict error={error} refresh={() => void qc.invalidateQueries({ queryKey: ['delivery-zones', locationId] })} />
-      {!(error instanceof ApiError && error.code === 'OPTIMISTIC_CONCURRENCY_CONFLICT') && <ErrorNotice error={error} />}
+      <Conflict
+        error={error}
+        refresh={() => void qc.invalidateQueries({ queryKey: ['delivery-zones', locationId] })}
+      />
+      {!(error instanceof ApiError && error.code === 'OPTIMISTIC_CONCURRENCY_CONFLICT') && (
+        <ErrorNotice error={error} />
+      )}
       <table>
         <thead>
           <tr>
@@ -730,7 +754,13 @@ function DeliveryZones({ permissions, locationId }: { permissions: string[]; loc
         </thead>
         <tbody>
           {zones.data?.data.map((zone) => (
-            <DeliveryZoneRow key={zone.id} zone={zone} write={write} setError={setError} locationId={locationId} />
+            <DeliveryZoneRow
+              key={zone.id}
+              zone={zone}
+              write={write}
+              setError={setError}
+              locationId={locationId}
+            />
           ))}
         </tbody>
       </table>
@@ -738,9 +768,28 @@ function DeliveryZones({ permissions, locationId }: { permissions: string[]; loc
         <article className="panel" style={{ marginTop: '2rem' }}>
           <h3>New Delivery Zone</h3>
           <form className="compact" onSubmit={create}>
-            <input required placeholder="Zone Name" value={name} onChange={e => setName(e.target.value)} />
-            <input required placeholder="Fee ($)" type="number" step=".01" value={fee} onChange={e => setFee(e.target.value)} />
-            <input required placeholder="Minimum ($)" type="number" step=".01" value={minimum} onChange={e => setMinimum(e.target.value)} />
+            <input
+              required
+              placeholder="Zone Name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+            <input
+              required
+              placeholder="Fee ($)"
+              type="number"
+              step=".01"
+              value={fee}
+              onChange={(e) => setFee(e.target.value)}
+            />
+            <input
+              required
+              placeholder="Minimum ($)"
+              type="number"
+              step=".01"
+              value={minimum}
+              onChange={(e) => setMinimum(e.target.value)}
+            />
             <button>Create</button>
           </form>
         </article>
@@ -749,12 +798,22 @@ function DeliveryZones({ permissions, locationId }: { permissions: string[]; loc
   );
 }
 
-function DeliveryZoneRow({ zone, write, setError, locationId }: { zone: DeliveryZone, write: boolean, setError: (e: unknown) => void, locationId: string }) {
+function DeliveryZoneRow({
+  zone,
+  write,
+  setError,
+  locationId,
+}: {
+  zone: DeliveryZone;
+  write: boolean;
+  setError: (e: unknown) => void;
+  locationId: string;
+}) {
   const qc = useQueryClient();
   const [name, setName] = useState(zone.name);
   const [fee, setFee] = useState((zone.fee / 100).toFixed(2));
   const [minimum, setMinimum] = useState((zone.minimum_order_amount / 100).toFixed(2));
-  
+
   async function update(payload: Record<string, unknown>) {
     try {
       await apiFetch(`/api/v1/locations/${locationId}/delivery-zones/${zone.id}`, {
@@ -771,17 +830,51 @@ function DeliveryZoneRow({ zone, write, setError, locationId }: { zone: Delivery
   return (
     <tr>
       <td>
-        <input disabled={!write} value={name} onChange={e => setName(e.target.value)} onBlur={() => name !== zone.name && update({ name })} />
+        <input
+          disabled={!write}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onBlur={() => name !== zone.name && update({ name })}
+        />
       </td>
       <td>
-        $<input disabled={!write} type="number" step=".01" value={fee} onChange={e => setFee(e.target.value)} onBlur={() => Math.round(+fee * 100) !== zone.fee && update({ fee: Math.round(+fee * 100) })} style={{width: '80px'}} />
+        $
+        <input
+          disabled={!write}
+          type="number"
+          step=".01"
+          value={fee}
+          onChange={(e) => setFee(e.target.value)}
+          onBlur={() =>
+            Math.round(+fee * 100) !== zone.fee && update({ fee: Math.round(+fee * 100) })
+          }
+          style={{ width: '80px' }}
+        />
       </td>
       <td>
-        $<input disabled={!write} type="number" step=".01" value={minimum} onChange={e => setMinimum(e.target.value)} onBlur={() => Math.round(+minimum * 100) !== zone.minimum_order_amount && update({ minimum_order_amount: Math.round(+minimum * 100) })} style={{width: '80px'}} />
+        $
+        <input
+          disabled={!write}
+          type="number"
+          step=".01"
+          value={minimum}
+          onChange={(e) => setMinimum(e.target.value)}
+          onBlur={() =>
+            Math.round(+minimum * 100) !== zone.minimum_order_amount &&
+            update({ minimum_order_amount: Math.round(+minimum * 100) })
+          }
+          style={{ width: '80px' }}
+        />
       </td>
       <td>
         <label>
-          <input disabled={!write} type="checkbox" checked={zone.active} onChange={e => update({ active: e.target.checked })} /> Active
+          <input
+            disabled={!write}
+            type="checkbox"
+            checked={zone.active}
+            onChange={(e) => update({ active: e.target.checked })}
+          />{' '}
+          Active
         </label>
       </td>
     </tr>
@@ -1281,3 +1374,451 @@ export function App() {
   return <Root />;
 }
 export default App;
+type Ingredient = {
+  id: string;
+  name: string;
+  unit_of_measure: string;
+};
+
+type RecipeLine = {
+  id: string;
+  product_id: string | null;
+  modifier_id: string | null;
+  ingredient_id: string;
+  quantity_per_unit: string;
+};
+
+type InventoryItem = {
+  id: string;
+  name: string;
+  unit_of_measure: string;
+  quantity_on_hand: string | null;
+  low_stock_threshold: string | null;
+  version: number | null;
+  stock_id: string | null;
+};
+
+function Inventory({ permissions, locationId }: { permissions: string[]; locationId: string }) {
+  const [tab, setTab] = useState<'ingredients' | 'recipes' | 'stock'>('stock');
+  return (
+    <section>
+      <h2>Inventory & Recipes</h2>
+      <nav className="tabs" style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
+        <button className={tab === 'stock' ? 'active' : ''} onClick={() => setTab('stock')}>
+          Stock
+        </button>
+        <button
+          className={tab === 'ingredients' ? 'active' : ''}
+          onClick={() => setTab('ingredients')}
+        >
+          Ingredients
+        </button>
+        <button className={tab === 'recipes' ? 'active' : ''} onClick={() => setTab('recipes')}>
+          Recipes
+        </button>
+      </nav>
+      {tab === 'stock' && <InventoryStock permissions={permissions} locationId={locationId} />}
+      {tab === 'ingredients' && <InventoryIngredients permissions={permissions} />}
+      {tab === 'recipes' && <InventoryRecipes permissions={permissions} />}
+    </section>
+  );
+}
+
+function InventoryIngredients({ permissions }: { permissions: string[] }) {
+  const qc = useQueryClient();
+  const write = permissions.includes('inventory.ingredients.write');
+  const [error, setError] = useState<unknown>();
+  const ingredients = useQuery({
+    queryKey: ['ingredients'],
+    queryFn: () => apiFetch<{ data: Ingredient[] }>('/api/v1/ingredients'),
+  });
+
+  const [name, setName] = useState('');
+  const [unit, setUnit] = useState('');
+
+  async function create(e: FormEvent) {
+    e.preventDefault();
+    try {
+      await apiFetch('/api/v1/ingredients', {
+        method: 'POST',
+        body: JSON.stringify({ name, unit_of_measure: unit }),
+      });
+      setName('');
+      setUnit('');
+      void qc.invalidateQueries({ queryKey: ['ingredients'] });
+      setError(undefined);
+    } catch (err) {
+      setError(err);
+    }
+  }
+
+  return (
+    <div>
+      <ErrorNotice error={error} />
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Unit</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {ingredients.data?.data.map((ing) => (
+            <IngredientRow key={ing.id} ing={ing} write={write} setError={setError} />
+          ))}
+        </tbody>
+      </table>
+      {write && (
+        <article className="panel" style={{ marginTop: '2rem' }}>
+          <h3>New Ingredient</h3>
+          <form className="compact" onSubmit={create}>
+            <input
+              required
+              placeholder="Name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+            <input
+              required
+              placeholder="Unit (e.g. kg)"
+              value={unit}
+              onChange={(e) => setUnit(e.target.value)}
+            />
+            <button>Create</button>
+          </form>
+        </article>
+      )}
+    </div>
+  );
+}
+
+function IngredientRow({
+  ing,
+  write,
+  setError,
+}: {
+  ing: Ingredient;
+  write: boolean;
+  setError: (err: unknown) => void;
+}) {
+  const qc = useQueryClient();
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(ing.name);
+  const [unit, setUnit] = useState(ing.unit_of_measure);
+
+  async function save() {
+    try {
+      await apiFetch(`/api/v1/ingredients/${ing.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ name, unit_of_measure: unit }),
+      });
+      setEditing(false);
+      void qc.invalidateQueries({ queryKey: ['ingredients'] });
+      setError(undefined);
+    } catch (err) {
+      setError(err);
+    }
+  }
+
+  if (editing) {
+    return (
+      <tr>
+        <td>
+          <input value={name} onChange={(e) => setName(e.target.value)} />
+        </td>
+        <td>
+          <input value={unit} onChange={(e) => setUnit(e.target.value)} />
+        </td>
+        <td>
+          <button onClick={save}>Save</button>
+          <button onClick={() => setEditing(false)}>Cancel</button>
+        </td>
+      </tr>
+    );
+  }
+
+  return (
+    <tr>
+      <td>{ing.name}</td>
+      <td>{ing.unit_of_measure}</td>
+      <td>{write && <button onClick={() => setEditing(true)}>Edit</button>}</td>
+    </tr>
+  );
+}
+
+function InventoryRecipes({ permissions }: { permissions: string[] }) {
+  const qc = useQueryClient();
+  const write = permissions.includes('inventory.recipes.write');
+  const [error, setError] = useState<unknown>();
+
+  const ingredients = useQuery({
+    queryKey: ['ingredients'],
+    queryFn: () => apiFetch<{ data: Ingredient[] }>('/api/v1/ingredients'),
+  });
+
+  const products = useQuery({
+    queryKey: ['products'],
+    queryFn: () => apiFetch<{ data: Product[] }>('/api/v1/products'),
+  });
+
+  const [productId, setProductId] = useState('');
+
+  const recipes = useQuery({
+    queryKey: ['recipes', productId],
+    queryFn: () =>
+      apiFetch<{ data: RecipeLine[] }>(
+        `/api/v1/recipes${productId ? `?product_id=${productId}` : ''}`,
+      ),
+    enabled: !!productId,
+  });
+
+  const [ingredientId, setIngredientId] = useState('');
+  const [quantity, setQuantity] = useState('');
+
+  async function create(e: FormEvent) {
+    e.preventDefault();
+    if (!productId) return;
+    try {
+      await apiFetch('/api/v1/recipes', {
+        method: 'POST',
+        body: JSON.stringify({
+          product_id: productId,
+          ingredient_id: ingredientId,
+          quantity_per_unit: quantity,
+        }),
+      });
+      setIngredientId('');
+      setQuantity('');
+      void qc.invalidateQueries({ queryKey: ['recipes', productId] });
+      setError(undefined);
+    } catch (err) {
+      setError(err);
+    }
+  }
+
+  async function remove(id: string) {
+    if (!confirm('Delete recipe line?')) return;
+    try {
+      await apiFetch(`/api/v1/recipes/${id}`, { method: 'DELETE' });
+      void qc.invalidateQueries({ queryKey: ['recipes', productId] });
+      setError(undefined);
+    } catch (err) {
+      setError(err);
+    }
+  }
+
+  return (
+    <div>
+      <ErrorNotice error={error} />
+      <div style={{ marginBottom: '1rem' }}>
+        <label>
+          Select Product:
+          <select value={productId} onChange={(e) => setProductId(e.target.value)}>
+            <option value="">-- Choose a product --</option>
+            {products.data?.data.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      {productId && (
+        <>
+          <table>
+            <thead>
+              <tr>
+                <th>Ingredient</th>
+                <th>Qty Per Unit</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {recipes.data?.data.map((r) => {
+                const ingName =
+                  ingredients.data?.data.find((i) => i.id === r.ingredient_id)?.name ??
+                  r.ingredient_id;
+                const unit =
+                  ingredients.data?.data.find((i) => i.id === r.ingredient_id)?.unit_of_measure ??
+                  '';
+                return (
+                  <tr key={r.id}>
+                    <td>{ingName}</td>
+                    <td>
+                      {r.quantity_per_unit} {unit}
+                    </td>
+                    <td>{write && <button onClick={() => remove(r.id)}>Delete</button>}</td>
+                  </tr>
+                );
+              })}
+              {(!recipes.data?.data || recipes.data.data.length === 0) && (
+                <tr>
+                  <td colSpan={3}>No recipe lines defined for this product.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+
+          {write && (
+            <article className="panel" style={{ marginTop: '2rem' }}>
+              <h3>Add Recipe Line</h3>
+              <form className="compact" onSubmit={create}>
+                <select
+                  required
+                  value={ingredientId}
+                  onChange={(e) => setIngredientId(e.target.value)}
+                >
+                  <option value="">-- Ingredient --</option>
+                  {ingredients.data?.data.map((i) => (
+                    <option key={i.id} value={i.id}>
+                      {i.name} ({i.unit_of_measure})
+                    </option>
+                  ))}
+                </select>
+                <input
+                  required
+                  placeholder="Quantity"
+                  type="number"
+                  step=".0001"
+                  value={quantity}
+                  onChange={(e) => setQuantity(e.target.value)}
+                />
+                <button>Add</button>
+              </form>
+            </article>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function InventoryStock({
+  permissions,
+  locationId,
+}: {
+  permissions: string[];
+  locationId: string;
+}) {
+  const qc = useQueryClient();
+  const write = permissions.includes('inventory.stock.adjust');
+  const [error, setError] = useState<unknown>();
+
+  const stock = useQuery({
+    queryKey: ['inventory', locationId],
+    queryFn: () => apiFetch<{ data: InventoryItem[] }>(`/api/v1/locations/${locationId}/inventory`),
+  });
+
+  return (
+    <div>
+      <Conflict
+        error={error}
+        refresh={() => void qc.invalidateQueries({ queryKey: ['inventory', locationId] })}
+      />
+      {!(error instanceof ApiError && error.code === 'OPTIMISTIC_CONCURRENCY_CONFLICT') && (
+        <ErrorNotice error={error} />
+      )}
+      <table>
+        <thead>
+          <tr>
+            <th>Ingredient</th>
+            <th>On Hand</th>
+            <th>Unit</th>
+            <th>Adjust</th>
+          </tr>
+        </thead>
+        <tbody>
+          {stock.data?.data.map((item) => (
+            <StockRow
+              key={item.id}
+              item={item}
+              write={write}
+              setError={setError}
+              locationId={locationId}
+            />
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function StockRow({
+  item,
+  write,
+  setError,
+  locationId,
+}: {
+  item: InventoryItem;
+  write: boolean;
+  setError: (err: unknown) => void;
+  locationId: string;
+}) {
+  const qc = useQueryClient();
+  const [editing, setEditing] = useState(false);
+  const [newQty, setNewQty] = useState(item.quantity_on_hand ?? '0');
+  const [reason, setReason] = useState('');
+
+  async function adjust(e: FormEvent) {
+    e.preventDefault();
+    try {
+      await apiFetch(`/api/v1/locations/${locationId}/inventory/${item.id}/adjust`, {
+        method: 'POST',
+        headers: item.stock_id ? { 'If-Match': String(item.version) } : {},
+        body: JSON.stringify({ new_quantity: newQty, reason }),
+      });
+      setEditing(false);
+      setReason('');
+      void qc.invalidateQueries({ queryKey: ['inventory', locationId] });
+      setError(undefined);
+    } catch (err) {
+      setError(err);
+    }
+  }
+
+  if (editing) {
+    return (
+      <tr>
+        <td>{item.name}</td>
+        <td colSpan={3}>
+          <form
+            className="compact"
+            onSubmit={adjust}
+            style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}
+          >
+            <input
+              required
+              type="number"
+              step=".0001"
+              placeholder="New Qty"
+              value={newQty}
+              onChange={(e) => setNewQty(e.target.value)}
+              style={{ width: '100px' }}
+            />
+            <input
+              required
+              placeholder="Reason"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+            />
+            <button>Save</button>
+            <button type="button" onClick={() => setEditing(false)}>
+              Cancel
+            </button>
+          </form>
+        </td>
+      </tr>
+    );
+  }
+
+  return (
+    <tr>
+      <td>{item.name}</td>
+      <td>{item.quantity_on_hand ?? '0'}</td>
+      <td>{item.unit_of_measure}</td>
+      <td>{write && <button onClick={() => setEditing(true)}>Adjust</button>}</td>
+    </tr>
+  );
+}

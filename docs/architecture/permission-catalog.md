@@ -206,12 +206,21 @@ $$\text{\textbf{Legend: }}\mathbf{X} = \text{Granted by default} \quad \vert \qu
 | :--- | :--- |
 | `delivery.zones.read` | View a location's delivery zones (name, fee, minimum order amount, active state). |
 | `delivery.zones.write` | Create, edit, and activate/deactivate a location's delivery zones. |
+### 4.9 Inventory
+| Permission Name | Description |
+| :--- | :--- |
+| `inventory.ingredients.read` | View the organization's ingredient catalog. |
+| `inventory.ingredients.write` | Create and edit ingredients in the catalog. |
+| `inventory.recipes.read` | View recipe mapping lines for products and modifiers. |
+| `inventory.recipes.write` | Create, edit, and delete recipe mapping lines. |
+| `inventory.stock.read` | View location stock levels, thresholds, and adjustment histories. |
+| `inventory.stock.adjust` | Perform manual inventory counts, adjusting on-hand quantities and logging waste. |
 
 ## 5. Out-of-Scope Domains & Deferred Modules
 
 To preserve modular architectural boundaries and prevent premature schema complexity, permissions for domains outside the Foundation scope are **deliberately omitted** from this document:
 
-- **`inventory`** (Stock counts, recipes, receiving, waste tracking, variance reporting)
+- **`inventory`** (Receiving, vendor management, multi-location transfers, and advanced costing — theoretical inventory and stock adjustments are now built, see section 4.9)
 - **`loyalty`** (Customer rewards, points accumulation, coupon validation)
 - **`reservations`** (Table booking schedules, waitlist management, deposit collection)
 - **`delivery`** (Driver dispatching, aggregator channel integration — zone rules and minimum-order enforcement are now built, see section 4.8)

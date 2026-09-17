@@ -2398,7 +2398,7 @@ paths:
               properties:
                 order_type:
                   type: string
-                  enum: [DINE_IN, TAKEOUT]
+                  enum: [ DINE_IN, TAKEOUT ]
       responses:
         "201":
           description: Counter (tableless) guest session minted
@@ -2744,7 +2744,7 @@ paths:
       tags:
         - OnlineOrdering
       security:
-        - StaffBearerAuth: []
+        - staffSession: []
       parameters:
         - name: loc_id
           in: path
@@ -2775,7 +2775,7 @@ paths:
       tags:
         - OnlineOrdering
       security:
-        - StaffBearerAuth: []
+        - staffSession: []
       parameters:
         - name: loc_id
           in: path
@@ -2900,6 +2900,269 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/DeliveryZoneAdmin"
+  /api/v1/ingredients:
+    get:
+      operationId: listIngredients
+      summary: List organization ingredients
+      security:
+        - staffSession: []
+      responses:
+        "200":
+          description: A list of ingredients
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Ingredient"
+    post:
+      operationId: createIngredient
+      summary: Create a new ingredient
+      security:
+        - staffSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - unit_of_measure
+              properties:
+                name:
+                  type: string
+                unit_of_measure:
+                  type: string
+      responses:
+        "201":
+          description: The created ingredient
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ingredient"
+  /api/v1/ingredients/{id}:
+    put:
+      operationId: updateIngredient
+      summary: Update an ingredient
+      security:
+        - staffSession: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                unit_of_measure:
+                  type: string
+      responses:
+        "200":
+          description: The updated ingredient
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ingredient"
+  /api/v1/recipes:
+    get:
+      operationId: listRecipes
+      summary: List recipe lines
+      security:
+        - staffSession: []
+      parameters:
+        - name: product_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: List of recipe lines
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/RecipeLine"
+    post:
+      operationId: createRecipeLine
+      summary: Create a recipe line
+      security:
+        - staffSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - ingredient_id
+                - quantity_per_unit
+              properties:
+                product_id:
+                  type: string
+                  format: uuid
+                variant_id:
+                  type: string
+                  format: uuid
+                modifier_id:
+                  type: string
+                  format: uuid
+                ingredient_id:
+                  type: string
+                  format: uuid
+                quantity_per_unit:
+                  type: number
+      responses:
+        "201":
+          description: The created recipe line
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecipeLine"
+  /api/v1/recipes/{id}:
+    delete:
+      operationId: deleteRecipeLine
+      summary: Delete a recipe line
+      security:
+        - staffSession: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Deleted
+  /api/v1/locations/{locationId}/inventory:
+    get:
+      operationId: getLocationInventory
+      summary: Get location inventory
+      security:
+        - staffSession: []
+      parameters:
+        - name: locationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Location inventory
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/InventoryItem"
+  /api/v1/locations/{locationId}/inventory/low-stock:
+    get:
+      operationId: getLocationLowStock
+      summary: Get location low stock
+      security:
+        - staffSession: []
+      parameters:
+        - name: locationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Location low stock items
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/InventoryItem"
+  /api/v1/locations/{locationId}/inventory/{ingredientId}/adjust:
+    post:
+      operationId: adjustInventoryStock
+      summary: Adjust inventory stock
+      security:
+        - staffSession: []
+      parameters:
+        - name: locationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: ingredientId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: If-Match
+          in: header
+          required: false
+          description: Required once a stock row already exists for this ingredient at this location; omit for the first-ever adjustment, which creates the row.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - new_quantity
+                - reason
+              properties:
+                new_quantity:
+                  type: number
+                reason:
+                  type: string
+      responses:
+        "200":
+          description: Stock adjusted
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - stock
+                  - adjustment
+                properties:
+                  stock:
+                    $ref: "#/components/schemas/IngredientStock"
+                  adjustment:
+                    $ref: "#/components/schemas/StockAdjustment"
 
 components:
   securitySchemes:
@@ -5438,3 +5701,178 @@ components:
           type: integer
         active:
           type: boolean
+    Ingredient:
+      type: object
+      required:
+        - id
+        - organization_id
+        - name
+        - unit_of_measure
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        organization_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        unit_of_measure:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    IngredientStock:
+      type: object
+      required:
+        - id
+        - location_id
+        - ingredient_id
+        - quantity_on_hand
+        - version
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        location_id:
+          type: string
+          format: uuid
+        ingredient_id:
+          type: string
+          format: uuid
+        quantity_on_hand:
+          type: string
+        low_stock_threshold:
+          type:
+            - string
+            - "null"
+        version:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    RecipeLine:
+      type: object
+      required:
+        - id
+        - organization_id
+        - ingredient_id
+        - quantity_per_unit
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        organization_id:
+          type: string
+          format: uuid
+        product_id:
+          type:
+            - string
+            - "null"
+          format: uuid
+        variant_id:
+          type:
+            - string
+            - "null"
+          format: uuid
+        modifier_id:
+          type:
+            - string
+            - "null"
+          format: uuid
+        ingredient_id:
+          type: string
+          format: uuid
+        quantity_per_unit:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    StockAdjustment:
+      type: object
+      required:
+        - id
+        - location_id
+        - ingredient_id
+        - staff_id
+        - quantity_delta
+        - reason
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        location_id:
+          type: string
+          format: uuid
+        ingredient_id:
+          type: string
+          format: uuid
+        staff_id:
+          type: string
+          format: uuid
+        quantity_delta:
+          type: string
+        reason:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+    InventoryItem:
+      type: object
+      required:
+        - id
+        - organization_id
+        - name
+        - unit_of_measure
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        organization_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        unit_of_measure:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        quantity_on_hand:
+          type:
+            - string
+            - "null"
+        low_stock_threshold:
+          type:
+            - string
+            - "null"
+        version:
+          type:
+            - integer
+            - "null"
+        stock_id:
+          type:
+            - string
+            - "null"
+          format: uuid

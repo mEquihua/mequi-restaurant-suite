@@ -3,6 +3,7 @@ import type { DatabaseTransaction } from '../../shared/index.js';
 import { IdentityHttpError } from '../identity/index.js';
 import { findAccount, findOrder } from './persistence/repository.js';
 import { lineAmount, resolveLinePrice } from './state.js';
+import { evaluateBestPromotion } from '../promotions/index.js';
 
 export type GuestLineInput = { product_id: string; variant_id?: string; modifier_ids?: string[]; quantity: number };
 
@@ -44,7 +45,28 @@ export async function addOrderLines(
     if (modifiers.length !== modifierIds.length || modifiers.some((modifier) => !modifier.is_active)) throw new IdentityHttpError(400, 'INVALID_MODIFIER', 'Modifier is not available for this product.');
     const line = await trx.insertInto('order_lines').values({ location_id: input.locationId, order_id: input.orderId, account_id: account.id, product_id: product.id, variant_id: lineInput.variant_id ?? null, seat_number: lineInput.seat_number ?? null, course_name: lineInput.course_name?.trim() ?? null, quantity: lineInput.quantity, unit_price: resolveLinePrice({ basePrice: product.base_price, overridePrice: override?.override_price, variantAdjustment, modifierAdjustments: modifiers.map((modifier) => modifier.price_adjustment), quantity: lineInput.quantity }) }).returningAll().executeTakeFirstOrThrow();
     if (modifiers.length) await trx.insertInto('order_line_modifiers').values(modifiers.map((modifier) => ({ location_id: input.locationId, order_line_id: line.id, modifier_id: modifier.id, unit_price: modifier.price_adjustment }))).execute();
-    await updateAccountTotal(trx, input.locationId, account.id, lineAmount(line));
+    
+    const amount = lineAmount(line);
+    const bestPromo = await evaluateBestPromotion(trx, {
+      organizationId: input.organizationId,
+      productId: product.id,
+      categoryId: product.category_id ?? null,
+      lineAmount: amount,
+      now: new Date()
+    });
+
+    if (bestPromo) {
+      await trx.insertInto('order_line_promotions').values({
+        location_id: input.locationId,
+        order_line_id: line.id,
+        promotion_id: bestPromo.promotion_id,
+        computed_amount: bestPromo.computed_amount,
+      }).execute();
+      await updateAccountTotal(trx, input.locationId, account.id, amount - bestPromo.computed_amount);
+    } else {
+      await updateAccountTotal(trx, input.locationId, account.id, amount);
+    }
+
     created.push(line);
   }
   const updated = await trx.updateTable('orders').set({ version: sql<number>`version + 1` }).where('id', '=', input.orderId).where('version', '=', input.expectedVersion).returningAll().executeTakeFirst();

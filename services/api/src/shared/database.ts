@@ -143,6 +143,8 @@ export interface Database {
   loyalty_coupons: LoyaltyCouponTable;
   loyalty_transactions: LoyaltyTransactionTable;
   loyalty_redemptions: LoyaltyRedemptionTable;
+  promotions: PromotionTable;
+  order_line_promotions: OrderLinePromotionTable;
 
 }
 
@@ -781,4 +783,33 @@ export function installDatabase(app: FastifyInstance, options: DatabaseOptions =
       }),
   );
   app.addHook('onClose', async () => db.destroy());
+}
+
+export interface PromotionTable {
+  id: Generated<string>;
+  organization_id: string;
+  name: string;
+  description: string | null;
+  discount_type: 'PERCENTAGE' | 'AMOUNT';
+  discount_value: number;
+  category_id: string | null;
+  product_id: string | null;
+  is_active: boolean;
+  starts_at: Date | null;
+  ends_at: Date | null;
+  days_of_week: number[] | null;
+  start_time: string | null;
+  end_time: string | null;
+  version: Generated<number>;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
+export interface OrderLinePromotionTable {
+  id: Generated<string>;
+  location_id: string;
+  order_line_id: string;
+  promotion_id: string;
+  computed_amount: number;
+  created_at: Generated<Date>;
 }

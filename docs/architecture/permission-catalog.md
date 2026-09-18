@@ -191,6 +191,8 @@ $$\text{\textbf{Legend: }}\mathbf{X} = \text{Granted by default} \quad \vert \qu
 | | `kitchen.tickets.update_status` | **X** | **X** | | | | **X** |
 | **Reports** | `reports.sales.read` | **X** | **X** | | **X** | | |
 | | `reports.audit.read` | **X** | **X** | | | | |
+| **Promotions**| `promotions.promotions.read` | **X** | **X** | | | | |
+| | `promotions.promotions.write`| **X** | **X** | | | | |
 
 ---
 
@@ -215,6 +217,12 @@ $$\text{\textbf{Legend: }}\mathbf{X} = \text{Granted by default} \quad \vert \qu
 | `inventory.recipes.write` | Create, edit, and delete recipe mapping lines. |
 | `inventory.stock.read` | View location stock levels, thresholds, and adjustment histories. |
 | `inventory.stock.adjust` | Perform manual inventory counts, adjusting on-hand quantities and logging waste. |
+
+### 4.10 Promotions
+| Permission Name | Description |
+| :--- | :--- |
+| `promotions.promotions.read` | View the organization's catalog of automatic promotions and schedules. |
+| `promotions.promotions.write` | Create, edit, and activate/deactivate automatic promotion rules. |
 
 ## 5. Out-of-Scope Domains & Deferred Modules
 

@@ -20,6 +20,7 @@ import {
 } from './api.js';
 import { useRealtime } from './realtime.js';
 import { Loyalty } from './Loyalty.js';
+import { Promotions } from './Promotions.js';
 
 type Me = {
   staff: { first_name: string; last_name: string };
@@ -88,6 +89,7 @@ export const navForPermissions = (permissions: string[]) =>
     ['Scheduled Orders', '/scheduled-orders', 'online_ordering.settings.read'],
 
     ['Loyalty', '/loyalty', 'loyalty.settings.read'],
+    ['Promotions', '/promotions', 'promotions.promotions.read'],
     ['Employee Clocking', '/timeclock', 'timeclock.shifts.read'],
     ['Module Center', '/modules', 'module_center.modules.read'],
     ['Staff & Roles', '/staff', 'iam.staff.read'],
@@ -336,6 +338,7 @@ function Workspace({ me }: { me: Me }) {
           <Route path="/scheduled-orders" element={<ScheduledOrders permissions={me.permissions} locationId={me.location_id} />} />
 
           <Route path="/loyalty" element={<Loyalty permissions={me.permissions} />} />
+          <Route path="/promotions" element={<Promotions permissions={me.permissions} />} />
           <Route path="/timeclock" element={<Timeclock permissions={me.permissions} locationId={me.location_id} />} />
           <Route path="/staff" element={<People permissions={me.permissions} locationId={me.location_id} />} />
           <Route path="/reports" element={<Reports permissions={me.permissions} organizationId={me.organization_id} reportLocations={reportLocations} />} />

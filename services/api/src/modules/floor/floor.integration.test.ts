@@ -50,7 +50,7 @@ describeIntegration('floor API against PostgreSQL', () => {
     await db.deleteFrom('cancellations_and_voids').execute();
     await db.deleteFrom('payments').execute();
     await db.deleteFrom('order_line_modifiers').execute(); await db.deleteFrom('order_fulfillments').execute();
-    await db.deleteFrom('order_lines').execute();
+    await db.deleteFrom('order_line_promotions').execute(); await db.deleteFrom('order_lines').execute();
     await db.deleteFrom('orders').execute();
     await db.deleteFrom('accounts').execute();
     await db.deleteFrom('reservations').execute();
@@ -69,7 +69,7 @@ describeIntegration('floor API against PostgreSQL', () => {
     await db.deleteFrom('modifiers').execute();
     await db.deleteFrom('modifier_groups').execute();
     await db.deleteFrom('product_variants').execute();
-    await db.deleteFrom('products').execute();
+    await db.deleteFrom('promotions').execute(); await db.deleteFrom('products').execute();
     await db.deleteFrom('categories').execute();
     await db.deleteFrom('terminal_pin_attempts').execute();
     await db.deleteFrom('staff_sessions').execute();

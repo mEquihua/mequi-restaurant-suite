@@ -4,6 +4,38 @@
  */
 
 export interface paths {
+    "/api/v1/promotions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listPromotions"];
+        put?: never;
+        post: operations["createPromotion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/promotions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getPromotion"];
+        put: operations["updatePromotion"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ping": {
         parameters: {
             query?: never;
@@ -2699,6 +2731,48 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        PromotionsListResponse: components["schemas"]["Promotion"][];
+        Promotion: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            description?: string | null;
+            /** @enum {string} */
+            discount_type: "PERCENTAGE" | "AMOUNT";
+            discount_value: number;
+            /** Format: uuid */
+            category_id?: string | null;
+            /** Format: uuid */
+            product_id?: string | null;
+            is_active: boolean;
+            /** Format: date-time */
+            starts_at?: string | null;
+            /** Format: date-time */
+            ends_at?: string | null;
+            days_of_week?: number[] | null;
+            start_time?: string | null;
+            end_time?: string | null;
+            version: number;
+        };
+        PromotionInput: {
+            name: string;
+            description?: string | null;
+            /** @enum {string} */
+            discount_type: "PERCENTAGE" | "AMOUNT";
+            discount_value: number;
+            /** Format: uuid */
+            category_id?: string | null;
+            /** Format: uuid */
+            product_id?: string | null;
+            is_active: boolean;
+            /** Format: date-time */
+            starts_at?: string | null;
+            /** Format: date-time */
+            ends_at?: string | null;
+            days_of_week?: number[] | null;
+            start_time?: string | null;
+            end_time?: string | null;
+        };
         ScheduledOrderSettingsRow: {
             accepts_scheduled_orders: boolean;
             minimum_lead_time_minutes: number;
@@ -3190,6 +3264,8 @@ export interface components {
             [key: string]: unknown;
         };
         OrderLine: {
+            promotion_name?: string | null;
+            promotion_computed_amount?: number | null;
             id: components["schemas"]["Uuid"];
             order_id: components["schemas"]["Uuid"];
             account_id: components["schemas"]["Uuid"];
@@ -3790,6 +3866,114 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    listPromotions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Promotions list */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromotionsListResponse"];
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+        };
+    };
+    createPromotion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PromotionInput"];
+            };
+        };
+        responses: {
+            /** @description Promotion created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Promotion"];
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+        };
+    };
+    getPromotion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Promotion retrieved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Promotion"];
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    updatePromotion: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PromotionInput"];
+            };
+        };
+        responses: {
+            /** @description Promotion updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Promotion"];
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            428: components["responses"]["Error"];
+        };
+    };
     ping: {
         parameters: {
             query?: never;

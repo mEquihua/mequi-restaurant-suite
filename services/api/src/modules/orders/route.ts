@@ -1927,9 +1927,12 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
         if (!order) throw new IdentityHttpError(404, 'NOT_FOUND', 'Order was not found.');
 
         const lines = await actor.trx
-          .selectFrom('order_lines')
-          .selectAll()
-          .where('order_id', '=', orderId)
+          .selectFrom('order_lines as ol')
+          .leftJoin('order_line_promotions as olp', 'olp.order_line_id', 'ol.id')
+          .leftJoin('promotions as p', 'p.id', 'olp.promotion_id')
+          .selectAll('ol')
+          .select(['p.name as promotion_name', 'olp.computed_amount as promotion_computed_amount'])
+          .where('ol.order_id', '=', orderId)
           .execute();
 
         const modifierRows = lines.length
@@ -2027,8 +2030,10 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
           .selectFrom('order_lines as ol')
           .innerJoin('orders as o', 'o.id', 'ol.order_id')
           .innerJoin('visits as v', 'v.id', 'o.visit_id')
+          .leftJoin('order_line_promotions as olp', 'olp.order_line_id', 'ol.id')
+          .leftJoin('promotions as p', 'p.id', 'olp.promotion_id')
           .selectAll('ol')
-          .select(['o.visit_id', 'v.table_id', 'o.created_at as order_created_at'])
+          .select(['o.visit_id', 'v.table_id', 'o.created_at as order_created_at', 'p.name as promotion_name', 'olp.computed_amount as promotion_computed_amount'])
           .where('v.location_id', '=', locationId);
 
         if (exclude_future_scheduled) {

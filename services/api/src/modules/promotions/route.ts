@@ -113,11 +113,13 @@ export const promotionsRoute: FastifyPluginAsync<PromotionsRouteOptions> = async
   app.get('/api/v1/promotions', async (request) =>
     withStaffSession(request, async (actor) => {
       requirePermission(actor, 'promotions.promotions.read');
-      return actor.trx
-        .selectFrom('promotions')
-        .selectAll()
-        .where('organization_id', '=', actor.organizationId)
-        .execute();
+      return {
+        data: await actor.trx
+          .selectFrom('promotions')
+          .selectAll()
+          .where('organization_id', '=', actor.organizationId)
+          .execute(),
+      };
     })
   );
 

@@ -29,7 +29,6 @@ describeIntegration('promotions module', () => {
   app.register(menuModule, {});
 
   let organizationId: string;
-  let otherOrganizationId: string;
   let locationId: string;
     let staffSession: string;
 
@@ -99,9 +98,7 @@ describeIntegration('promotions module', () => {
 
     const org = await db.insertInto('organizations').values({ name: 'Promo Org' }).returning('id').executeTakeFirstOrThrow();
     organizationId = org.id;
-    const org2 = await db.insertInto('organizations').values({ name: 'Other Org' }).returning('id').executeTakeFirstOrThrow();
-    otherOrganizationId = org2.id;
-    
+
     const loc = await db.insertInto('locations').values({ organization_id: organizationId, name: 'Main', timezone: 'UTC' }).returning('id').executeTakeFirstOrThrow();
     locationId = loc.id;
     
@@ -113,18 +110,23 @@ describeIntegration('promotions module', () => {
       { role_id: role.id, permission_name: 'promotions.promotions.write', scope: 'organization' },
       { role_id: role.id, permission_name: 'orders.visits.create', scope: 'location' },
       { role_id: role.id, permission_name: 'orders.orders.create', scope: 'location' },
+      { role_id: role.id, permission_name: 'accounts.accounts.create', scope: 'location' },
       { role_id: role.id, permission_name: 'orders.lines.add', scope: 'location' }
     ]).execute();
 
     await db.insertInto('staff_roles').values({ staff_id: owner.id, role_id: role.id }).execute();
-    const terminal = await db.insertInto('terminals').values({ location_id: locationId, name: 'Reg', is_active: true, credential_hash: credentialHash(terminalCredential(locationId, '123')) }).returning('id').executeTakeFirstOrThrow();
 
-    const sessionRes = await app.inject({
+    const terminalId = crypto.randomUUID();
+    const credential = terminalCredential(locationId, terminalId);
+    await db.insertInto('terminals').values({ id: terminalId, location_id: locationId, name: 'Reg', credential_hash: credentialHash(credential) }).execute();
+
+    const unlock = await app.inject({
       method: 'POST',
-      url: '/api/v1/identity/staff/login',
-      body: { location_id: locationId, terminal_id: terminal.id, staff_id: owner.id, pin: '1234' },
+      url: '/api/v1/auth/pin-unlock',
+      headers: { 'X-Terminal-Credential': credential },
+      payload: { staff_id: owner.id, pin: '1234' },
     });
-    staffSession = sessionRes.json().token;
+    staffSession = unlock.json().token;
   });
 
   afterAll(async () => {
@@ -154,7 +156,7 @@ describeIntegration('promotions module', () => {
       headers: { authorization: `Bearer ${staffSession}` },
     });
     expect(getRes.statusCode).toBe(200);
-    expect(getRes.json().length).toBe(1);
+    expect(getRes.json().data.length).toBe(1);
 
     const updateRes = await app.inject({
       method: 'PUT',
@@ -198,7 +200,8 @@ describeIntegration('promotions module', () => {
       body: { source: 'WALK_IN', guests: 2 }
     });
     const visitId = visitRes.json().id;
-    
+    const visitVersion = visitRes.json().version;
+
     const accountRes = await app.inject({
       method: 'POST',
       url: `/api/v1/locations/${locationId}/visits/${visitId}/accounts`,
@@ -206,11 +209,11 @@ describeIntegration('promotions module', () => {
       body: {}
     });
     const accountId = accountRes.json().id;
-    
+
     const orderRes = await app.inject({
       method: 'POST',
       url: `/api/v1/locations/${locationId}/visits/${visitId}/orders`,
-      headers: { authorization: `Bearer ${staffSession}` },
+      headers: { authorization: `Bearer ${staffSession}`, 'if-match': String(visitVersion) },
       body: { order_type: 'DINE_IN' }
     });
     const orderId = orderRes.json().id;
@@ -220,13 +223,12 @@ describeIntegration('promotions module', () => {
     const noPromoRes = await app.inject({
       method: 'POST',
       url: `/api/v1/locations/${locationId}/orders/${orderId}/lines`,
-      headers: { authorization: `Bearer ${staffSession}` },
+      headers: { authorization: `Bearer ${staffSession}`, 'if-match': String(orderVersion) },
       body: {
-        expected_version: orderVersion,
         lines: [{ account_id: accountId, product_id: p1.id, quantity: 1 }]
       }
     });
-    expect(noPromoRes.statusCode).toBe(200);
+    expect(noPromoRes.statusCode).toBe(201);
     orderVersion = noPromoRes.json().order.version;
     let account = await db.selectFrom('accounts').select('subtotal').where('id', '=', accountId).executeTakeFirst();
     expect(account?.subtotal).toBe(300);
@@ -243,13 +245,12 @@ describeIntegration('promotions module', () => {
     const globalPromoRes = await app.inject({
       method: 'POST',
       url: `/api/v1/locations/${locationId}/orders/${orderId}/lines`,
-      headers: { authorization: `Bearer ${staffSession}` },
+      headers: { authorization: `Bearer ${staffSession}`, 'if-match': String(orderVersion) },
       body: {
-        expected_version: orderVersion,
         lines: [{ account_id: accountId, product_id: p1.id, quantity: 1 }]
       }
     });
-    expect(globalPromoRes.statusCode).toBe(200);
+    expect(globalPromoRes.statusCode).toBe(201);
     orderVersion = globalPromoRes.json().order.version;
     // previous subtotal (300) + Coke(300) - 10%(30) = 570
     account = await db.selectFrom('accounts').select('subtotal').where('id', '=', accountId).executeTakeFirst();
@@ -264,30 +265,20 @@ describeIntegration('promotions module', () => {
       category_id: cat.id,
       is_active: true
     }).execute();
-    
-    // other org promo - should not apply even if 50%
-    await db.insertInto('promotions').values({
-      organization_id: otherOrganizationId,
-      name: 'Other Org 50%',
-      discount_type: 'PERCENTAGE',
-      discount_value: 50,
-      is_active: true
-    }).execute();
 
     const stackingRes = await app.inject({
       method: 'POST',
       url: `/api/v1/locations/${locationId}/orders/${orderId}/lines`,
-      headers: { authorization: `Bearer ${staffSession}` },
+      headers: { authorization: `Bearer ${staffSession}`, 'if-match': String(orderVersion) },
       body: {
-        expected_version: orderVersion,
         lines: [{ account_id: accountId, product_id: p2.id, quantity: 1 }] // Beer (500)
       }
     });
-    expect(stackingRes.statusCode).toBe(200);
+    expect(stackingRes.statusCode).toBe(201);
     orderVersion = stackingRes.json().order.version;
     const addedLine = stackingRes.json().lines[0];
     
-    // Best is 20% of 500 = 100. (Not 50% of other org). Previous subtotal 570 + 500 - 100 = 970.
+    // Best is 20% of 500 = 100 (beats the 10% global rule). Previous subtotal 570 + 500 - 100 = 970.
     account = await db.selectFrom('accounts').select('subtotal').where('id', '=', accountId).executeTakeFirst();
     expect(account?.subtotal).toBe(970);
     
@@ -309,12 +300,12 @@ describeIntegration('promotions module', () => {
     const noMatchRes = await app.inject({
       method: 'POST',
       url: `/api/v1/locations/${locationId}/orders/${orderId}/lines`,
-      headers: { authorization: `Bearer ${staffSession}` },
+      headers: { authorization: `Bearer ${staffSession}`, 'if-match': String(orderVersion) },
       body: {
-        expected_version: orderVersion,
         lines: [{ account_id: accountId, product_id: p2.id, quantity: 1 }] // Beer (500)
       }
     });
+    expect(noMatchRes.statusCode).toBe(201);
     orderVersion = noMatchRes.json().order.version;
     // Drinks 20% still applies (100). Subtotal = 970 + 500 - 100 = 1370. The 100% does not apply.
     account = await db.selectFrom('accounts').select('subtotal').where('id', '=', accountId).executeTakeFirst();

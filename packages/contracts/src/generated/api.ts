@@ -2731,7 +2731,9 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        PromotionsListResponse: components["schemas"]["Promotion"][];
+        PromotionsListResponse: {
+            data: components["schemas"]["Promotion"][];
+        };
         Promotion: {
             /** Format: uuid */
             id: string;

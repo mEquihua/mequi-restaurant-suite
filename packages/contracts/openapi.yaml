@@ -4594,9 +4594,14 @@ components:
   schemas:
 
     PromotionsListResponse:
-      type: array
-      items:
-        $ref: '#/components/schemas/Promotion'
+      type: object
+      required:
+      - data
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Promotion'
     Promotion:
       type: object
       required:

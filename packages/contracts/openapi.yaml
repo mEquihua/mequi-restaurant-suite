@@ -2284,6 +2284,27 @@ paths:
       security: *id011
       parameters: *id012
       responses: *id013
+  /api/v1/locations/{locationId}/reports/sales/by-channel:
+    get:
+      operationId: reportSalesByChannel
+      x-required-permission: reports.sales.read
+      security: *id011
+      parameters: *id012
+      responses: *id013
+  /api/v1/locations/{locationId}/reports/covers/by-day:
+    get:
+      operationId: reportCoversByDay
+      x-required-permission: reports.sales.read
+      security: *id011
+      parameters: *id012
+      responses: *id013
+  /api/v1/locations/{locationId}/reports/labor/hours:
+    get:
+      operationId: reportLaborHours
+      x-required-permission: reports.audit.read
+      security: *id011
+      parameters: *id012
+      responses: *id013
   /api/v1/sections/{id}/tables:
     put:
       operationId: replaceSectionTables
@@ -3520,6 +3541,57 @@ paths:
       security: *id016
       parameters: *id017
       responses: *id018
+  /api/v1/organizations/{orgId}/reports/sales/by-channel:
+    get:
+      operationId: reportOrgSalesByChannel
+      x-required-permission: reports.sales.read
+      security: *id016
+      parameters: &id019
+      - name: orgId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - $ref: '#/components/parameters/ReportFrom'
+      - $ref: '#/components/parameters/ReportTo'
+      - name: all
+        in: query
+        schema:
+          type: boolean
+      - name: location_ids
+        in: query
+        schema:
+          type: string
+      - $ref: '#/components/parameters/ReportFormat'
+      responses: &id020
+        '200':
+          description: Report data or CSV export
+          content:
+            application/json:
+              schema:
+                type: object
+            text/csv:
+              schema:
+                type: string
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+  /api/v1/organizations/{orgId}/reports/covers/by-day:
+    get:
+      operationId: reportOrgCoversByDay
+      x-required-permission: reports.sales.read
+      security: *id016
+      parameters: *id019
+      responses: *id020
+  /api/v1/organizations/{orgId}/reports/labor/hours:
+    get:
+      operationId: reportOrgLaborHours
+      x-required-permission: reports.audit.read
+      security: *id016
+      parameters: *id019
+      responses: *id020
   /api/v1/locations/{loc_id}/reservation-settings:
     get:
       operationId: getReservationSettings

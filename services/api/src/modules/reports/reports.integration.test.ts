@@ -185,4 +185,87 @@ describeIntegration('reports API against PostgreSQL', () => {
     const forbidden = await app.inject({ method: 'GET', url: `/api/v1/organizations/${org.id}/reports/sales/by-day?${range}&all=true`, headers: auth(noSalesToken) });
     expect(forbidden.statusCode).toBe(403);
   });
+
+  describe('advanced reporting module', () => {
+    const range20 = 'from=2026-09-20T00%3A00%3A00.000Z&to=2026-09-21T00%3A00%3A00.000Z';
+    
+    beforeAll(async () => {
+      const burger = (await db.selectFrom('products').select('id').where('name', '=', 'Burger').executeTakeFirstOrThrow()).id;
+
+      const visits = await db.insertInto('visits').values([
+        { location_id: location, staff_id: staff, guest_count: 2, status: 'COMPLETED', opened_at: new Date('2026-09-20T12:00:00.000Z'), closed_at: new Date('2026-09-20T13:00:00.000Z') },
+        { location_id: location, staff_id: staff, guest_count: null, status: 'COMPLETED', opened_at: new Date('2026-09-20T14:00:00.000Z'), closed_at: new Date('2026-09-20T15:00:00.000Z') },
+        { location_id: location, staff_id: staff, guest_count: 4, status: 'OPEN', opened_at: new Date('2026-09-20T16:00:00.000Z'), closed_at: null }
+      ]).returning('id').execute();
+
+      const account = await db.insertInto('accounts').values([
+        { location_id: location, visit_id: visits[0].id, subtotal: 3000, tax: 0, total: 2700, paid_amount: 2700, status: 'PAID' }
+      ]).returning('id').executeTakeFirstOrThrow();
+
+      const orders = await db.insertInto('orders').values([
+        { location_id: location, visit_id: visits[0].id, order_type: 'DINE_IN', status: 'COMPLETED', created_at: new Date('2026-09-20T12:15:00.000Z') },
+        { location_id: location, visit_id: visits[0].id, order_type: 'TAKEOUT', status: 'COMPLETED', created_at: new Date('2026-09-20T12:30:00.000Z') }
+      ]).returning('id').execute();
+
+      await db.insertInto('order_lines').values([
+        { location_id: location, order_id: orders[0].id, account_id: account.id, product_id: burger, quantity: 2, unit_price: 1000, status: 'FULFILLED' },
+        { location_id: location, order_id: orders[0].id, account_id: account.id, product_id: burger, quantity: 1, unit_price: 1000, status: 'VOIDED' },
+        { location_id: location, order_id: orders[1].id, account_id: account.id, product_id: burger, quantity: 1, unit_price: 1000, status: 'FULFILLED' }
+      ]).execute();
+
+      await db.insertInto('account_discounts').values({ location_id: location, account_id: account.id, discount_type: 'AMOUNT', value: 300, computed_amount: 300, reason: 'Split', applied_by: staff, is_override: false, created_at: new Date('2026-09-20T12:45:00.000Z') }).execute();
+
+      await db.insertInto('timeclock_shifts').values([
+        { location_id: location, staff_id: staff, status: 'CLOSED', clocked_in_at: new Date('2026-09-20T08:00:00.000Z'), clocked_out_at: new Date('2026-09-20T10:00:00.000Z'), clocked_in_by_staff_id: staff, clocked_out_by_staff_id: staff },
+        { location_id: location, staff_id: staff, status: 'OPEN', clocked_in_at: new Date('2026-09-20T11:00:00.000Z'), clocked_out_at: null, clocked_in_by_staff_id: staff }
+      ]).execute();
+    });
+
+    it('calculates Covers by Day correctly', async () => {
+      const covers = await app.inject({ method: 'GET', url: `/api/v1/locations/${location}/reports/covers/by-day?${range20}`, headers: auth() });
+      expect(covers.statusCode).toBe(200);
+      expect(covers.json().data).toEqual([
+        {
+          day: '2026-09-20',
+          completed_visit_count: 2,
+          visits_with_guest_count: 1,
+          total_covers: 2,
+          average_covers_per_visit: 2.00
+        }
+      ]);
+    });
+
+    it('calculates Sales by Channel correctly with deterministic discount splitting', async () => {
+      const channels = await app.inject({ method: 'GET', url: `/api/v1/locations/${location}/reports/sales/by-channel?${range20}`, headers: auth() });
+      expect(channels.statusCode).toBe(200);
+      expect(channels.json().data).toEqual([
+        { channel: 'DINE_IN', order_count: 1, gross_sales: 2000, discounts: 200, refunds: 0, net_sales: 1800 },
+        { channel: 'TAKEOUT', order_count: 1, gross_sales: 1000, discounts: 100, refunds: 0, net_sales: 900 }
+      ]);
+    });
+
+    it('calculates Labor Hours correctly, rejecting sales-only token', async () => {
+      const denied = await app.inject({ method: 'GET', url: `/api/v1/locations/${location}/reports/labor/hours?${range20}`, headers: auth(salesToken) });
+      expect(denied.statusCode).toBe(403);
+
+      const hours = await app.inject({ method: 'GET', url: `/api/v1/locations/${location}/reports/labor/hours?${range20}`, headers: auth(auditToken) });
+      expect(hours.statusCode).toBe(200);
+      expect(hours.json().data).toHaveLength(1);
+      expect(hours.json().data[0]).toMatchObject({ shift_count: 1, hours_worked: 2, location_total_hours: 2 });
+    });
+
+    it('supports CSV format on org route for the new reports', async () => {
+      const orgId = (await db.selectFrom('organizations').select('id').where('name', '=', 'Reports Integration').executeTakeFirstOrThrow()).id;
+      const csv = await app.inject({ method: 'GET', url: `/api/v1/organizations/${orgId}/reports/sales/by-channel?${range20}&all=true&format=csv`, headers: auth(salesToken) });
+      expect(csv.statusCode).toBe(200);
+      expect(csv.headers['content-type']).toContain('text/csv');
+      
+      const actual_lines = csv.body.trim().split('\n');
+      expect(actual_lines[0]).toBe('location_id,location_name,channel,order_count,gross_sales,discounts,refunds,net_sales');
+      expect(actual_lines).toHaveLength(3);
+      expect(actual_lines[1]).toContain('Centro,DINE_IN');
+      expect(actual_lines[2]).toContain('Centro,TAKEOUT');
+    });
+  });
+
 });

@@ -2,11 +2,14 @@ import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 
 import { IdentityHttpError, requirePermission, withAuthenticatedSession } from '../identity/index.js';
 import {
+  coversByDay,
   discounts,
+  laborHours,
   ordersSummary,
   paymentsByMethod,
   refunds,
   salesByCategory,
+  salesByChannel,
   salesByDay,
   salesByEmployee,
   salesByHour,
@@ -74,6 +77,9 @@ export const reportsRoute: FastifyPluginAsync<ReportsRouteOptions> = async (app,
   app.get('/api/v1/locations/:locationId/reports/sales/by-product', schema, report('reports.sales.read', (actor, range, query) => salesByProduct(actor.trx, range, query.limit ?? 100, query.offset ?? 0)));
   app.get('/api/v1/locations/:locationId/reports/sales/by-category', schema, report('reports.sales.read', (actor, range) => salesByCategory(actor.trx, range)));
   app.get('/api/v1/locations/:locationId/reports/sales/by-employee', schema, report('reports.sales.read', (actor, range) => salesByEmployee(actor.trx, range)));
+  app.get('/api/v1/locations/:locationId/reports/sales/by-channel', schema, report('reports.sales.read', (actor, range) => salesByChannel(actor.trx, range)));
+  app.get('/api/v1/locations/:locationId/reports/covers/by-day', schema, report('reports.sales.read', (actor, range) => coversByDay(actor.trx, range)));
+  app.get('/api/v1/locations/:locationId/reports/labor/hours', schema, report('reports.audit.read', (actor, range) => laborHours(actor.trx, range)));
   app.get('/api/v1/locations/:locationId/reports/orders/summary', schema, report('reports.sales.read', async (actor, range) => {
     const [summary] = await ordersSummary(actor.trx, range) as Array<{ order_count: number; total_sales: number }>;
     return [{ order_count: summary?.order_count ?? 0, average_ticket: averageTicket(summary?.total_sales ?? 0, summary?.order_count ?? 0) }];
@@ -146,4 +152,66 @@ export const reportsRoute: FastifyPluginAsync<ReportsRouteOptions> = async (app,
   app.get('/api/v1/organizations/:orgId/reports/voids-and-cancellations', orgSchema, orgReport('reports.audit.read', (trx, range) => voidsAndCancellations(trx, range)));
   app.get('/api/v1/organizations/:orgId/reports/refunds', orgSchema, orgReport('reports.audit.read', (trx, range) => refunds(trx, range)));
   app.get('/api/v1/organizations/:orgId/reports/tips', orgSchema, orgReport('reports.sales.read', (trx, range) => tips(trx, range)));
+
+  const orgRangeCsvQuery = {
+    type: 'object', additionalProperties: false, required: ['from', 'to'],
+    properties: {
+      from: { type: 'string', format: 'date-time' }, to: { type: 'string', format: 'date-time' },
+      format: { type: 'string', enum: ['json', 'csv'] }, limit: { type: 'integer', minimum: 1, maximum: 500 }, offset: { type: 'integer', minimum: 0 },
+      location_ids: { type: 'string' }, all: { type: 'boolean' }
+    },
+    oneOf: [
+      { required: ['location_ids'] },
+      { required: ['all'] }
+    ]
+  } as const;
+  type OrgCsvQuery = { from: string; to: string; format?: 'json' | 'csv'; limit?: number; offset?: number; location_ids?: string; all?: boolean };
+
+  const orgCsvReport = (permission: string, execute: (trx: Parameters<typeof salesByDay>[0], range: ReportRange, query: OrgCsvQuery) => Promise<Array<Record<string, unknown>>>) =>
+    async (request: FastifyRequest, reply: FastifyReply) => withSession(request, async (actor) => {
+      requirePermission(actor, permission);
+      const query = request.query as OrgCsvQuery;
+      const orgId = (request.params as { orgId: string }).orgId;
+      if (orgId !== actor.organizationId) throw new IdentityHttpError(403, 'FORBIDDEN', 'Cannot access reports for a different organization.');
+      if (query.all && query.location_ids) throw new IdentityHttpError(400, 'VALIDATION_ERROR', 'Cannot specify both all and location_ids');
+      if (!query.all && !query.location_ids) throw new IdentityHttpError(400, 'VALIDATION_ERROR', 'Must specify either all or location_ids');
+
+      const orgLocations = await actor.trx
+        .selectFrom('locations')
+        .select(['id', 'name'])
+        .where('organization_id', '=', actor.organizationId)
+        .execute();
+
+      let validLocations = orgLocations;
+      if (!query.all && query.location_ids) {
+        const requested = new Set(query.location_ids.split(','));
+        validLocations = orgLocations.filter(loc => requested.has(loc.id));
+      }
+
+      if (validLocations.length === 0) {
+        if (query.format === 'csv') return respond(reply, query as unknown as Query, []);
+        return { data: [] };
+      }
+
+      const results = [];
+      const flatResults = [];
+      for (const loc of validLocations) {
+        const range = parseRange(query as unknown as Query, loc.id);
+        const rows = await app.withLocationTransaction(loc.id, (trx) => execute(trx, range, query));
+        results.push({ location_id: loc.id, location_name: loc.name, data: rows });
+        for (const row of rows) {
+          flatResults.push({ location_id: loc.id, location_name: loc.name, ...row });
+        }
+      }
+
+      if (query.format === 'csv') {
+        return respond(reply, query as unknown as Query, flatResults);
+      }
+      return { data: results };
+    });
+
+  const orgCsvSchema = { schema: { params: orgParams, querystring: orgRangeCsvQuery } };
+  app.get('/api/v1/organizations/:orgId/reports/sales/by-channel', orgCsvSchema, orgCsvReport('reports.sales.read', (trx, range) => salesByChannel(trx, range)));
+  app.get('/api/v1/organizations/:orgId/reports/covers/by-day', orgCsvSchema, orgCsvReport('reports.sales.read', (trx, range) => coversByDay(trx, range)));
+  app.get('/api/v1/organizations/:orgId/reports/labor/hours', orgCsvSchema, orgCsvReport('reports.audit.read', (trx, range) => laborHours(trx, range)));
 };

@@ -192,16 +192,7 @@ describeIntegration('identity API against PostgreSQL', () => {
       .values({ organization_id: organization.id, name: 'Grill' })
       .returning('id')
       .execute();
-    const otherOrganization = await db
-      .insertInto('organizations')
-      .values({ name: 'Other Restaurant' })
-      .returning('id')
-      .executeTakeFirstOrThrow();
-    const otherCategory = await db
-      .insertInto('categories')
-      .values({ organization_id: otherOrganization.id, name: 'Other category' })
-      .returning('id')
-      .executeTakeFirstOrThrow();
+    const nonExistentCategoryId = crypto.randomUUID();
     const [areaA, areaB] = await db
       .insertInto('areas')
       .values([
@@ -252,7 +243,7 @@ describeIntegration('identity API against PostgreSQL', () => {
     const me = await app.inject({ method: 'GET', url: '/api/v1/auth/me', headers: { authorization: `Bearer ${ownerSession}` } });
     expect(me.json()).toMatchObject({ app_target: 'KITCHEN', profile_config: { scope: 'CATEGORY', category_ids: [category.id] } });
 
-    const invalidCategory = await update('KITCHEN', { scope: 'CATEGORY', category_ids: [otherCategory.id] });
+    const invalidCategory = await update('KITCHEN', { scope: 'CATEGORY', category_ids: [nonExistentCategoryId] });
     expect(invalidCategory.statusCode).toBe(400);
     expect(invalidCategory.json().error.code).toBe('INVALID_CATEGORY');
     const invalidTable = await update('SELF_SERVICE', { mode: 'TABLE', table_id: tableB.id });

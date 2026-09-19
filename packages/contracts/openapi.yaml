@@ -4,7 +4,6 @@ info:
   version: 0.1.0
   description: REST API versioned under /api/v1.
 paths:
-
   /api/v1/promotions:
     get:
       operationId: listPromotions
@@ -4722,7 +4721,6 @@ components:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
   schemas:
-
     PromotionsListResponse:
       type: object
       required:
@@ -6357,6 +6355,33 @@ components:
           - CANCELLED
         version:
           type: integer
+    WebhookSubscription:
+      type: object
+      required: [id, organization_id, url, event_types, is_active, version, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        organization_id:
+          type: string
+          format: uuid
+        url:
+          type: string
+          format: uri
+        event_types:
+          type: array
+          items:
+            type: string
+        is_active:
+          type: boolean
+        version:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
     Account:
       type: object
       additionalProperties: true
@@ -7881,3 +7906,156 @@ components:
         updated_at:
           type: string
           format: date-time
+  /api/v1/organizations/{organizationId}/webhooks:
+    get:
+      operationId: listWebhooks
+      x-required-permission: integrations.webhooks.read
+      security:
+        - staffSession: []
+      parameters:
+        - name: organizationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/WebhookSubscription'
+    post:
+      operationId: createWebhook
+      x-required-permission: integrations.webhooks.write
+      security:
+        - staffSession: []
+      parameters:
+        - name: organizationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url, event_types]
+              properties:
+                url:
+                  type: string
+                  format: uri
+                event_types:
+                  type: array
+                  items:
+                    type: string
+                is_active:
+                  type: boolean
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [subscription, secret]
+                properties:
+                  subscription:
+                    $ref: '#/components/schemas/WebhookSubscription'
+                  secret:
+                    type: string
+  /api/v1/organizations/{organizationId}/webhooks/{id}:
+    put:
+      operationId: updateWebhook
+      x-required-permission: integrations.webhooks.write
+      security:
+        - staffSession: []
+      parameters:
+        - name: organizationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: If-Match
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url, event_types, is_active]
+              properties:
+                url:
+                  type: string
+                  format: uri
+                event_types:
+                  type: array
+                  items:
+                    type: string
+                is_active:
+                  type: boolean
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookSubscription'
+  /api/v1/organizations/{organizationId}/webhooks/{id}/rotate-secret:
+    post:
+      operationId: rotateWebhookSecret
+      x-required-permission: integrations.webhooks.write
+      security:
+        - staffSession: []
+      parameters:
+        - name: organizationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: If-Match
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [subscription, secret]
+                properties:
+                  subscription:
+                    $ref: '#/components/schemas/WebhookSubscription'
+                  secret:
+                    type: string

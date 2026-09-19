@@ -224,6 +224,12 @@ $$\text{\textbf{Legend: }}\mathbf{X} = \text{Granted by default} \quad \vert \qu
 | `promotions.promotions.read` | View the organization's catalog of automatic promotions and schedules. |
 | `promotions.promotions.write` | Create, edit, and activate/deactivate automatic promotion rules. |
 
+### 4.11 Integrations & Webhooks
+| Permission Name | Description |
+| :--- | :--- |
+| `integrations.webhooks.read` | View organization webhook subscriptions. |
+| `integrations.webhooks.write` | Create, edit, and delete webhook subscriptions. |
+
 ## 5. Out-of-Scope Domains & Deferred Modules
 
 To preserve modular architectural boundaries and prevent premature schema complexity, permissions for domains outside the Foundation scope are **deliberately omitted** from this document:

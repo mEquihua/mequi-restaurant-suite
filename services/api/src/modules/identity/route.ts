@@ -61,7 +61,20 @@ export interface IdentityRouteOptions {
 }
 
 type PinUnlockBody = { staff_id: string; pin: string };
-type EnrollTerminalBody = { location_id: string; name: string; device_profile?: string };
+type EnrollTerminalBody = { location_id: string; name: string };
+type TerminalProfileTarget = 'KITCHEN' | 'SELF_SERVICE' | 'STAFF' | null;
+type TerminalProfileConfig =
+  | { scope: 'ALL' }
+  | { scope: 'CATEGORY'; category_ids: string[] }
+  | { mode: 'KIOSK' }
+  | { mode: 'TABLE'; table_id: string }
+  | { mode: 'ORDER_STATUS' }
+  | { mode: 'HOST' }
+  | null;
+type UpdateTerminalProfileBody = {
+  app_target: TerminalProfileTarget;
+  profile_config: TerminalProfileConfig;
+};
 type CreateStaffBody = { first_name: string; last_name: string; pin: string; role_ids: string[] };
 type UpdateStaffBody = { first_name?: string; last_name?: string; active?: boolean; pin?: string };
 type UpdatePermissionsBody = {
@@ -88,7 +101,8 @@ function publicTerminal(row: {
   id: string;
   location_id: string;
   name: string;
-  device_profile: string | null;
+  app_target: TerminalProfileTarget;
+  profile_config: unknown | null;
   is_active: boolean;
   version: number;
 }) {
@@ -96,10 +110,50 @@ function publicTerminal(row: {
     id: row.id,
     location_id: row.location_id,
     name: row.name,
-    device_profile: row.device_profile,
+    app_target: row.app_target,
+    profile_config: row.profile_config,
     is_active: row.is_active,
     version: row.version,
   };
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function hasExactKeys(value: Record<string, unknown>, keys: string[]) {
+  const actual = Object.keys(value);
+  return actual.length === keys.length && keys.every((key) => actual.includes(key));
+}
+
+function validTerminalProfile(body: {
+  app_target: unknown;
+  profile_config: unknown;
+}): body is UpdateTerminalProfileBody {
+  const { app_target: target, profile_config: config } = body;
+  if (target === null) return config === null;
+  if (typeof config !== 'object' || config === null || Array.isArray(config)) return false;
+  const profile = config as Record<string, unknown>;
+  if (target === 'KITCHEN') {
+    if (profile.scope === 'ALL') return hasExactKeys(profile, ['scope']);
+    return (
+      profile.scope === 'CATEGORY' &&
+      hasExactKeys(profile, ['scope', 'category_ids']) &&
+      Array.isArray(profile.category_ids) &&
+      profile.category_ids.length > 0 &&
+      profile.category_ids.every((id) => typeof id === 'string' && UUID.test(id)) &&
+      new Set(profile.category_ids).size === profile.category_ids.length
+    );
+  }
+  if (target === 'SELF_SERVICE') {
+    if (profile.mode === 'KIOSK' || profile.mode === 'ORDER_STATUS')
+      return hasExactKeys(profile, ['mode']);
+    return (
+      profile.mode === 'TABLE' &&
+      hasExactKeys(profile, ['mode', 'table_id']) &&
+      typeof profile.table_id === 'string' &&
+      UUID.test(profile.table_id)
+    );
+  }
+  return target === 'STAFF' && profile.mode === 'HOST' && hasExactKeys(profile, ['mode']);
 }
 
 function fail(reply: FastifyReply, request: FastifyRequest, error: IdentityHttpError) {
@@ -189,7 +243,6 @@ export const identityRoute: FastifyPluginAsync<IdentityRouteOptions> = async (ap
           properties: {
             location_id: uuidSchema,
             name: { type: 'string', minLength: 1, maxLength: 120 },
-            device_profile: { type: 'string', maxLength: 120 },
           },
         },
       },
@@ -233,7 +286,6 @@ export const identityRoute: FastifyPluginAsync<IdentityRouteOptions> = async (ap
               id: terminalId,
               location_id: body.location_id,
               name: body.name.trim(),
-              device_profile: body.device_profile?.trim() || null,
               credential_hash: hashSecret(credential),
             })
             .returningAll()
@@ -255,6 +307,139 @@ export const identityRoute: FastifyPluginAsync<IdentityRouteOptions> = async (ap
         .execute();
       return { data: terminals.map(publicTerminal) };
     }),
+  );
+
+  app.get(
+    '/api/v1/terminals/me',
+    async (request) => {
+      const presentedTerminal = terminalCredential(request);
+      if (!presentedTerminal)
+        throw new IdentityHttpError(
+          401,
+          'TERMINAL_UNAUTHENTICATED',
+          'A valid enrolled terminal credential is required.',
+        );
+      return app.withLocationTransaction(presentedTerminal.locationId, async (trx) => {
+        const terminal = await findTerminal(trx, presentedTerminal.terminalId);
+        if (
+          !terminal ||
+          terminal.location_id !== presentedTerminal.locationId ||
+          !terminal.is_active ||
+          !secretMatchesHash(presentedTerminal.credential, terminal.credential_hash)
+        )
+          throw new IdentityHttpError(
+            401,
+            'TERMINAL_UNAUTHENTICATED',
+            'A valid enrolled terminal credential is required.',
+          );
+        return {
+          terminal_id: terminal.id,
+          location_id: terminal.location_id,
+          app_target: terminal.app_target,
+          profile_config: terminal.profile_config,
+        };
+      });
+    },
+  );
+
+  app.put(
+    '/api/v1/terminals/:terminalId/profile',
+    {
+      schema: {
+        params: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['terminalId'],
+          properties: { terminalId: uuidSchema },
+        },
+        body: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['app_target', 'profile_config'],
+          properties: {
+            app_target: { type: ['string', 'null'] },
+            profile_config: { type: ['object', 'null'] },
+          },
+        },
+      },
+    },
+    async (request) => {
+      const body = request.body as { app_target: unknown; profile_config: unknown };
+      const { terminalId } = request.params as { terminalId: string };
+      const expectedVersion = parseIfMatch(request.headers['if-match']);
+      return withSession(request, async (actor) => {
+        requirePermission(actor, 'iam.terminals.enroll');
+        if (!validTerminalProfile(body))
+          throw new IdentityHttpError(
+            400,
+            'VALIDATION_ERROR',
+            'app_target and profile_config must form a valid terminal profile.',
+          );
+        const terminal = await findTerminal(actor.trx, terminalId);
+        if (!terminal)
+          throw new IdentityHttpError(
+            404,
+            'NOT_FOUND',
+            'Terminal was not found in this location scope.',
+          );
+        const kitchenProfile = body.profile_config as { scope?: string; category_ids?: string[] } | null;
+        if (body.app_target === 'KITCHEN' && kitchenProfile?.scope === 'CATEGORY') {
+          const categoryIds = kitchenProfile.category_ids!;
+          const categories = await actor.trx
+            .selectFrom('categories')
+            .select('id')
+            .where('organization_id', '=', actor.organizationId)
+            .where('id', 'in', categoryIds)
+            .execute();
+          if (categories.length !== categoryIds.length)
+            throw new IdentityHttpError(
+              400,
+              'INVALID_CATEGORY',
+              'One or more categories do not belong to this organization.',
+            );
+        }
+        const selfServiceProfile = body.profile_config as { mode?: string; table_id?: string } | null;
+        if (body.app_target === 'SELF_SERVICE' && selfServiceProfile?.mode === 'TABLE') {
+          const table = await actor.trx
+            .selectFrom('tables')
+            .select('id')
+            .where('id', '=', selfServiceProfile.table_id!)
+            .where('location_id', '=', terminal.location_id)
+            .executeTakeFirst();
+          if (!table)
+            throw new IdentityHttpError(
+              400,
+              'INVALID_TABLE',
+              'The table does not belong to the terminal location.',
+            );
+        }
+        const updated = await actor.trx
+          .updateTable('terminals')
+          .set({
+            app_target: body.app_target,
+            profile_config: body.profile_config,
+            version: sql<number>`version + 1`,
+          })
+          .where('id', '=', terminalId)
+          .where('version', '=', expectedVersion)
+          .returningAll()
+          .executeTakeFirst();
+        if (updated) return publicTerminal(updated);
+        const current = await findTerminal(actor.trx, terminalId);
+        if (!current)
+          throw new IdentityHttpError(
+            404,
+            'NOT_FOUND',
+            'Terminal was not found in this location scope.',
+          );
+        throw new IdentityHttpError(
+          409,
+          'OPTIMISTIC_CONCURRENCY_CONFLICT',
+          'The resource has been modified since it was last read. Please refresh and try again.',
+          { current_version: current.version, current_state: publicTerminal(current) },
+        );
+      });
+    },
   );
 
   app.post(
@@ -417,20 +602,31 @@ export const identityRoute: FastifyPluginAsync<IdentityRouteOptions> = async (ap
   });
 
   app.get('/api/v1/auth/me', async (request) =>
-    withSession(request, async (actor) => ({
-      staff: {
-        id: actor.staff.id,
-        first_name: actor.staff.firstName,
-        last_name: actor.staff.lastName,
-        active: actor.staff.active,
-        version: actor.staff.version,
-      },
-      location_id: actor.locationId,
-      terminal_id: actor.terminalId,
-      organization_id: actor.organizationId,
-      roles: actor.roles,
-      permissions: actor.permissions,
-    })),
+    withSession(request, async (actor) => {
+      const terminal = await findTerminal(actor.trx, actor.terminalId);
+      if (!terminal)
+        throw new IdentityHttpError(
+          401,
+          'SESSION_UNAUTHENTICATED',
+          'A valid staff session is required.',
+        );
+      return {
+        staff: {
+          id: actor.staff.id,
+          first_name: actor.staff.firstName,
+          last_name: actor.staff.lastName,
+          active: actor.staff.active,
+          version: actor.staff.version,
+        },
+        location_id: actor.locationId,
+        terminal_id: actor.terminalId,
+        organization_id: actor.organizationId,
+        roles: actor.roles,
+        permissions: actor.permissions,
+        app_target: terminal.app_target,
+        profile_config: terminal.profile_config,
+      };
+    }),
   );
 
   app.get('/api/v1/staff', async (request) =>

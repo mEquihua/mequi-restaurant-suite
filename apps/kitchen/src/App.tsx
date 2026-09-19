@@ -94,13 +94,29 @@ function MainApp() {
   if (isLoading) return <div>Loading...</div>;
   if (!user) return <div>Error loading user profile</div>;
 
-  const typedUser = user as { permissions: { permission_name: string }[]; location_id: string };
-  const hasKitchen = typedUser.permissions.some((p: { permission_name: string }) => p.permission_name === 'kitchen.tickets.read');
+  const typedUser = user as {
+    permissions: string[];
+    location_id: string;
+    app_target: string | null;
+    profile_config: unknown | null;
+  };
+  const hasKitchen = typedUser.permissions.includes('kitchen.tickets.read');
   
   if (hasKitchen) {
     return (
       <Routes>
-        <Route path="/*" element={<TicketBoard locationId={typedUser.location_id} />} />
+        <Route
+          path="/*"
+          element={
+            <TicketBoard
+              locationId={typedUser.location_id}
+              terminalProfile={{
+                app_target: typedUser.app_target,
+                profile_config: typedUser.profile_config,
+              }}
+            />
+          }
+        />
       </Routes>
     );
   }

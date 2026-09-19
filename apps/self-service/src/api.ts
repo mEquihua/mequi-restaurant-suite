@@ -2,6 +2,7 @@ import type { components } from '@restaurant-suite/contracts';
 
 export const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 const GUEST_TOKEN_KEY = 'guest_session_token';
+const TERMINAL_CREDENTIAL_KEY = 'self_service_terminal_credential';
 
 export class ApiError extends Error {
   constructor(
@@ -29,6 +30,42 @@ export function setGuestToken(token: string) {
 }
 export function clearGuestToken() {
   sessionStorage.removeItem(GUEST_TOKEN_KEY);
+}
+export function getTerminalCredential(): { terminal_id: string; secret: string } | null {
+  const credential = localStorage.getItem(TERMINAL_CREDENTIAL_KEY);
+  return credential ? JSON.parse(credential) : null;
+}
+export function setTerminalCredential(credential: { terminal_id: string; secret: string }) {
+  localStorage.setItem(TERMINAL_CREDENTIAL_KEY, JSON.stringify(credential));
+}
+
+/** Terminal-only requests deliberately never attach the guest bearer token. */
+export async function terminalFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const headers = new Headers(options.headers);
+  if (options.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
+  let response: Response;
+  try {
+    response = await fetch(`${BASE_URL}${path}`, { ...options, headers });
+  } catch {
+    throw new ApiError(0, 'NETWORK_ERROR', 'Unable to reach the restaurant.');
+  }
+  if (!response.ok) {
+    let error = { code: 'UNKNOWN_ERROR', message: response.statusText, details: undefined as unknown };
+    try {
+      const body = (await response.json()) as {
+        error?: { code?: string; message?: string; details?: unknown };
+      };
+      error = {
+        code: body.error?.code ?? error.code,
+        message: body.error?.message ?? error.message,
+        details: body.error?.details,
+      };
+    } catch {
+      /* retain HTTP fallback */
+    }
+    throw new ApiError(response.status, error.code, error.message, error.details);
+  }
+  return response.json() as Promise<T>;
 }
 
 export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {

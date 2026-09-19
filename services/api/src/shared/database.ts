@@ -206,6 +206,8 @@ export interface TerminalTable {
   location_id: string;
   name: string;
   device_profile: string | null;
+  app_target: 'KITCHEN' | 'SELF_SERVICE' | 'STAFF' | null;
+  profile_config: unknown | null;
   is_active: Generated<boolean>;
   version: Generated<number>;
   credential_hash: string;

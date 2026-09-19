@@ -29,6 +29,16 @@ type Me = {
   permissions: string[];
 };
 type Category = { id: string; name: string; is_active: boolean };
+type Table = { id: string; name: string; status: string };
+type Terminal = {
+  id: string;
+  location_id: string;
+  name: string;
+  is_active: boolean;
+  version: number;
+  app_target: 'KITCHEN' | 'SELF_SERVICE' | 'STAFF' | null;
+  profile_config: unknown | null;
+};
 type Product = {
   id: string;
   category_id: string | null;
@@ -92,7 +102,9 @@ export const navForPermissions = (permissions: string[]) =>
     ['Promotions', '/promotions', 'promotions.promotions.read'],
     ['Employee Clocking', '/timeclock', 'timeclock.shifts.read'],
     ['Module Center', '/modules', 'module_center.modules.read'],
-    ['Staff & Roles', '/staff', 'iam.staff.read'],
+    ...(permissions.includes('iam.staff.read') || permissions.includes('iam.terminals.read')
+      ? [['Staff & Roles', '/staff', 'iam.staff.read']]
+      : []),
     ['Reports', '/reports', 'reports.sales.read'],
   ].filter((x): x is [string, string, string] => permissions.includes(x[2]));
 export function reportRange(from: string, to: string) {
@@ -131,7 +143,7 @@ function Enrollment() {
         '/api/v1/terminals/enroll',
         {
           method: 'POST',
-          body: JSON.stringify({ location_id: locationId, name, device_profile: 'admin-pwa' }),
+          body: JSON.stringify({ location_id: locationId, name }),
         },
       );
       setTerminalCredential(locationId, { terminal_id: res.terminal.id, secret: res.terminal_credential });
@@ -230,7 +242,7 @@ async function handleSwitchLocation(newLocationId: string, currentLoc: string) {
         '/api/v1/terminals/enroll',
         {
           method: 'POST',
-          body: JSON.stringify({ location_id: newLocationId, name: 'Virtual Admin Terminal', device_profile: 'admin-pwa' }),
+          body: JSON.stringify({ location_id: newLocationId, name: 'Virtual Admin Terminal' }),
         },
       );
       cred = { terminal_id: res.terminal.id, secret: res.terminal_credential };
@@ -1092,20 +1104,21 @@ function People({
   });
   const terminals = useQuery({
     queryKey: ['terminals'],
-    queryFn: () =>
-      apiFetch<{
-        data: Array<{
-          id: string;
-          name: string;
-          device_profile: string | null;
-          is_active: boolean;
-        }>;
-      }>('/api/v1/terminals'),
+    queryFn: () => apiFetch<{ data: Terminal[] }>('/api/v1/terminals'),
+  });
+  const categories = useQuery({
+    queryKey: ['categories'],
+    queryFn: () => apiFetch<{ data: Category[] }>('/api/v1/categories'),
+  });
+  const tables = useQuery({
+    queryKey: ['tables', locationId],
+    queryFn: () => apiFetch<{ data: Table[] }>(`/api/v1/locations/${locationId}/tables`),
   });
   const [error, setError] = useState<unknown>();
   const canCreate = grants.includes('iam.staff.create'),
     canUpdate = grants.includes('iam.staff.update'),
-    canRoles = grants.includes('iam.roles.update');
+    canRoles = grants.includes('iam.roles.update'),
+    canEnrollTerminal = grants.includes('iam.terminals.enroll');
   async function createStaff(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const data = new FormData(e.currentTarget);
@@ -1194,14 +1207,23 @@ function People({
       </div>
       <div className="panel">
         <h3>Terminals</h3>
-        {grants.includes('iam.terminals.enroll') && (
+        {canEnrollTerminal && (
           <TerminalEnroll locationId={locationId} onError={setError} />
         )}
         <ul>
           {terminals.data?.data.map((terminal) => (
             <li key={terminal.id}>
-              {terminal.name} · {terminal.device_profile ?? 'unspecified'} ·{' '}
+              {terminal.name} ·{' '}
+              {terminalPurpose(terminal, categories.data?.data ?? [], tables.data?.data ?? [])} ·{' '}
               {terminal.is_active ? 'active' : 'inactive'}
+              {canEnrollTerminal && (
+                <TerminalProfileEditor
+                  terminal={terminal}
+                  categories={categories.data?.data ?? []}
+                  tables={tables.data?.data ?? []}
+                  onError={setError}
+                />
+              )}
             </li>
           ))}
         </ul>
@@ -1289,7 +1311,6 @@ function TerminalEnroll({
   onError: (error: unknown) => void;
 }) {
   const [name, setName] = useState(''),
-    [profile, setProfile] = useState(''),
     [credential, setCredential] = useState('');
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -1299,7 +1320,6 @@ function TerminalEnroll({
         body: JSON.stringify({
           location_id: locationId,
           name,
-          device_profile: profile || undefined,
         }),
       });
       setCredential(result.terminal_credential);
@@ -1316,11 +1336,6 @@ function TerminalEnroll({
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
-        <input
-          placeholder="Device profile"
-          value={profile}
-          onChange={(e) => setProfile(e.target.value)}
-        />
         <button>Enroll terminal</button>
       </form>
       {credential && (
@@ -1329,6 +1344,131 @@ function TerminalEnroll({
         </p>
       )}
     </>
+  );
+}
+
+function terminalPurpose(terminal: Terminal, categories: Category[], tables: Table[]) {
+  const profile = terminal.profile_config as Record<string, unknown> | null;
+  if (!terminal.app_target || !profile) return 'No purpose';
+  if (terminal.app_target === 'KITCHEN' && profile.scope === 'ALL') return 'Kitchen / All';
+  if (terminal.app_target === 'KITCHEN' && profile.scope === 'CATEGORY') {
+    const names = Array.isArray(profile.category_ids)
+      ? profile.category_ids
+          .map((id) => categories.find((category) => category.id === id)?.name ?? String(id))
+          .join(', ')
+      : '';
+    return `Kitchen / ${names || 'selected categories'}`;
+  }
+  if (terminal.app_target === 'SELF_SERVICE' && profile.mode === 'KIOSK')
+    return 'Self-Service / Kiosk';
+  if (terminal.app_target === 'SELF_SERVICE' && profile.mode === 'TABLE')
+    return `Self-Service / ${tables.find((table) => table.id === profile.table_id)?.name ?? 'table'}`;
+  if (terminal.app_target === 'SELF_SERVICE' && profile.mode === 'ORDER_STATUS')
+    return 'Self-Service / Order Status';
+  if (terminal.app_target === 'STAFF' && profile.mode === 'HOST') return 'Staff / Host';
+  return 'Configuration mismatch';
+}
+
+function TerminalProfileEditor({
+  terminal,
+  categories,
+  tables,
+  onError,
+}: {
+  terminal: Terminal;
+  categories: Category[];
+  tables: Table[];
+  onError: (error: unknown) => void;
+}) {
+  const qc = useQueryClient();
+  const existing = terminal.profile_config as Record<string, unknown> | null;
+  const [target, setTarget] = useState<Terminal['app_target']>(terminal.app_target);
+  const [kitchenScope, setKitchenScope] = useState<'ALL' | 'CATEGORY'>(
+    terminal.app_target === 'KITCHEN' && existing?.scope === 'CATEGORY' ? 'CATEGORY' : 'ALL',
+  );
+  const [categoryIds, setCategoryIds] = useState<string[]>(
+    terminal.app_target === 'KITCHEN' && Array.isArray(existing?.category_ids)
+      ? existing.category_ids.filter((id): id is string => typeof id === 'string')
+      : [],
+  );
+  const [selfServiceMode, setSelfServiceMode] = useState<'KIOSK' | 'TABLE' | 'ORDER_STATUS'>(
+    terminal.app_target === 'SELF_SERVICE' && typeof existing?.mode === 'string'
+      ? existing.mode as 'KIOSK' | 'TABLE' | 'ORDER_STATUS'
+      : 'KIOSK',
+  );
+  const [tableId, setTableId] = useState(
+    terminal.app_target === 'SELF_SERVICE' && typeof existing?.table_id === 'string'
+      ? existing.table_id
+      : '',
+  );
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const profile = terminal.profile_config as Record<string, unknown> | null;
+    setTarget(terminal.app_target);
+    setKitchenScope(terminal.app_target === 'KITCHEN' && profile?.scope === 'CATEGORY' ? 'CATEGORY' : 'ALL');
+    setCategoryIds(
+      terminal.app_target === 'KITCHEN' && Array.isArray(profile?.category_ids)
+        ? profile.category_ids.filter((id): id is string => typeof id === 'string')
+        : [],
+    );
+    setSelfServiceMode(
+      terminal.app_target === 'SELF_SERVICE' && typeof profile?.mode === 'string'
+        ? profile.mode as 'KIOSK' | 'TABLE' | 'ORDER_STATUS'
+        : 'KIOSK',
+    );
+    setTableId(terminal.app_target === 'SELF_SERVICE' && typeof profile?.table_id === 'string' ? profile.table_id : '');
+  }, [terminal]);
+  async function save(clear = false) {
+    let profile_config: unknown = null;
+    const app_target: Terminal['app_target'] = clear ? null : target;
+    if (!clear && target === 'KITCHEN')
+      profile_config = kitchenScope === 'ALL' ? { scope: 'ALL' } : { scope: 'CATEGORY', category_ids: categoryIds };
+    if (!clear && target === 'SELF_SERVICE')
+      profile_config = selfServiceMode === 'TABLE' ? { mode: 'TABLE', table_id: tableId } : { mode: selfServiceMode };
+    if (!clear && target === 'STAFF') profile_config = { mode: 'HOST' };
+    try {
+      await apiFetch(`/api/v1/terminals/${terminal.id}/profile`, {
+        method: 'PUT',
+        ifMatch: terminal.version,
+        body: JSON.stringify({ app_target, profile_config }),
+      });
+      setOpen(false);
+      void qc.invalidateQueries({ queryKey: ['terminals'] });
+    } catch (error) {
+      onError(error);
+    }
+  }
+  return (
+    <details open={open} onToggle={(event) => setOpen((event.target as HTMLDetailsElement).open)} style={{ marginTop: '0.5rem' }}>
+      <summary>Edit purpose</summary>
+      <div className="compact">
+        <select value={target ?? ''} onChange={(event) => setTarget((event.target.value || null) as Terminal['app_target'])}>
+          <option value="">No purpose</option>
+          <option value="KITCHEN">Kitchen</option>
+          <option value="SELF_SERVICE">Self-Service</option>
+          <option value="STAFF">Staff</option>
+        </select>
+        {target === 'KITCHEN' && <>
+          <select value={kitchenScope} onChange={(event) => setKitchenScope(event.target.value as 'ALL' | 'CATEGORY')}>
+            <option value="ALL">All</option><option value="CATEGORY">Selected categories</option>
+          </select>
+          {kitchenScope === 'CATEGORY' && <select multiple value={categoryIds} onChange={(event) => setCategoryIds(Array.from(event.target.selectedOptions, (option) => option.value))}>
+            {categories.filter((category) => category.is_active).map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+          </select>}
+        </>}
+        {target === 'SELF_SERVICE' && <>
+          <select value={selfServiceMode} onChange={(event) => setSelfServiceMode(event.target.value as 'KIOSK' | 'TABLE' | 'ORDER_STATUS')}>
+            <option value="KIOSK">Kiosk</option><option value="TABLE">Table</option><option value="ORDER_STATUS">Order Status</option>
+          </select>
+          {selfServiceMode === 'TABLE' && <select value={tableId} onChange={(event) => setTableId(event.target.value)}>
+            <option value="">Select table</option>{tables.map((table) => <option key={table.id} value={table.id}>{table.name}</option>)}
+          </select>}
+        </>}
+        {target === 'STAFF' && <span>Host</span>}
+        <button type="button" onClick={() => void save()}>Save purpose</button>
+        <button type="button" onClick={() => void save(true)}>Clear purpose</button>
+      </div>
+    </details>
   );
 }
 

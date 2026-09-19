@@ -85,6 +85,39 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/terminals/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Resolve the profile for an enrolled terminal credential */
+        get: operations["getCurrentTerminalProfile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/terminals/{terminalId}/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["updateTerminalProfile"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/pin-unlock": {
         parameters: {
             query?: never;
@@ -2897,14 +2930,15 @@ export interface components {
             id: components["schemas"]["Uuid"];
             location_id: components["schemas"]["Uuid"];
             name: string;
-            device_profile: string | null;
+            /** @enum {string|null} */
+            app_target: "KITCHEN" | "SELF_SERVICE" | "STAFF" | null;
+            profile_config: components["schemas"]["TerminalProfileConfig"] | null;
             is_active: boolean;
             version: number;
         };
         EnrollTerminalRequest: {
             location_id: components["schemas"]["Uuid"];
             name: string;
-            device_profile?: string;
         };
         EnrollTerminalResponse: {
             terminal: components["schemas"]["Terminal"];
@@ -2912,6 +2946,39 @@ export interface components {
         };
         TerminalListResponse: {
             data: components["schemas"]["Terminal"][];
+        };
+        TerminalProfileConfig: {
+            /** @constant */
+            scope: "ALL";
+        } | {
+            /** @constant */
+            scope: "CATEGORY";
+            category_ids: components["schemas"]["Uuid"][];
+        } | {
+            /** @constant */
+            mode: "KIOSK";
+        } | {
+            /** @constant */
+            mode: "TABLE";
+            table_id: components["schemas"]["Uuid"];
+        } | {
+            /** @constant */
+            mode: "ORDER_STATUS";
+        } | {
+            /** @constant */
+            mode: "HOST";
+        };
+        UpdateTerminalProfileRequest: {
+            /** @enum {string|null} */
+            app_target: "KITCHEN" | "SELF_SERVICE" | "STAFF" | null;
+            profile_config: components["schemas"]["TerminalProfileConfig"] | null;
+        };
+        TerminalProfileLookupResponse: {
+            terminal_id: components["schemas"]["Uuid"];
+            location_id: components["schemas"]["Uuid"];
+            /** @enum {string|null} */
+            app_target: "KITCHEN" | "SELF_SERVICE" | "STAFF" | null;
+            profile_config: components["schemas"]["TerminalProfileConfig"] | null;
         };
         PinUnlockRequest: {
             staff_id: components["schemas"]["Uuid"];
@@ -2997,12 +3064,16 @@ export interface components {
             staff: components["schemas"]["Staff"];
             location_id: components["schemas"]["Uuid"];
             terminal_id: components["schemas"]["Uuid"];
+            organization_id: components["schemas"]["Uuid"];
             roles: {
                 id: components["schemas"]["Uuid"];
                 name: string;
                 description: string | null;
             }[];
             permissions: string[];
+            /** @enum {string|null} */
+            app_target: "KITCHEN" | "SELF_SERVICE" | "STAFF" | null;
+            profile_config: components["schemas"]["TerminalProfileConfig"] | null;
         };
         Category: {
             id: components["schemas"]["Uuid"];
@@ -4138,6 +4209,64 @@ export interface operations {
             };
             401: components["responses"]["Error"];
             403: components["responses"]["Error"];
+        };
+    };
+    getCurrentTerminalProfile: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Enrollment credential returned once by terminal enrollment. */
+                "X-Terminal-Credential": components["parameters"]["TerminalCredential"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current terminal profile */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TerminalProfileLookupResponse"];
+                };
+            };
+            401: components["responses"]["Error"];
+        };
+    };
+    updateTerminalProfile: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": string;
+            };
+            path: {
+                terminalId: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateTerminalProfileRequest"];
+            };
+        };
+        responses: {
+            /** @description Updated terminal profile */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Terminal"];
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            428: components["responses"]["Error"];
         };
     };
     pinUnlock: {

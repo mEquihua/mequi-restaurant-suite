@@ -166,6 +166,64 @@ paths:
           $ref: '#/components/responses/Error'
         '403':
           $ref: '#/components/responses/Error'
+  /api/v1/terminals/me:
+    get:
+      operationId: getCurrentTerminalProfile
+      summary: Resolve the profile for an enrolled terminal credential
+      parameters:
+      - $ref: '#/components/parameters/TerminalCredential'
+      responses:
+        '200':
+          description: Current terminal profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TerminalProfileLookupResponse'
+        '401':
+          $ref: '#/components/responses/Error'
+  /api/v1/terminals/{terminalId}/profile:
+    put:
+      operationId: updateTerminalProfile
+      x-required-permission: iam.terminals.enroll
+      security:
+      - staffSession: []
+      parameters:
+      - name: terminalId
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/Uuid'
+      - name: If-Match
+        in: header
+        required: true
+        schema:
+          type: string
+          pattern: '^"?[1-9][0-9]*"?$'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTerminalProfileRequest'
+      responses:
+        '200':
+          description: Updated terminal profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Terminal'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '428':
+          $ref: '#/components/responses/Error'
   /api/v1/auth/pin-unlock:
     post:
       operationId: pinUnlock
@@ -4839,9 +4897,10 @@ components:
       - id
       - location_id
       - name
-      - device_profile
       - is_active
       - version
+      - app_target
+      - profile_config
       properties:
         id:
           $ref: '#/components/schemas/Uuid'
@@ -4849,10 +4908,15 @@ components:
           $ref: '#/components/schemas/Uuid'
         name:
           type: string
-        device_profile:
+        app_target:
           type:
           - string
           - 'null'
+          enum: [KITCHEN, SELF_SERVICE, STAFF, null]
+        profile_config:
+          oneOf:
+          - $ref: '#/components/schemas/TerminalProfileConfig'
+          - type: 'null'
         is_active:
           type: boolean
         version:
@@ -4870,9 +4934,6 @@ components:
         name:
           type: string
           minLength: 1
-          maxLength: 120
-        device_profile:
-          type: string
           maxLength: 120
     EnrollTerminalResponse:
       type: object
@@ -4896,6 +4957,84 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Terminal'
+    TerminalProfileConfig:
+      oneOf:
+      - type: object
+        additionalProperties: false
+        required: [scope]
+        properties:
+          scope:
+            const: ALL
+      - type: object
+        additionalProperties: false
+        required: [scope, category_ids]
+        properties:
+          scope:
+            const: CATEGORY
+          category_ids:
+            type: array
+            minItems: 1
+            uniqueItems: true
+            items:
+              $ref: '#/components/schemas/Uuid'
+      - type: object
+        additionalProperties: false
+        required: [mode]
+        properties:
+          mode:
+            const: KIOSK
+      - type: object
+        additionalProperties: false
+        required: [mode, table_id]
+        properties:
+          mode:
+            const: TABLE
+          table_id:
+            $ref: '#/components/schemas/Uuid'
+      - type: object
+        additionalProperties: false
+        required: [mode]
+        properties:
+          mode:
+            const: ORDER_STATUS
+      - type: object
+        additionalProperties: false
+        required: [mode]
+        properties:
+          mode:
+            const: HOST
+    UpdateTerminalProfileRequest:
+      type: object
+      additionalProperties: false
+      required: [app_target, profile_config]
+      properties:
+        app_target:
+          type:
+          - string
+          - 'null'
+          enum: [KITCHEN, SELF_SERVICE, STAFF, null]
+        profile_config:
+          oneOf:
+          - $ref: '#/components/schemas/TerminalProfileConfig'
+          - type: 'null'
+    TerminalProfileLookupResponse:
+      type: object
+      additionalProperties: false
+      required: [terminal_id, location_id, app_target, profile_config]
+      properties:
+        terminal_id:
+          $ref: '#/components/schemas/Uuid'
+        location_id:
+          $ref: '#/components/schemas/Uuid'
+        app_target:
+          type:
+          - string
+          - 'null'
+          enum: [KITCHEN, SELF_SERVICE, STAFF, null]
+        profile_config:
+          oneOf:
+          - $ref: '#/components/schemas/TerminalProfileConfig'
+          - type: 'null'
     PinUnlockRequest:
       type: object
       additionalProperties: false
@@ -5159,14 +5298,19 @@ components:
       - staff
       - location_id
       - terminal_id
+      - organization_id
       - roles
       - permissions
+      - app_target
+      - profile_config
       properties:
         staff:
           $ref: '#/components/schemas/Staff'
         location_id:
           $ref: '#/components/schemas/Uuid'
         terminal_id:
+          $ref: '#/components/schemas/Uuid'
+        organization_id:
           $ref: '#/components/schemas/Uuid'
         roles:
           type: array
@@ -5190,6 +5334,15 @@ components:
           type: array
           items:
             type: string
+        app_target:
+          type:
+          - string
+          - 'null'
+          enum: [KITCHEN, SELF_SERVICE, STAFF, null]
+        profile_config:
+          oneOf:
+          - $ref: '#/components/schemas/TerminalProfileConfig'
+          - type: 'null'
     Category:
       type: object
       additionalProperties: false

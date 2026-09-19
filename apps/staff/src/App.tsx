@@ -1,6 +1,6 @@
 import { TimeclockWidget } from './TimeclockWidget.js';
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
-import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Navigate, Routes, Route, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { apiFetch, getSessionToken, getTerminalCredential, setTerminalCredential, setSessionToken, clearSessionToken } from './api.js';
 import { WaiterMode } from './waiter/WaiterMode.js';
@@ -109,15 +109,42 @@ function MainApp() {
   if (isLoading) return <div>Loading...</div>;
   if (!user) return <div>Error loading user profile</div>;
 
-  const typedUser = user as { permissions: { permission_name: string }[]; location_id: string };
-  const hasWaiter = typedUser.permissions.some((p: { permission_name: string }) => p.permission_name === 'orders.visits.create');
-  const hasPos = typedUser.permissions.some((p: { permission_name: string }) => p.permission_name === 'orders.orders.create');
-  const hasHost = typedUser.permissions.some((p: { permission_name: string }) => p.permission_name === 'reservations.reservations.read');
+  const typedUser = user as {
+    permissions: string[];
+    location_id: string;
+    app_target: string | null;
+    profile_config: unknown | null;
+  };
+  const hasWaiter = typedUser.permissions.includes('orders.visits.create');
+  const hasPos = typedUser.permissions.includes('orders.orders.create');
+  const hasHost = typedUser.permissions.includes('reservations.reservations.read');
   
 
   const clockWidget = <TimeclockWidget locationId={typedUser.location_id} permissions={typedUser.permissions} />;
 
   const modeCount = [hasWaiter, hasPos, hasHost].filter(Boolean).length;
+
+  const forcedHost =
+    typedUser.app_target === 'STAFF' &&
+    typeof typedUser.profile_config === 'object' &&
+    typedUser.profile_config !== null &&
+    !Array.isArray(typedUser.profile_config) &&
+    (typedUser.profile_config as { mode?: unknown }).mode === 'HOST' &&
+    Object.keys(typedUser.profile_config).length === 1;
+  if (forcedHost)
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '1rem', borderBottom: '1px solid #ccc' }}>
+          {clockWidget}
+        </div>
+        <div style={{ flex: 1, overflow: 'auto' }}>
+          <Routes>
+            <Route path="/host/*" element={<HostMode locationId={typedUser.location_id} />} />
+            <Route path="*" element={<Navigate replace to="/host" />} />
+          </Routes>
+        </div>
+      </div>
+    );
 
   
   if (modeCount > 1) {

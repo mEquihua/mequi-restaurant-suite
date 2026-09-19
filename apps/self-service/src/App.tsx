@@ -7,8 +7,10 @@ import {
 } from '@tanstack/react-query';
 import {
   BrowserRouter,
+  Navigate,
   Route,
   Routes,
+  useLocation,
   useNavigate,
   useParams,
   useSearchParams,
@@ -18,13 +20,17 @@ import {
   ApiError,
   apiFetch,
   clearGuestToken,
+  getTerminalCredential,
   setGuestToken,
+  setTerminalCredential,
+  terminalFetch,
   type Category,
   type GuestAddLinesRequest,
   type GuestSessionMintResponse,
   type Product,
   type ServiceRequestType,
 } from './api.js';
+import { resolveSelfServiceTerminalRoute, type TerminalProfileLookup } from './terminal-profile.js';
 import {
   bucketBoardOrders,
   canOfferOnlinePayment,
@@ -588,6 +594,79 @@ function StatusColumn({ title, orders }: { title: string; orders: BoardOrder[] }
     </section>
   );
 }
+
+function EnrollmentScreen() {
+  const [token, setToken] = useState('');
+  const [locationId, setLocationId] = useState('');
+  const [name, setName] = useState('');
+  const [error, setError] = useState('');
+
+  async function enroll(event: React.FormEvent) {
+    event.preventDefault();
+    try {
+      const enrolled = await terminalFetch<{
+        terminal: { id: string };
+        terminal_credential: string;
+      }>('/api/v1/terminals/enroll', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ location_id: locationId, name }),
+      });
+      setTerminalCredential({ terminal_id: enrolled.terminal.id, secret: enrolled.terminal_credential });
+      window.location.replace('/');
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'Terminal enrollment failed.');
+    }
+  }
+
+  return (
+    <main className="centered">
+      <h1>Enroll Self-Service terminal</h1>
+      <p>Provision this browser once with an authorized staff session.</p>
+      {error && <p className="error">{error}</p>}
+      <form onSubmit={enroll} style={{ display: 'grid', gap: '0.75rem', width: 'min(100%, 28rem)' }}>
+        <input required placeholder="Admin session token" value={token} onChange={(event) => setToken(event.target.value)} />
+        <input required placeholder="Location ID" value={locationId} onChange={(event) => setLocationId(event.target.value)} />
+        <input required placeholder="Terminal name" value={name} onChange={(event) => setName(event.target.value)} />
+        <button className="primary">Enroll terminal</button>
+      </form>
+    </main>
+  );
+}
+
+function TerminalUnavailable({ mismatch }: { mismatch: boolean }) {
+  return (
+    <main className="centered">
+      <h1>{mismatch ? 'Terminal configuration mismatch' : 'Terminal unavailable'}</h1>
+      <p>
+        {mismatch
+          ? 'This terminal is not configured for a Self-Service kiosk, table, or order-status display.'
+          : 'This browser has an invalid or inactive terminal credential. Ask an administrator to re-enroll it.'}
+      </p>
+    </main>
+  );
+}
+
+function TerminalBootstrap({ children }: { children: React.ReactNode }) {
+  const location = useLocation();
+  const credential = getTerminalCredential();
+  const profile = useQuery({
+    queryKey: ['terminal-profile', credential?.terminal_id],
+    enabled: Boolean(credential) && location.pathname !== '/enroll-terminal',
+    queryFn: () =>
+      terminalFetch<TerminalProfileLookup>('/api/v1/terminals/me', {
+        headers: { 'x-terminal-credential': credential!.secret },
+      }),
+    retry: false,
+  });
+  if (!credential || location.pathname === '/enroll-terminal') return <>{children}</>;
+  if (profile.isPending) return <main className="centered"><h1>Loading terminal…</h1></main>;
+  if (profile.isError)
+    return <TerminalUnavailable mismatch={!(profile.error instanceof ApiError && profile.error.status === 401)} />;
+  const destination = profile.data && resolveSelfServiceTerminalRoute(profile.data);
+  return destination ? <Navigate replace to={destination} /> : <TerminalUnavailable mismatch />;
+}
+
 function NotFound() {
   return (
     <main className="centered">
@@ -614,13 +693,16 @@ export function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <Routes>
-          <Route path="/:locationId/table/:tableId" element={<TableRoute />} />
-          <Route path="/:locationId/kiosk" element={<KioskEntry />} />
-          <Route path="/:locationId/kiosk/order" element={<KioskOrderRoute />} />
-          <Route path="/:locationId/status-board" element={<StatusBoard />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <TerminalBootstrap>
+          <Routes>
+            <Route path="/enroll-terminal" element={<EnrollmentScreen />} />
+            <Route path="/:locationId/table/:tableId" element={<TableRoute />} />
+            <Route path="/:locationId/kiosk" element={<KioskEntry />} />
+            <Route path="/:locationId/kiosk/order" element={<KioskOrderRoute />} />
+            <Route path="/:locationId/status-board" element={<StatusBoard />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </TerminalBootstrap>
       </BrowserRouter>
     </QueryClientProvider>
   );
@@ -709,4 +791,3 @@ function LoyaltyWidget({ locationId, visitId }: { locationId: string; visitId: s
     </div>
   );
 }
-

@@ -4,9 +4,9 @@ import type { components } from '@restaurant-suite/contracts';
 
 type TimeclockShift = components['schemas']['TimeclockShift'];
 
-export function TimeclockWidget({ locationId, permissions }: { locationId: string, permissions: { permission_name: string }[] }) {
+export function TimeclockWidget({ locationId, permissions }: { locationId: string, permissions: string[] }) {
   const qc = useQueryClient();
-  const canClock = permissions.some(p => p.permission_name === 'timeclock.shifts.clock');
+  const canClock = permissions.includes('timeclock.shifts.clock');
 
   const { data: shiftsData, isLoading } = useQuery({
     queryKey: ['my-shifts'],

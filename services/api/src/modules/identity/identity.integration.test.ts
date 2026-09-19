@@ -177,6 +177,140 @@ describeIntegration('identity API against PostgreSQL', () => {
     });
     expect(me.statusCode).toBe(200);
     expect(me.json().staff.id).toBe(ownerId);
+    expect(me.json().app_target).toBeNull();
+    expect(me.json().profile_config).toBeNull();
+  });
+
+  it('resolves terminal profiles and validates profile assignment', async () => {
+    const terminalId = ownerTerminalCredential.split('.')[1]!;
+    const organization = await db
+      .selectFrom('organizations')
+      .select('id')
+      .executeTakeFirstOrThrow();
+    const [category] = await db
+      .insertInto('categories')
+      .values({ organization_id: organization.id, name: 'Grill' })
+      .returning('id')
+      .execute();
+    const nonExistentCategoryId = crypto.randomUUID();
+    const [areaA, areaB] = await db
+      .insertInto('areas')
+      .values([
+        { location_id: locationA, name: 'Dining room A' },
+        { location_id: locationB, name: 'Dining room B' },
+      ])
+      .returning('id')
+      .execute();
+    const [tableA, tableB] = await db
+      .insertInto('tables')
+      .values([
+        { location_id: locationA, area_id: areaA.id, name: 'A1', max_capacity: 4 },
+        { location_id: locationB, area_id: areaB.id, name: 'B1', max_capacity: 4 },
+      ])
+      .returning('id')
+      .execute();
+
+    const lookup = await app.inject({
+      method: 'GET',
+      url: '/api/v1/terminals/me',
+      headers: { 'x-terminal-credential': ownerTerminalCredential },
+    });
+    expect(lookup.statusCode).toBe(200);
+    expect(lookup.json()).toMatchObject({ terminal_id: terminalId, location_id: locationA, app_target: null, profile_config: null });
+
+    let version = 1;
+    async function update(app_target: string | null, profile_config: unknown, expected = version) {
+      const response = await app.inject({
+        method: 'PUT',
+        url: `/api/v1/terminals/${terminalId}/profile`,
+        headers: { authorization: `Bearer ${ownerSession}`, 'if-match': String(expected) },
+        payload: { app_target, profile_config },
+      });
+      if (response.statusCode === 200) version = response.json().version;
+      return response;
+    }
+
+    expect((await update('KITCHEN', { scope: 'ALL' })).statusCode).toBe(200);
+    expect((await update('KITCHEN', { scope: 'CATEGORY', category_ids: [category.id] })).statusCode).toBe(200);
+    expect((await update('SELF_SERVICE', { mode: 'KIOSK' })).statusCode).toBe(200);
+    expect((await update('SELF_SERVICE', { mode: 'TABLE', table_id: tableA.id })).statusCode).toBe(200);
+    expect((await update('SELF_SERVICE', { mode: 'ORDER_STATUS' })).statusCode).toBe(200);
+    expect((await update('STAFF', { mode: 'HOST' })).statusCode).toBe(200);
+    expect((await update(null, null)).statusCode).toBe(200);
+
+    const configured = await update('KITCHEN', { scope: 'CATEGORY', category_ids: [category.id] });
+    expect(configured.statusCode).toBe(200);
+    const me = await app.inject({ method: 'GET', url: '/api/v1/auth/me', headers: { authorization: `Bearer ${ownerSession}` } });
+    expect(me.json()).toMatchObject({ app_target: 'KITCHEN', profile_config: { scope: 'CATEGORY', category_ids: [category.id] } });
+
+    const invalidCategory = await update('KITCHEN', { scope: 'CATEGORY', category_ids: [nonExistentCategoryId] });
+    expect(invalidCategory.statusCode).toBe(400);
+    expect(invalidCategory.json().error.code).toBe('INVALID_CATEGORY');
+    const invalidTable = await update('SELF_SERVICE', { mode: 'TABLE', table_id: tableB.id });
+    expect(invalidTable.statusCode).toBe(400);
+    expect(invalidTable.json().error.code).toBe('INVALID_TABLE');
+    const malformed = await update('KITCHEN', { scope: 'ALL', category_ids: [category.id] });
+    expect(malformed.statusCode).toBe(400);
+    expect(malformed.json().error.code).toBe('VALIDATION_ERROR');
+
+    const missingMatch = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/terminals/${terminalId}/profile`,
+      headers: { authorization: `Bearer ${ownerSession}` },
+      payload: { app_target: null, profile_config: null },
+    });
+    expect(missingMatch.statusCode).toBe(428);
+    const invalidMatch = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/terminals/${terminalId}/profile`,
+      headers: { authorization: `Bearer ${ownerSession}`, 'if-match': 'zero' },
+      payload: { app_target: null, profile_config: null },
+    });
+    expect(invalidMatch.statusCode).toBe(400);
+    expect(invalidMatch.json().error.code).toBe('INVALID_IF_MATCH');
+    const stale = await update(null, null, 1);
+    expect(stale.statusCode).toBe(409);
+    expect(stale.json().error.code).toBe('OPTIMISTIC_CONCURRENCY_CONFLICT');
+    expect(stale.json().error.details.current_state.id).toBe(terminalId);
+
+    for (const headers of [
+      {},
+      { 'x-terminal-credential': 'invalid' },
+      { 'x-terminal-credential': createTerminalCredential(locationA, crypto.randomUUID()) },
+      { 'x-terminal-credential': createTerminalCredential(locationB, terminalId) },
+    ]) {
+      const response = await app.inject({ method: 'GET', url: '/api/v1/terminals/me', headers });
+      expect(response.statusCode).toBe(401);
+      expect(response.json().error.code).toBe('TERMINAL_UNAUTHENTICATED');
+    }
+    const mismatchedSecret = await app.inject({
+      method: 'GET',
+      url: '/api/v1/terminals/me',
+      headers: { 'x-terminal-credential': createTerminalCredential(locationA, terminalId) },
+    });
+    expect(mismatchedSecret.statusCode).toBe(401);
+    const inactiveId = crypto.randomUUID();
+    const inactiveCredential = createTerminalCredential(locationA, inactiveId);
+    await db.insertInto('terminals').values({ id: inactiveId, location_id: locationA, name: 'Inactive', is_active: false, credential_hash: hashSecret(inactiveCredential) }).execute();
+    const inactive = await app.inject({ method: 'GET', url: '/api/v1/terminals/me', headers: { 'x-terminal-credential': inactiveCredential } });
+    expect(inactive.statusCode).toBe(401);
+
+    const readRole = await db.insertInto('roles').values({ organization_id: organization.id, name: 'Terminal reader' }).returning('id').executeTakeFirstOrThrow();
+    await db.insertInto('role_permissions').values({ role_id: readRole.id, permission_name: 'iam.terminals.read', scope: 'location' }).execute();
+    const reader = await db.insertInto('staff').values({ organization_id: organization.id, first_name: 'Read', last_name: 'Only', pin_hash: await hashPin('1357') }).returning('id').executeTakeFirstOrThrow();
+    await db.insertInto('staff_roles').values({ staff_id: reader.id, role_id: readRole.id, location_id: locationA }).execute();
+    const readerTerminalId = crypto.randomUUID();
+    const readerCredential = createTerminalCredential(locationA, readerTerminalId);
+    await db.insertInto('terminals').values({ id: readerTerminalId, location_id: locationA, name: 'Reader', credential_hash: hashSecret(readerCredential) }).execute();
+    const unlock = await app.inject({ method: 'POST', url: '/api/v1/auth/pin-unlock', headers: { 'x-terminal-credential': readerCredential }, payload: { staff_id: reader.id, pin: '1357' } });
+    expect(unlock.statusCode).toBe(201);
+    const forbidden = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/terminals/${terminalId}/profile`,
+      headers: { authorization: `Bearer ${unlock.json().token}`, 'if-match': String(version) },
+      payload: { app_target: null, profile_config: null },
+    });
+    expect(forbidden.statusCode).toBe(403);
   });
 
   it('backs off failed PINs per terminal and presented credential', async () => {

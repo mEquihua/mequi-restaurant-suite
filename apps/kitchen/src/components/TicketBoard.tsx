@@ -21,6 +21,7 @@ interface OrderLine {
 
 interface Product {
   id: string;
+  category_id: string | null;
   name: string;
   allergens: string[];
   tags: string[];
@@ -37,7 +38,13 @@ const STATION_OPTIONS = [
   { id: 'dessert', label: 'Dessert', tags: ['dessert'] },
 ];
 
-export function TicketBoard({ locationId }: { locationId: string }) {
+export function TicketBoard({
+  locationId,
+  terminalProfile,
+}: {
+  locationId: string;
+  terminalProfile: { app_target: string | null; profile_config: unknown | null };
+}) {
   const isConnected = useRealtime(locationId);
   const queryClient = useQueryClient();
 
@@ -72,9 +79,24 @@ export function TicketBoard({ locationId }: { locationId: string }) {
   }
 
   const currentStation = STATION_OPTIONS.find(s => s.id === stationId) || STATION_OPTIONS[0];
+  const categoryIds =
+    terminalProfile.app_target === 'KITCHEN' &&
+    typeof terminalProfile.profile_config === 'object' &&
+    terminalProfile.profile_config !== null &&
+    !Array.isArray(terminalProfile.profile_config) &&
+    (terminalProfile.profile_config as { scope?: unknown }).scope === 'CATEGORY' &&
+    Array.isArray((terminalProfile.profile_config as { category_ids?: unknown }).category_ids)
+      ? new Set(
+          (terminalProfile.profile_config as { category_ids: unknown[] }).category_ids.filter(
+            (id): id is string => typeof id === 'string',
+          ),
+        )
+      : undefined;
+  const hasCategoryProfile = categoryIds !== undefined;
 
   // Filtering lines based on station tags
   const filteredLines = (linesData?.data || []).filter(line => {
+    if (categoryIds) return categoryIds.has(productsById.get(line.product_id)?.category_id ?? '');
     if (currentStation.id === 'all') return true;
     const p = productsById.get(line.product_id);
     if (!p) return false;
@@ -158,15 +180,17 @@ export function TicketBoard({ locationId }: { locationId: string }) {
         <h1 style={{ margin: 0, fontSize: '1.5rem' }}>Kitchen Display</h1>
         {!isConnected && <div style={{ background: '#d32f2f', color: 'white', padding: '0.5rem 1rem', borderRadius: '4px', fontWeight: 'bold' }}>OFFLINE / STALE DATA</div>}
         
-        <select 
-          value={stationId} 
-          onChange={e => setStationId(e.target.value)}
-          style={{ padding: '0.5rem', fontSize: '1.25rem' }}
-        >
-          {STATION_OPTIONS.map(s => (
-            <option key={s.id} value={s.id}>{s.label}</option>
-          ))}
-        </select>
+        {!hasCategoryProfile && (
+          <select
+            value={stationId}
+            onChange={e => setStationId(e.target.value)}
+            style={{ padding: '0.5rem', fontSize: '1.25rem' }}
+          >
+            {STATION_OPTIONS.map(s => (
+              <option key={s.id} value={s.id}>{s.label}</option>
+            ))}
+          </select>
+        )}
       </header>
 
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>

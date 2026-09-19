@@ -2,7 +2,6 @@ import { Kysely, PostgresDialect, sql, type Generated, type Transaction } from '
 import pg from 'pg';
 import type { FastifyInstance } from 'fastify';
 
-
 export interface CustomerTable {
   id: Generated<string>;
   organization_id: string;
@@ -55,7 +54,6 @@ export interface OrderFulfillmentTable {
   created_at: Generated<Date>;
   updated_at: Generated<Date>;
 }
-
 
 export interface TimeclockShiftTable {
   id: Generated<string>;
@@ -129,6 +127,7 @@ export interface Database {
   cash_drawer_movements: CashDrawerMovementTable;
   refunds: RefundTable;
   outbox_events: OutboxEventTable;
+  webhook_subscriptions: WebhookSubscriptionTable;
   audit_events: AuditEventTable;
   command_idempotency: CommandIdempotencyTable;
   ingredients: IngredientTable;
@@ -145,7 +144,6 @@ export interface Database {
   loyalty_redemptions: LoyaltyRedemptionTable;
   promotions: PromotionTable;
   order_line_promotions: OrderLinePromotionTable;
-
 }
 
 export type TableName = keyof Database;
@@ -533,7 +531,21 @@ export interface OutboxEventTable {
   created_at: Generated<Date>;
   updated_at: Generated<Date>;
   dispatched_at: Date | null;
+  webhook_dispatched_at: Date | null;
 }
+
+export interface WebhookSubscriptionTable {
+  id: Generated<string>;
+  organization_id: string;
+  url: string;
+  event_types: string[];
+  secret: string;
+  is_active: Generated<boolean>;
+  version: Generated<number>;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
 export interface AuditEventTable {
   id: Generated<string>;
   location_id: string;
@@ -634,7 +646,6 @@ export interface ReservationSettingsTable {
   created_at: Generated<Date>;
   updated_at: Generated<Date>;
 }
-
 
 export interface LoyaltySettingsTable {
   id: Generated<string>;

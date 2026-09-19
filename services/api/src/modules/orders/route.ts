@@ -218,23 +218,27 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
     requireLocation(actor, locationId);
     return locationId;
   };
-  const outbox = async (actor: Actor, aggregateId: string, eventType: string, payload: unknown) => {
-    const line = await actor.trx
-      .selectFrom('order_lines as ol')
-      .innerJoin('orders as o', 'o.id', 'ol.order_id')
-      .select('o.visit_id')
-      .where('ol.id', '=', aggregateId)
-      .executeTakeFirst();
+  const outbox = async (actor: Actor, aggregateType: string, aggregateId: string, eventType: string, payload: unknown) => {
+    let visitId: string | undefined = undefined;
+    if (aggregateType === 'order_line') {
+      const line = await actor.trx
+        .selectFrom('order_lines as ol')
+        .innerJoin('orders as o', 'o.id', 'ol.order_id')
+        .select('o.visit_id')
+        .where('ol.id', '=', aggregateId)
+        .executeTakeFirst();
+      visitId = line?.visit_id;
+    }
     return actor.trx
       .insertInto('outbox_events')
       .values({
         location_id: actor.locationId,
-        aggregate_type: 'order_line',
+        aggregate_type: aggregateType,
         aggregate_id: aggregateId,
         event_type: eventType,
         payload: {
           ...(payload as Record<string, unknown>),
-          ...(line ? { visit_id: line.visit_id } : {}),
+          ...(visitId ? { visit_id: visitId } : {}),
         } as never,
         schema_version: 1,
       })
@@ -460,10 +464,16 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
         .execute();
       await updateAccountTotal(actor, before.account_id, -lineAmount(before));
     }
-    await outbox(actor, lineId, `order_line.${to.toLowerCase()}`, {
+    await outbox(actor, 'order_line', lineId, `order_line.${to.toLowerCase()}`, {
       line_id: lineId,
       order_id: before.order_id,
       status: to,
+      ...(to === 'VOIDED' ? {
+        order_line_id: lineId,
+        product_id: before.product_id,
+        reason: reason ?? 'Void',
+        authorized_by: authorizedBy ?? actor.staffId,
+      } : {}),
     });
     if (override)
       await audit(
@@ -927,7 +937,7 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
                  .where('location_id', '=', actor.locationId)
                  .execute();
             }
-            await outbox(actor, line.id, 'order_line.sent', {
+            await outbox(actor, 'order_line', line.id, 'order_line.sent', {
               line_id: line.id,
               order_id: orderId,
               status: 'SENT',
@@ -1129,7 +1139,7 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
         .execute();
       await updateAccountTotal(actor, line.account_id, -lineAmount(line));
       if (['SENT', 'PREPARING', 'READY', 'FULFILLED'].includes(line.status))
-        await outbox(actor, line.id, 'order_line.cancelled', {
+        await outbox(actor, 'order_line', line.id, 'order_line.cancelled', {
           line_id: line.id,
           status,
           order_id: orderId,
@@ -1144,6 +1154,13 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
       .returningAll()
       .executeTakeFirst();
     if (!updated) throw conflict(order, order);
+    await outbox(actor, 'order', orderId, 'order.cancelled', {
+      order_id: orderId,
+      visit_id: order.visit_id,
+      location_id: actor.locationId,
+      reason: body.reason,
+      authorized_by: body.authorized_by ?? actor.staffId,
+    });
     if (override)
       await audit(
         actor,
@@ -1602,6 +1619,23 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
               .returningAll()
               .executeTakeFirst();
             if (!updated) throw conflict(account, account);
+            await outbox(actor, 'payment', payment.id, 'payment.received', {
+              payment_id: payment.id,
+              account_id: accountId,
+              method: body.method,
+              amount: body.amount,
+              tip_amount: body.tip_amount ?? 0,
+              reference_code: body.reference_code ?? null,
+            });
+            if (status === 'PAID') {
+              await outbox(actor, 'account', accountId, 'account.paid', {
+                account_id: accountId,
+                total: account.total,
+                paid_amount: paid,
+                visit_id: account.visit_id,
+                location_id: actor.locationId,
+              });
+            }
             return { payment, account: updated };
           },
         );
@@ -1679,6 +1713,13 @@ export const ordersRoute: FastifyPluginAsync<OrdersRouteOptions> = async (app, o
             .where('id', '=', account.id)
             .execute();
         }
+        await outbox(actor, 'refund', refund.id, 'payment.refunded', {
+          refund_id: refund.id,
+          payment_id: payment.id,
+          amount,
+          reason: body.reason,
+          authorized_by: actor.staffId,
+        });
         await audit(
           actor,
           request,

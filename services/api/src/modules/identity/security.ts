@@ -103,6 +103,7 @@ const OWNER_AND_MANAGER_PERMISSIONS: readonly string[] = [
   'kitchen.tickets.read', 'kitchen.tickets.update_status',
   'reports.sales.read', 'reports.audit.read',
   'online_ordering.settings.read', 'online_ordering.settings.write',
+  'integrations.webhooks.read', 'integrations.webhooks.write',
 ];
 
 export const SYSTEM_ROLE_TEMPLATES: ReadonlyArray<{ name: string; description: string; permissions: readonly string[] }> = [

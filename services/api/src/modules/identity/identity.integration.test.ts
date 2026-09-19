@@ -71,6 +71,7 @@ describeIntegration('identity API against PostgreSQL', () => {
     await db.deleteFrom('staff').execute();
     await db.deleteFrom('roles').execute();
     await db.deleteFrom('customer_sessions').execute();    await db.deleteFrom('customers').execute();    await db.deleteFrom('delivery_zones').execute();    await db.deleteFrom('scheduled_order_settings').execute();    await db.deleteFrom('locations').execute();
+    await db.deleteFrom('webhook_subscriptions').execute();
     await db.deleteFrom('organizations').execute();
 
     const organization = await db

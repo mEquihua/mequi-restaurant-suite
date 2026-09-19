@@ -3407,6 +3407,21 @@ export interface components {
         } & {
             [key: string]: unknown;
         };
+        WebhookSubscription: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            organization_id: string;
+            /** Format: uri */
+            url: string;
+            event_types: string[];
+            is_active: boolean;
+            version: number;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
         Account: {
             id: components["schemas"]["Uuid"];
             location_id: components["schemas"]["Uuid"];

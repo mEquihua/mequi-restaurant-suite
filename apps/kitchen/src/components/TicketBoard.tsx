@@ -51,10 +51,21 @@ export function TicketBoard({
   const [stationId, setStationId] = useState<string>(() => {
     return localStorage.getItem('kitchen_station') || 'all';
   });
+  
+  const [printingTicket, setPrintingTicket] = useState<{tableId: string, lines: OrderLine[]} | null>(null);
 
   useEffect(() => {
     localStorage.setItem('kitchen_station', stationId);
   }, [stationId]);
+  
+  useEffect(() => {
+    if (printingTicket) {
+      setTimeout(() => {
+        window.print();
+        setPrintingTicket(null);
+      }, 100);
+    }
+  }, [printingTicket]);
 
   const { data: linesData, error: linesError, isError: isLinesError } = useQuery<{ data: OrderLine[] }>({
     queryKey: ['order-lines', locationId],
@@ -209,6 +220,7 @@ export function TicketBoard({
                     markUnavailable.mutate(productId);
                   }
                 }}
+                setPrintingTicket={setPrintingTicket}
               />
             );
           })}
@@ -229,6 +241,29 @@ export function TicketBoard({
           </ul>
         </aside>
       </div>
+
+      {printingTicket && (
+        <div className="print-template" style={{ display: 'none' }}>
+          <h2 style={{ margin: '0 0 10px 0', fontSize: '1.5rem', textAlign: 'center' }}>
+            {printingTicket.tableId === 'Takeout/Other' ? 'Takeout' : `Table ${printingTicket.tableId.slice(0,4)}`}
+          </h2>
+          <div style={{ borderTop: '1px solid black', margin: '10px 0' }}></div>
+          {printingTicket.lines.map(line => (
+            <div key={line.id} style={{ marginBottom: '5px', fontSize: '1.2rem' }}>
+              <strong>{line.quantity} ×</strong> {productsById.get(line.product_id)?.name || 'Unknown'}
+              {line.modifiers && line.modifiers.map(m => (
+                <div key={m.modifier_id} style={{ marginLeft: '1rem', fontSize: '1rem' }}>
+                  + {modifierNamesById.get(m.modifier_id) || 'Unknown'}
+                </div>
+              ))}
+            </div>
+          ))}
+          <div style={{ borderTop: '1px solid black', margin: '10px 0' }}></div>
+          <div style={{ textAlign: 'center', fontSize: '0.8rem' }}>
+            {new Date().toLocaleString()}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -243,19 +278,19 @@ function useCurrentTime() {
 }
 
 function TicketCard({
-
   lines,
   productsById,
   modifierNamesById,
   onUpdateStatus,
-  onMarkUnavailable
+  onMarkUnavailable,
+  setPrintingTicket,
 }: {
-
-  lines: OrderLine[],
-  productsById: Map<string, Product>,
-  modifierNamesById: Map<string, string>,
-  onUpdateStatus: (lineId: string, status: string, version: number) => void,
-  onMarkUnavailable: (productId: string) => void
+  lines: OrderLine[];
+  productsById: Map<string, { name: string; allergens: string[] | null }>;
+  modifierNamesById: Map<string, string>;
+  onUpdateStatus: (lineId: string, status: string, version: number) => void;
+  onMarkUnavailable: (productId: string) => void;
+  setPrintingTicket: (ticket: { tableId: string, lines: OrderLine[] } | null) => void;
 }) {
   const tableId = lines[0]?.table_id || 'Takeout/Other';
   // updated_at reflects the last status transition; for a line still sitting
@@ -286,9 +321,12 @@ function TicketCard({
       <div style={{ padding: '1rem', borderBottom: '1px solid #ccc', background: isReady ? '#e8f5e9' : 'transparent' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h2 style={{ margin: 0, fontSize: '2rem' }}>{tableId === 'Takeout/Other' ? 'Takeout' : `Table ${tableId.slice(0,4)}`}</h2>
-          <span style={{ fontSize: '1.5rem', fontWeight: 'bold', color: timeColor }}>
-            {elapsedMinutes}m {elapsedMinutes >= 15 ? '(LATE)' : ''}
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <span style={{ fontSize: '1.5rem', fontWeight: 'bold', color: timeColor }}>
+              {elapsedMinutes}m {elapsedMinutes >= 15 ? '(LATE)' : ''}
+            </span>
+            <button onClick={() => setPrintingTicket({ tableId, lines })} style={{ padding: '0.5rem', background: '#e0e0e0', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Print</button>
+          </div>
         </div>
         {isHeld && <div style={{ color: '#666', fontWeight: 'bold', marginTop: '0.5rem' }}>HELD</div>}
       </div>
@@ -311,7 +349,7 @@ function TicketCard({
               
               {hasAllergens && (
                 <div style={{ color: '#d32f2f', fontWeight: 'bold', marginTop: '0.25rem' }}>
-                  ALLERGY: {product.allergens.join(', ')}
+                  ALLERGY: {(product?.allergens || []).join(', ')}
                 </div>
               )}
               

@@ -81,6 +81,7 @@ describeIntegration('reports API against PostgreSQL', () => {
       'delivery_zones',
       'scheduled_order_settings',
       'locations',
+      'webhook_subscriptions',
       'organizations'] as const)
       await db.deleteFrom(table).execute();
     const org = (await db.insertInto('organizations').values({ name: 'Reports Integration' }).returning('id').executeTakeFirstOrThrow()).id;

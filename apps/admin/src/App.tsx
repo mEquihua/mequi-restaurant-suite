@@ -21,6 +21,7 @@ import {
 import { useRealtime } from './realtime.js';
 import { Loyalty } from './Loyalty.js';
 import { Promotions } from './Promotions.js';
+import { Webhooks } from './Webhooks.js';
 
 type Me = {
   staff: { first_name: string; last_name: string };
@@ -100,6 +101,7 @@ export const navForPermissions = (permissions: string[]) =>
 
     ['Loyalty', '/loyalty', 'loyalty.settings.read'],
     ['Promotions', '/promotions', 'promotions.promotions.read'],
+    ['Integrations & Webhooks', '/webhooks', 'integrations.webhooks.read'],
     ['Employee Clocking', '/timeclock', 'timeclock.shifts.read'],
     ['Module Center', '/modules', 'module_center.modules.read'],
     ...(permissions.includes('iam.staff.read') || permissions.includes('iam.terminals.read')
@@ -351,6 +353,7 @@ function Workspace({ me }: { me: Me }) {
 
           <Route path="/loyalty" element={<Loyalty permissions={me.permissions} />} />
           <Route path="/promotions" element={<Promotions permissions={me.permissions} />} />
+          <Route path="/webhooks" element={<Webhooks permissions={me.permissions} organizationId={me.organization_id} />} />
           <Route path="/timeclock" element={<Timeclock permissions={me.permissions} locationId={me.location_id} />} />
           <Route path="/staff" element={<People permissions={me.permissions} locationId={me.location_id} />} />
           <Route path="/reports" element={<Reports permissions={me.permissions} organizationId={me.organization_id} reportLocations={reportLocations} />} />

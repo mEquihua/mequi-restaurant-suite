@@ -15,6 +15,7 @@ import { reservationsModule } from './modules/reservations/index.js';
 import { loyaltyModule } from './modules/loyalty/index.js';
 import { timeclockModule } from './modules/timeclock/index.js';
 import { promotionsModule } from './modules/promotions/index.js';
+import { integrationsModule } from './modules/integrations/index.js';
 import { realtimeModule } from './modules/realtime/index.js';
 import { pingModule } from './modules/ping/index.js';
 
@@ -73,6 +74,7 @@ export function createApp(options: AppOptions = {}): FastifyInstance {
   app.register(loyaltyModule, {});
   app.register(timeclockModule, {});
   app.register(promotionsModule, {});
+  app.register(integrationsModule, {});
   app.register(realtimeModule);
 
   return app;

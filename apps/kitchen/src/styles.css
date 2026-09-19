@@ -9,3 +9,19 @@ button:focus-visible {
   outline: 3px solid #2563eb;
   outline-offset: 2px;
 }
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print-template, .print-template * {
+    visibility: visible;
+  }
+  .print-template {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 80mm;
+    display: block !important;
+  }
+}

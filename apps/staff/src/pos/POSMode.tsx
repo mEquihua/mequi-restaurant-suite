@@ -12,6 +12,7 @@ type OrderLine = components['schemas']['OrderLine'];
 
 export function POSMode({ locationId }: { locationId: string }) {
   const [cart, setCart] = useState<{ product: Product; quantity: number }[]>([]);
+  const [lastOrder, setLastOrder] = useState<{ cart: { product: Product; quantity: number }[], total: number } | null>(null);
   const [checkoutState, setCheckoutState] = useState<'shopping' | 'checking_out' | 'success'>('shopping');
   const [error, setError] = useState<string | null>(null);
 
@@ -55,7 +56,7 @@ export function POSMode({ locationId }: { locationId: string }) {
       const accountVersion = account.version;
 
       // 4. Add lines
-      const addLinesRes = await apiFetch<{ order: Order; lines: OrderLine[] }>(`/api/v1/locations/${locationId}/orders/${order.id}/lines`, {
+      const addLinesRes = await apiFetch<{ lines: OrderLine[], order: Order }>(`/api/v1/locations/${locationId}/orders/${order.id}/lines`, {
         method: 'POST', headers: { 'If-Match': `"${orderVersion}"` },
         body: JSON.stringify({
           lines: cart.map(item => ({ product_id: item.product.id, quantity: item.quantity, account_id: account.id }))
@@ -82,6 +83,7 @@ export function POSMode({ locationId }: { locationId: string }) {
         method: 'POST', headers: { 'If-Match': `"${visitVersion}"` }, body: JSON.stringify({})
       });
 
+      setLastOrder({ cart, total: currentAccount.total });
       setCheckoutState('success');
       setCart([]);
     } catch (e) {
@@ -94,7 +96,28 @@ export function POSMode({ locationId }: { locationId: string }) {
     return (
       <div style={{ padding: '2rem' }}>
         <h2>Order Complete!</h2>
-        <button onClick={() => setCheckoutState('shopping')}>New Order</button>
+        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
+          <button onClick={() => setCheckoutState('shopping')}>New Order</button>
+          <button onClick={() => window.print()}>Print Receipt</button>
+        </div>
+        <div className="print-template" style={{ display: 'none' }}>
+          <h2 style={{ margin: '0 0 10px 0', fontSize: '1.5rem', textAlign: 'center' }}>Receipt</h2>
+          <div style={{ borderTop: '1px solid black', margin: '10px 0' }}></div>
+          {lastOrder?.cart.map((item, idx) => (
+            <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
+              <span>{item.quantity}x {item.product.name}</span>
+            </div>
+          ))}
+          <div style={{ borderTop: '1px solid black', margin: '10px 0' }}></div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold' }}>
+            <span>Total</span>
+            <span>${((lastOrder?.total || 0) / 100).toFixed(2)}</span>
+          </div>
+          <div style={{ borderTop: '1px solid black', margin: '10px 0' }}></div>
+          <div style={{ textAlign: 'center', fontSize: '0.8rem' }}>
+            {new Date().toLocaleString()}
+          </div>
+        </div>
       </div>
     );
   }

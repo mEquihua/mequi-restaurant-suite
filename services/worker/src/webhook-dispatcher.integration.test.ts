@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { Kysely, PostgresDialect, type Generated } from 'kysely';
 import pg from 'pg';
@@ -68,7 +69,6 @@ describeIntegration('WebhookDispatcher', () => {
   afterAll(async () => {
     await dispatcher.stop();
     await db.destroy();
-    await pool.end();
   });
 
   it('processes a batch and sends HTTP requests', async () => {
@@ -89,7 +89,7 @@ describeIntegration('WebhookDispatcher', () => {
       .values({
         location_id: locationId,
         aggregate_type: 'account',
-        aggregate_id: 'acc1',
+        aggregate_id: crypto.randomUUID(),
         event_type: 'account.paid',
         payload: { total: 100 } as never,
         schema_version: 1,

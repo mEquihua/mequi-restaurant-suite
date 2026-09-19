@@ -1227,6 +1227,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/locations/{locationId}/reports/sales/by-channel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["reportSalesByChannel"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/locations/{locationId}/reports/covers/by-day": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["reportCoversByDay"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/locations/{locationId}/reports/labor/hours": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["reportLaborHours"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/sections/{id}/tables": {
         parameters: {
             query?: never;
@@ -2297,6 +2345,54 @@ export interface paths {
             cookie?: never;
         };
         get: operations["reportOrgTips"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organizations/{orgId}/reports/sales/by-channel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["reportOrgSalesByChannel"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organizations/{orgId}/reports/covers/by-day": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["reportOrgCoversByDay"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organizations/{orgId}/reports/labor/hours": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["reportOrgLaborHours"];
         put?: never;
         post?: never;
         delete?: never;
@@ -6318,6 +6414,93 @@ export interface operations {
             403: components["responses"]["Error"];
         };
     };
+    reportSalesByChannel: {
+        parameters: {
+            query: {
+                from: components["parameters"]["ReportFrom"];
+                to: components["parameters"]["ReportTo"];
+                format?: components["parameters"]["ReportFormat"];
+            };
+            header?: never;
+            path: {
+                locationId: components["parameters"]["ReportLocationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Report data or CSV export */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportResponse"];
+                    "text/csv": string;
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+        };
+    };
+    reportCoversByDay: {
+        parameters: {
+            query: {
+                from: components["parameters"]["ReportFrom"];
+                to: components["parameters"]["ReportTo"];
+                format?: components["parameters"]["ReportFormat"];
+            };
+            header?: never;
+            path: {
+                locationId: components["parameters"]["ReportLocationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Report data or CSV export */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportResponse"];
+                    "text/csv": string;
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+        };
+    };
+    reportLaborHours: {
+        parameters: {
+            query: {
+                from: components["parameters"]["ReportFrom"];
+                to: components["parameters"]["ReportTo"];
+                format?: components["parameters"]["ReportFormat"];
+            };
+            header?: never;
+            path: {
+                locationId: components["parameters"]["ReportLocationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Report data or CSV export */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportResponse"];
+                    "text/csv": string;
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+        };
+    };
     replaceSectionTables: {
         parameters: {
             query?: never;
@@ -7319,6 +7502,99 @@ export interface operations {
                 };
                 content: {
                     "application/json": Record<string, never>;
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+        };
+    };
+    reportOrgSalesByChannel: {
+        parameters: {
+            query: {
+                from: components["parameters"]["ReportFrom"];
+                to: components["parameters"]["ReportTo"];
+                all?: boolean;
+                location_ids?: string;
+                format?: components["parameters"]["ReportFormat"];
+            };
+            header?: never;
+            path: {
+                orgId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Report data or CSV export */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                    "text/csv": string;
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+        };
+    };
+    reportOrgCoversByDay: {
+        parameters: {
+            query: {
+                from: components["parameters"]["ReportFrom"];
+                to: components["parameters"]["ReportTo"];
+                all?: boolean;
+                location_ids?: string;
+                format?: components["parameters"]["ReportFormat"];
+            };
+            header?: never;
+            path: {
+                orgId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Report data or CSV export */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                    "text/csv": string;
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+        };
+    };
+    reportOrgLaborHours: {
+        parameters: {
+            query: {
+                from: components["parameters"]["ReportFrom"];
+                to: components["parameters"]["ReportTo"];
+                all?: boolean;
+                location_ids?: string;
+                format?: components["parameters"]["ReportFormat"];
+            };
+            header?: never;
+            path: {
+                orgId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Report data or CSV export */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                    "text/csv": string;
                 };
             };
             401: components["responses"]["Error"];

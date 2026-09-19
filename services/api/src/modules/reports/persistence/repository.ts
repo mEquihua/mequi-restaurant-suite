@@ -178,3 +178,170 @@ export const tips = (trx: DatabaseTransaction, range: ReportRange) =>
     SELECT coalesce(sum(tip_amount), 0)::bigint AS total_tips FROM payments
     WHERE location_id = ${range.locationId} AND status = 'COMPLETED' AND created_at >= ${range.from} AND created_at < ${range.to}
   `);
+
+export const salesByChannel = (trx: DatabaseTransaction, range: ReportRange) =>
+  run(trx, sql`
+    WITH eligible_lines AS (
+      SELECT
+        ol.id as line_id,
+        ol.order_id,
+        o.order_type,
+        o.created_at as order_created_at,
+        ol.account_id,
+        (ol.quantity * ol.unit_price) AS line_gross
+      FROM order_lines ol
+      JOIN orders o ON o.id = ol.order_id
+      WHERE ol.location_id = ${range.locationId}
+        AND ol.status NOT IN ('VOIDED', 'CANCELLED', 'REJECTED')
+        AND o.status != 'CANCELLED'
+    ),
+    account_totals AS (
+      SELECT account_id, SUM(line_gross) as account_gross
+      FROM eligible_lines
+      GROUP BY account_id
+      HAVING SUM(line_gross) > 0
+    ),
+    report_discounts AS (
+      SELECT account_id, SUM(computed_amount) as amount
+      FROM account_discounts
+      WHERE location_id = ${range.locationId}
+        AND created_at >= ${range.from} AND created_at < ${range.to}
+      GROUP BY account_id
+    ),
+    report_refunds AS (
+      SELECT p.account_id, SUM(r.amount) as amount
+      FROM refunds r
+      JOIN payments p ON p.id = r.payment_id
+      WHERE r.location_id = ${range.locationId}
+        AND r.created_at >= ${range.from} AND r.created_at < ${range.to}
+      GROUP BY p.account_id
+    ),
+    allocations AS (
+      SELECT
+        el.line_id,
+        el.account_id,
+        COALESCE(rd.amount, 0) as discount_to_allocate,
+        COALESCE(rr.amount, 0) as refund_to_allocate,
+        FLOOR(COALESCE(rd.amount, 0) * el.line_gross::numeric / at.account_gross::numeric)::bigint as base_discount,
+        FLOOR(COALESCE(rr.amount, 0) * el.line_gross::numeric / at.account_gross::numeric)::bigint as base_refund,
+        (COALESCE(rd.amount, 0) * el.line_gross::numeric / at.account_gross::numeric) - FLOOR(COALESCE(rd.amount, 0) * el.line_gross::numeric / at.account_gross::numeric) as discount_frac,
+        (COALESCE(rr.amount, 0) * el.line_gross::numeric / at.account_gross::numeric) - FLOOR(COALESCE(rr.amount, 0) * el.line_gross::numeric / at.account_gross::numeric) as refund_frac
+      FROM eligible_lines el
+      JOIN account_totals at ON at.account_id = el.account_id
+      LEFT JOIN report_discounts rd ON rd.account_id = el.account_id
+      LEFT JOIN report_refunds rr ON rr.account_id = el.account_id
+      WHERE COALESCE(rd.amount, 0) > 0 OR COALESCE(rr.amount, 0) > 0
+    ),
+    discount_ranks AS (
+      SELECT
+        line_id,
+        base_discount,
+        discount_to_allocate - SUM(base_discount) OVER (PARTITION BY account_id) as discount_remainder_cents,
+        ROW_NUMBER() OVER (PARTITION BY account_id ORDER BY discount_frac DESC, line_id ASC) as discount_rank,
+        base_refund,
+        refund_to_allocate - SUM(base_refund) OVER (PARTITION BY account_id) as refund_remainder_cents,
+        ROW_NUMBER() OVER (PARTITION BY account_id ORDER BY refund_frac DESC, line_id ASC) as refund_rank
+      FROM allocations
+    ),
+    final_allocations AS (
+      SELECT
+        line_id,
+        base_discount + CASE WHEN discount_rank <= discount_remainder_cents THEN 1 ELSE 0 END as allocated_discount,
+        base_refund + CASE WHEN refund_rank <= refund_remainder_cents THEN 1 ELSE 0 END as allocated_refund
+      FROM discount_ranks
+    ),
+    channel_lines AS (
+      SELECT
+        el.order_type,
+        el.order_id,
+        CASE WHEN el.order_created_at >= ${range.from} AND el.order_created_at < ${range.to} THEN el.line_gross ELSE 0 END as gross_sales,
+        COALESCE(fa.allocated_discount, 0) as discounts,
+        COALESCE(fa.allocated_refund, 0) as refunds,
+        CASE WHEN el.order_created_at >= ${range.from} AND el.order_created_at < ${range.to} THEN 1 ELSE 0 END as is_in_range
+      FROM eligible_lines el
+      LEFT JOIN final_allocations fa ON fa.line_id = el.line_id
+      WHERE (el.order_created_at >= ${range.from} AND el.order_created_at < ${range.to})
+         OR COALESCE(fa.allocated_discount, 0) > 0
+         OR COALESCE(fa.allocated_refund, 0) > 0
+    )
+    SELECT
+      order_type as channel,
+      COUNT(DISTINCT CASE WHEN is_in_range = 1 THEN order_id END)::bigint AS order_count,
+      SUM(gross_sales)::bigint AS gross_sales,
+      SUM(discounts)::bigint AS discounts,
+      SUM(refunds)::bigint AS refunds,
+      (SUM(gross_sales) - SUM(discounts) - SUM(refunds))::bigint AS net_sales
+    FROM channel_lines
+    GROUP BY order_type
+    ORDER BY (SUM(gross_sales) - SUM(discounts) - SUM(refunds)) DESC, order_type ASC
+  `);
+
+export const coversByDay = (trx: DatabaseTransaction, range: ReportRange) =>
+  run(trx, sql`
+    WITH completed_visits AS (
+      SELECT
+        v.id,
+        v.guest_count,
+        DATE(v.closed_at AT TIME ZONE l.timezone) as day
+      FROM visits v
+      JOIN locations l ON l.id = v.location_id
+      WHERE v.location_id = ${range.locationId}
+        AND v.status = 'COMPLETED'
+        AND v.closed_at IS NOT NULL
+        AND v.closed_at >= ${range.from} AND v.closed_at < ${range.to}
+    )
+    SELECT
+      to_char(day, 'YYYY-MM-DD') AS day,
+      COUNT(id)::bigint AS completed_visit_count,
+      COUNT(CASE WHEN guest_count >= 0 THEN 1 END)::bigint AS visits_with_guest_count,
+      COALESCE(SUM(CASE WHEN guest_count >= 0 THEN guest_count ELSE 0 END), 0)::bigint AS total_covers,
+      (COALESCE(SUM(CASE WHEN guest_count >= 0 THEN guest_count ELSE 0 END), 0)::numeric / NULLIF(COUNT(CASE WHEN guest_count >= 0 THEN 1 END), 0))::numeric(10,2) AS average_covers_per_visit
+    FROM completed_visits
+    GROUP BY day
+    ORDER BY day ASC
+  `);
+
+export const laborHours = (trx: DatabaseTransaction, range: ReportRange) =>
+  run(trx, sql`
+    WITH shifts AS (
+      SELECT
+        ts.staff_id,
+        ts.clocked_in_at,
+        ts.clocked_out_at,
+        s.first_name,
+        s.last_name,
+        EXTRACT(EPOCH FROM (ts.clocked_out_at - ts.clocked_in_at)) / 3600 AS hours
+      FROM timeclock_shifts ts
+      JOIN staff s ON s.id = ts.staff_id
+      WHERE ts.location_id = ${range.locationId}
+        AND ts.clocked_in_at >= ${range.from} AND ts.clocked_in_at < ${range.to}
+        AND ts.status = 'CLOSED'
+        AND ts.clocked_out_at IS NOT NULL
+        AND ts.clocked_out_at >= ts.clocked_in_at
+    ),
+    staff_totals AS (
+      SELECT
+        staff_id,
+        first_name,
+        last_name,
+        COUNT(*)::bigint AS shift_count,
+        SUM(hours)::numeric(10, 2) AS hours_worked
+      FROM shifts
+      GROUP BY staff_id, first_name, last_name
+    ),
+    location_total AS (
+      SELECT
+        SUM(hours)::numeric(10, 2) AS location_total_hours
+      FROM shifts
+    )
+    SELECT
+      st.staff_id,
+      st.first_name,
+      st.last_name,
+      st.shift_count,
+      st.hours_worked,
+      lt.location_total_hours
+    FROM staff_totals st
+    CROSS JOIN location_total lt
+    ORDER BY st.hours_worked DESC, st.last_name, st.first_name
+  `);

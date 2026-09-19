@@ -1344,6 +1344,9 @@ const reportEndpoints = [
   ['Voids & cancellations', 'voids-and-cancellations', 'reports.audit.read'],
   ['Refunds', 'refunds', 'reports.audit.read'],
   ['Tips', 'tips', 'reports.sales.read'],
+  ['Sales by channel', 'sales/by-channel', 'reports.sales.read'],
+  ['Covers by day', 'covers/by-day', 'reports.sales.read'],
+  ['Labor hours', 'labor/hours', 'reports.audit.read'],
 ] as const;
 function Reports({ permissions, organizationId, reportLocations }: { permissions: string[]; organizationId: string; reportLocations: string[] }) {
   const [from, setFrom] = useState(() => new Date(Date.now() - 6 * 86400000).toISOString().slice(0, 10));

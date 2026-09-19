@@ -96,6 +96,7 @@ describeIntegration('orders API reads and table side effects against PostgreSQL'
       'delivery_zones',
       'scheduled_order_settings',
       'locations',
+      'webhook_subscriptions',
       'organizations',
       ] as const)
       await db.deleteFrom(table).execute();

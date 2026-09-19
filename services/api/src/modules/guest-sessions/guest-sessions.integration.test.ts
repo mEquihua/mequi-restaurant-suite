@@ -86,6 +86,7 @@ describeIntegration('guest table sessions against PostgreSQL', () => {
       'delivery_zones',
       'scheduled_order_settings',
       'locations',
+      'webhook_subscriptions',
       'organizations'
     ] as const) await db.deleteFrom(name).execute();
     organization = (await db.insertInto('organizations').values({ name: 'Guest sessions' }).returning('id').executeTakeFirstOrThrow()).id;

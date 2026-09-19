@@ -94,6 +94,7 @@ describeIntegration('Delivery Zones & Checkout Enforcement', () => {
       'delivery_zones',
       'scheduled_order_settings',
       'locations',
+      'webhook_subscriptions',
       'organizations'
     ] as const) {
       await db.deleteFrom(table).execute();

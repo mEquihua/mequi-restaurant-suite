@@ -92,6 +92,7 @@ describeIntegration('promotions module', () => {
       'delivery_zones',
       'scheduled_order_settings',
       'locations',
+      'webhook_subscriptions',
       'organizations',
     ])
       await db.deleteFrom(table as never).execute();

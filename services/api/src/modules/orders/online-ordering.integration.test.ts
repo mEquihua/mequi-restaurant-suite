@@ -92,6 +92,7 @@ describeIntegration('online ordering list endpoint integration tests against Pos
       'delivery_zones',
       'scheduled_order_settings',
       'locations',
+      'webhook_subscriptions',
       'organizations'
     ] as const) {
       await db.deleteFrom(name).execute().catch(() => {});

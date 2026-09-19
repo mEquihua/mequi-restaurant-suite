@@ -143,19 +143,13 @@ describeIntegration('webhooks module', () => {
       .values({ staff_id: staff.id, role_id: role.id, location_id: null })
       .execute();
 
-    const token = randomBytes(32).toString('base64url');
-    await db
-      .insertInto('staff_sessions')
-      .values({
-        staff_id: staff.id,
-        location_id: locationId,
-        terminal_id: termId,
-        token_hash: createHash('sha256').update(token).digest('hex'),
-        expires_at: new Date(Date.now() + 86400 * 1000),
-      })
-      .execute();
-
-    staffSession = `${staff.id}.${token}`;
+    const unlock = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/pin-unlock',
+      headers: { 'X-Terminal-Credential': cred },
+      payload: { staff_id: staff.id, pin: '1234' },
+    });
+    staffSession = unlock.json().token;
     await app.ready();
   });
 
@@ -189,8 +183,8 @@ describeIntegration('webhooks module', () => {
     });
     expect(listRes.statusCode).toBe(200);
     const list = JSON.parse(listRes.payload);
-    expect(list.items).toHaveLength(1);
-    expect(list.items[0].id).toBe(subId);
+    expect(list.data).toHaveLength(1);
+    expect(list.data[0].id).toBe(subId);
 
     // Update
     const updateRes = await app.inject({
